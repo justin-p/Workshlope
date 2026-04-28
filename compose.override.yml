@@ -49,8 +49,7 @@ services:
     restart: "no"
     ports:
       - "5432:5432"
-    env_file:
-      - .env.local
+
 
   adminer:
     restart: "no"
@@ -88,8 +87,6 @@ services:
       SMTP_PORT: "1025"
       SMTP_TLS: "false"
       EMAILS_FROM_EMAIL: "noreply@example.com"
-    env_file:
-      - .env.local
 
   mailcatcher:
     image: schickling/mailcatcher
@@ -103,6 +100,10 @@ services:
       # Bind only to localhost so the Auth.js bridge isn't exposed to the LAN
       # in dev. The frontend running on the host can still reach it.
       - "127.0.0.1:3001:3001"
+    environment:
+      NODE_ENV: production
+      GITHUB_BRIDGE_ISSUER: ${GITHUB_BRIDGE_ISSUER:-authjs}
+      GITHUB_BRIDGE_AUDIENCE: ${GITHUB_BRIDGE_AUDIENCE:-fastapi-bridge}
 
   frontend:
     restart: "no"
@@ -128,8 +129,6 @@ services:
     depends_on:
       - backend
       - mailcatcher
-    env_file:
-      - .env.local
     environment:
       - VITE_API_URL=http://backend:8000
       - MAILCATCHER_HOST=http://mailcatcher:1080

@@ -1,0 +1,18 @@
+---
+description: Use .env.local for Docker Compose lifecycle commands
+alwaysApply: true
+---
+
+# Docker Compose Env File Rule
+
+When running Docker Compose commands in this repository, always use `.env.local`.
+
+- For start/stop/restart/status/logs/config commands, prefer:
+  - `docker compose --env-file .env.local up ...`
+  - `docker compose --env-file .env.local down ...`
+  - `docker compose --env-file .env.local ps`
+  - `docker compose --env-file .env.local logs ...`
+  - `docker compose --env-file .env.local config`
+- Run commands from the repo root: `/home/justin-p/_git/github/testing`.
+- Do not assume `.env` is the desired source for local development credentials.
+- If a command was run without `--env-file .env.local`, rerun it with the flag.

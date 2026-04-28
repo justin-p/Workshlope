@@ -3,6 +3,11 @@
   "hooks": {
     "beforeShellExecution": [
       {
+        "command": ".cursor/hooks/docker-compose-env-local-guard.sh",
+        "matcher": "^docker\\s+compose\\b",
+        "failClosed": true
+      },
+      {
         "command": ".cursor/hooks/playwright-precommit-guard.sh",
         "matcher": "^git\\s+commit\\b",
         "failClosed": true
