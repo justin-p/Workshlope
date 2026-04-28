@@ -68,7 +68,9 @@ test.describe("Admin Users page - pending GitHub flow", () => {
     ).toHaveCount(0)
   })
 
-  test("admin can approve by linking to an existing user", async ({ page }) => {
+  test("admin can approve by linking to an existing user", async ({
+    page,
+  }) => {
     const { email } = await createUserViaAdminUi(page)
     const providerAccountId = await uniqueProviderAccountId()
     await createPendingViaBridge({
@@ -92,10 +94,15 @@ test.describe("Admin Users page - pending GitHub flow", () => {
       page.getByTestId(`pending-row-${providerAccountId}`),
     ).toHaveCount(0)
 
-    // Confirm linked badge appears in the Users tab.
+    // Confirm user is linked by checking the Manage GitHub status dialog.
     await page.getByTestId("users-tab-users").click()
     const userRow = page.getByRole("row").filter({ hasText: email })
-    await expect(userRow.getByText("octo-link")).toBeVisible()
+    await expect(userRow).toBeVisible()
+    await userRow.getByRole("button").last().click()
+    await page.getByRole("menuitem", { name: "Manage GitHub" }).click()
+    await expect(page.getByTestId("github-link-status")).not.toContainText(
+      /No GitHub account linked/i,
+    )
   })
 
   test("admin can approve by creating a new user", async ({ page }) => {

@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlmodel import Session, col, select
+from sqlmodel import Session, select
 
 from app.core.security import get_password_hash, verify_password
 from app.models import (
@@ -161,7 +161,7 @@ def list_pending_github_logins(
     count = len(session.exec(count_stmt).all())
     statement = (
         select(PendingGitHubLogin)
-        .order_by(col(PendingGitHubLogin.last_seen_at).desc())
+        .order_by(PendingGitHubLogin.last_seen_at.desc())  # type: ignore[union-attr]
         .offset(skip)
         .limit(limit)
     )

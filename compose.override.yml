@@ -49,6 +49,8 @@ services:
     restart: "no"
     ports:
       - "5432:5432"
+    env_file:
+      - .env.local
 
   adminer:
     restart: "no"
@@ -86,6 +88,8 @@ services:
       SMTP_PORT: "1025"
       SMTP_TLS: "false"
       EMAILS_FROM_EMAIL: "noreply@example.com"
+    env_file:
+      - .env.local
 
   mailcatcher:
     image: schickling/mailcatcher

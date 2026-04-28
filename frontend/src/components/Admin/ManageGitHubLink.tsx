@@ -30,10 +30,7 @@ function useGitHubLink(userId: string) {
   })
 }
 
-export const ManageGitHubLink = ({
-  user,
-  onSuccess,
-}: ManageGitHubLinkProps) => {
+export const ManageGitHubLink = ({ user, onSuccess }: ManageGitHubLinkProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
