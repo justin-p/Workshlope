@@ -85,6 +85,11 @@ class Settings(BaseSettings):
 
     EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48
 
+    # GitHub OAuth bridge (Auth.js -> FastAPI)
+    GITHUB_BRIDGE_SECRET: str | None = None
+    GITHUB_BRIDGE_AUDIENCE: str = "fastapi-bridge"
+    GITHUB_BRIDGE_ISSUER: str = "authjs"
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def emails_enabled(self) -> bool:

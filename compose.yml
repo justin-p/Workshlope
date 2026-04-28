@@ -136,6 +136,32 @@ services:
       # Enable redirection for HTTP and HTTPS
       - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.middlewares=https-redirect
 
+  authjs-service:
+    image: 'authjs-service:${TAG-latest}'
+    restart: always
+    build:
+      context: ./authjs-service
+      dockerfile: Dockerfile
+    networks:
+      - default
+    environment:
+      - NODE_ENV=production
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID?Variable not set}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET?Variable not set}
+      - GITHUB_BRIDGE_SECRET=${GITHUB_BRIDGE_SECRET?Variable not set}
+      - GITHUB_BRIDGE_ISSUER=${GITHUB_BRIDGE_ISSUER:-authjs}
+      - GITHUB_BRIDGE_AUDIENCE=${GITHUB_BRIDGE_AUDIENCE:-fastapi-bridge}
+      - FRONTEND_CALLBACK_URL=${FRONTEND_CALLBACK_URL?Variable not set}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3001/api/bridge/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   frontend:
     image: '${DOCKER_IMAGE_FRONTEND?Variable not set}:${TAG-latest}'
     restart: always
@@ -147,6 +173,7 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         - VITE_API_URL=https://api.${DOMAIN?Variable not set}
+        - VITE_AUTHJS_URL=${VITE_AUTHJS_URL:-http://localhost:3001}
         - NODE_ENV=production
     labels:
       - traefik.enable=true

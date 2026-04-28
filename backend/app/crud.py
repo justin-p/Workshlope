@@ -1,10 +1,20 @@
+import secrets
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlmodel import Session, select
 
 from app.core.security import get_password_hash, verify_password
-from app.models import Item, ItemCreate, User, UserCreate, UserUpdate
+from app.models import (
+    Item,
+    ItemCreate,
+    OAuthAccount,
+    PendingGitHubLogin,
+    User,
+    UserCreate,
+    UserUpdate,
+)
 
 
 def create_user(*, session: Session, user_create: UserCreate) -> User:
@@ -66,3 +76,182 @@ def create_item(*, session: Session, item_in: ItemCreate, owner_id: uuid.UUID) -
     session.commit()
     session.refresh(db_item)
     return db_item
+
+
+# ---------------------------------------------------------------------------
+# OAuth accounts (GitHub) and pending logins
+# ---------------------------------------------------------------------------
+
+
+def get_oauth_account(
+    *, session: Session, provider: str, provider_account_id: str
+) -> OAuthAccount | None:
+    statement = select(OAuthAccount).where(
+        OAuthAccount.provider == provider,
+        OAuthAccount.provider_account_id == provider_account_id,
+    )
+    return session.exec(statement).first()
+
+
+def get_oauth_account_for_user(
+    *, session: Session, user_id: uuid.UUID, provider: str
+) -> OAuthAccount | None:
+    statement = select(OAuthAccount).where(
+        OAuthAccount.user_id == user_id,
+        OAuthAccount.provider == provider,
+    )
+    return session.exec(statement).first()
+
+
+def create_oauth_account(
+    *,
+    session: Session,
+    user_id: uuid.UUID,
+    provider: str,
+    provider_account_id: str,
+    provider_login: str | None = None,
+    linked_by_user_id: uuid.UUID | None = None,
+) -> OAuthAccount:
+    db_obj = OAuthAccount(
+        user_id=user_id,
+        provider=provider,
+        provider_account_id=str(provider_account_id),
+        provider_login=provider_login,
+        linked_by_user_id=linked_by_user_id,
+    )
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj
+
+
+def delete_oauth_account_for_user(
+    *, session: Session, user_id: uuid.UUID, provider: str
+) -> bool:
+    existing = get_oauth_account_for_user(
+        session=session, user_id=user_id, provider=provider
+    )
+    if not existing:
+        return False
+    session.delete(existing)
+    session.commit()
+    return True
+
+
+def get_pending_github_login(
+    *, session: Session, provider: str, provider_account_id: str
+) -> PendingGitHubLogin | None:
+    statement = select(PendingGitHubLogin).where(
+        PendingGitHubLogin.provider == provider,
+        PendingGitHubLogin.provider_account_id == provider_account_id,
+    )
+    return session.exec(statement).first()
+
+
+def get_pending_github_login_by_id(
+    *, session: Session, pending_id: uuid.UUID
+) -> PendingGitHubLogin | None:
+    return session.get(PendingGitHubLogin, pending_id)
+
+
+def list_pending_github_logins(
+    *, session: Session, skip: int = 0, limit: int = 100
+) -> tuple[list[PendingGitHubLogin], int]:
+    count_stmt = select(PendingGitHubLogin)
+    count = len(session.exec(count_stmt).all())
+    statement = (
+        select(PendingGitHubLogin)
+        .order_by(PendingGitHubLogin.last_seen_at.desc())  # type: ignore[union-attr]
+        .offset(skip)
+        .limit(limit)
+    )
+    rows = list(session.exec(statement).all())
+    return rows, count
+
+
+def upsert_pending_github_login(
+    *,
+    session: Session,
+    provider: str,
+    provider_account_id: str,
+    provider_login: str | None = None,
+    email: str | None = None,
+    full_name: str | None = None,
+    avatar_url: str | None = None,
+) -> PendingGitHubLogin:
+    """Insert or update a pending GitHub login record for first-time logins.
+
+    Looks up by (provider, provider_account_id). If found, increments
+    ``attempt_count`` and refreshes profile fields + ``last_seen_at``. If not,
+    creates a new pending row.
+    """
+    now = datetime.now(timezone.utc)
+    existing = get_pending_github_login(
+        session=session,
+        provider=provider,
+        provider_account_id=provider_account_id,
+    )
+    if existing is not None:
+        existing.last_seen_at = now
+        existing.attempt_count = (existing.attempt_count or 0) + 1
+        if provider_login is not None:
+            existing.provider_login = provider_login
+        if email is not None:
+            existing.email = email
+        if full_name is not None:
+            existing.full_name = full_name
+        if avatar_url is not None:
+            existing.avatar_url = avatar_url
+        session.add(existing)
+        session.commit()
+        session.refresh(existing)
+        return existing
+
+    db_obj = PendingGitHubLogin(
+        provider=provider,
+        provider_account_id=str(provider_account_id),
+        provider_login=provider_login,
+        email=email,
+        full_name=full_name,
+        avatar_url=avatar_url,
+        first_seen_at=now,
+        last_seen_at=now,
+        attempt_count=1,
+    )
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj
+
+
+def delete_pending_github_login(
+    *, session: Session, pending: PendingGitHubLogin
+) -> None:
+    session.delete(pending)
+    session.commit()
+
+
+def create_user_from_github(
+    *,
+    session: Session,
+    email: str,
+    full_name: str | None = None,
+) -> User:
+    """Create a local user from a GitHub identity (no usable password).
+
+    The hashed_password is set to a random argon2 hash so password login is
+    effectively disabled until the admin sets one. ``is_active`` defaults to
+    True; ``is_superuser`` is False.
+    """
+    random_password = secrets.token_urlsafe(48)
+    db_obj = User(
+        email=email,
+        full_name=full_name,
+        is_active=True,
+        is_superuser=False,
+        hashed_password=get_password_hash(random_password),
+    )
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj

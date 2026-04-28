@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, PrivateCreateUserData, PrivateCreateUserResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
+import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, OauthBridgeLoginData, OauthBridgeLoginResponse, OauthListPendingLoginsData, OauthListPendingLoginsResponse, OauthApprovePendingLoginData, OauthApprovePendingLoginResponse, OauthDenyPendingLoginData, OauthDenyPendingLoginResponse, OauthGetLinkStatusData, OauthGetLinkStatusResponse, OauthAdminUnlinkGithubData, OauthAdminUnlinkGithubResponse, PrivateCreateUserData, PrivateCreateUserResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
 
 export class ItemsService {
     /**
@@ -205,6 +205,147 @@ export class LoginService {
             url: '/api/v1/password-recovery-html-content/{email}',
             path: {
                 email: data.email
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class OauthService {
+    /**
+     * Bridge Login
+     * Exchange a verified GitHub identity for an API JWT, or queue a pending request.
+     *
+     * - If the GitHub identity is already linked to an active user, returns
+     * ``status="signed_in"`` with an access token.
+     * - If the linked user is inactive, returns 403.
+     * - Otherwise, upserts a pending-approval record and returns
+     * ``status="pending_approval"`` with the pending row id.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns BridgeResponse Successful Response
+     * @throws ApiError
+     */
+    public static bridgeLogin(data: OauthBridgeLoginData): CancelablePromise<OauthBridgeLoginResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/oauth/github/bridge',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Pending Logins
+     * Admin: list pending GitHub login requests (most recent first).
+     * @param data The data for the request.
+     * @param data.skip
+     * @param data.limit
+     * @returns PendingGitHubLoginsPublic Successful Response
+     * @throws ApiError
+     */
+    public static listPendingLogins(data: OauthListPendingLoginsData = {}): CancelablePromise<OauthListPendingLoginsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/oauth/github/pending',
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Approve Pending Login
+     * Admin: approve a pending GitHub login.
+     *
+     * The body must include exactly one of ``user_id`` (link to an existing user)
+     * or ``create_user=true`` (create a new user from the pending profile and
+     * link to it).
+     * @param data The data for the request.
+     * @param data.pendingId
+     * @param data.requestBody
+     * @returns OAuthAccountPublic Successful Response
+     * @throws ApiError
+     */
+    public static approvePendingLogin(data: OauthApprovePendingLoginData): CancelablePromise<OauthApprovePendingLoginResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/oauth/github/pending/{pending_id}/approve',
+            path: {
+                pending_id: data.pendingId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Deny Pending Login
+     * Admin: deny a pending request by deleting it.
+     * @param data The data for the request.
+     * @param data.pendingId
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static denyPendingLogin(data: OauthDenyPendingLoginData): CancelablePromise<OauthDenyPendingLoginResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/oauth/github/pending/{pending_id}',
+            path: {
+                pending_id: data.pendingId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Link Status
+     * Return the GitHub link for a user, or ``null`` if none.
+     * @param data The data for the request.
+     * @param data.userId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getLinkStatus(data: OauthGetLinkStatusData): CancelablePromise<OauthGetLinkStatusResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/oauth/github/users/{user_id}/status',
+            path: {
+                user_id: data.userId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Admin Unlink Github
+     * @param data The data for the request.
+     * @param data.userId
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static adminUnlinkGithub(data: OauthAdminUnlinkGithubData): CancelablePromise<OauthAdminUnlinkGithubResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/oauth/github/users/{user_id}/link',
+            path: {
+                user_id: data.userId
             },
             errors: {
                 422: 'Validation Error'

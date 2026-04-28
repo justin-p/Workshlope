@@ -24,6 +24,42 @@ docker compose --env-file .env.local up -d --build
 4. Open:
    - Frontend: `http://localhost:5173`
    - API docs: `http://localhost:8000/docs`
+   - Auth.js bridge health: `http://localhost:3001/api/bridge/health`
+
+## GitHub sign-in (pending-approval flow)
+
+This stack supports an optional "Continue with GitHub" sign-in via a sidecar
+[Auth.js](https://authjs.dev) (NextAuth v5) service. New GitHub identities do
+**not** automatically receive an account. Instead, the first time someone
+signs in with a previously-unknown GitHub account:
+
+1. The Auth.js service handles the OAuth handshake with GitHub.
+2. It mints a short-lived bridge token (HS256, shared secret with the FastAPI
+   backend) and redirects the browser to `/auth/callback` on the frontend.
+3. The FastAPI backend verifies the bridge token. If the GitHub identity is
+   already linked to an active local user, it issues an API JWT and the user
+   is signed in. Otherwise it creates a `pending_github_login` row and the
+   frontend shows an "awaiting admin approval" screen.
+4. A superuser opens the **Pending GitHub** tab in `/admin` and chooses one of
+   two approval paths per request:
+   - **Link to an existing user** — pick a local user from the dropdown; the
+     GitHub identity is attached to that user.
+   - **Create a new user** — a new local user is created from the GitHub
+     profile email/full-name (no usable password, GitHub-only sign-in).
+   - Or **Deny** — the pending row is deleted and no user is created.
+5. On the next GitHub login from that account, the user is signed in
+   automatically.
+
+`is_active=false` always blocks sign-in, even when the GitHub account is
+linked.
+
+To run the bridge service locally, set the following in `.env`:
+
+- `GITHUB_BRIDGE_SECRET` — strong random shared secret; used by both
+  `authjs-service` and the FastAPI backend.
+- `authjs-service/.env` — `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
+  `AUTH_SECRET`, `BRIDGE_SECRET` (= `GITHUB_BRIDGE_SECRET`),
+  `FRONTEND_CALLBACK_URL=http://localhost:5173/auth/callback`.
 
 ## Upstream template docs
 

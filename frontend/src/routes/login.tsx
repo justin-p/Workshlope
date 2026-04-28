@@ -9,6 +9,7 @@ import { z } from "zod"
 
 import type { Body_login_login_access_token as AccessToken } from "@/client"
 import { AuthLayout } from "@/components/Common/AuthLayout"
+import { GitHubLoginButton } from "@/components/Common/GitHubLoginButton"
 import {
   Form,
   FormControl,
@@ -127,6 +128,13 @@ function Login() {
             <LoadingButton type="submit" loading={loginMutation.isPending}>
               Log In
             </LoadingButton>
+
+            <div className="relative text-center text-xs uppercase tracking-wide text-muted-foreground">
+              <span className="bg-background relative z-10 px-2">or</span>
+              <div className="absolute inset-y-1/2 left-0 right-0 -z-0 border-t" />
+            </div>
+
+            <GitHubLoginButton />
           </div>
 
           <div className="text-center text-sm">

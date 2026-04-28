@@ -5,8 +5,15 @@ import { Suspense } from "react"
 import { type UserPublic, UsersService } from "@/client"
 import AddUser from "@/components/Admin/AddUser"
 import { columns, type UserTableData } from "@/components/Admin/columns"
+import { PendingGitHubLogins } from "@/components/Admin/PendingGitHubLogins"
 import { DataTable } from "@/components/Common/DataTable"
 import PendingUsers from "@/components/Pending/PendingUsers"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
 
 function getUsersQueryOptions() {
@@ -62,12 +69,31 @@ function Admin() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Users</h1>
           <p className="text-muted-foreground">
-            Manage user accounts and permissions
+            Manage user accounts, permissions, and pending GitHub sign-ins
           </p>
         </div>
         <AddUser />
       </div>
-      <UsersTable />
+
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList>
+          <TabsTrigger value="users" data-testid="users-tab-users">
+            Users
+          </TabsTrigger>
+          <TabsTrigger
+            value="pending-github"
+            data-testid="users-tab-pending-github"
+          >
+            Pending GitHub
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="users">
+          <UsersTable />
+        </TabsContent>
+        <TabsContent value="pending-github">
+          <PendingGitHubLogins />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
