@@ -19,10 +19,10 @@ def test_get_access_token(client: TestClient) -> None:
         "password": settings.FIRST_SUPERUSER_PASSWORD,
     }
     r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
-    tokens = r.json()
+    body = r.json()
     assert r.status_code == 200
-    assert "access_token" in tokens
-    assert tokens["access_token"]
+    assert body["token_type"] == "bearer"
+    assert r.cookies.get("access_token")
 
 
 def test_get_access_token_incorrect_password(client: TestClient) -> None:
@@ -148,8 +148,7 @@ def test_login_with_bcrypt_password_upgrades_to_argon2(
     login_data = {"username": email, "password": password}
     r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
     assert r.status_code == 200
-    tokens = r.json()
-    assert "access_token" in tokens
+    assert r.cookies.get("access_token")
 
     db.refresh(user)
 
@@ -182,8 +181,7 @@ def test_login_with_argon2_password_keeps_hash(client: TestClient, db: Session) 
     login_data = {"username": email, "password": password}
     r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
     assert r.status_code == 200
-    tokens = r.json()
-    assert "access_token" in tokens
+    assert r.cookies.get("access_token")
 
     db.refresh(user)
 

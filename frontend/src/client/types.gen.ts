@@ -22,14 +22,11 @@ export type Body_login_login_access_token = {
 /**
  * Discriminated response from the GitHub bridge endpoint.
  *
- * - ``status="signed_in"`` -> ``access_token`` and ``token_type`` are set,
- * ``pending_id`` is null.
- * - ``status="pending_approval"`` -> ``pending_id`` is set, token fields null.
+ * - ``status="signed_in"`` -> session cookie is set and ``pending_id`` is null.
+ * - ``status="pending_approval"`` -> ``pending_id`` is set.
  */
 export type BridgeResponse = {
     status: 'signed_in' | 'pending_approval';
-    access_token?: (string | null);
-    token_type?: (string | null);
     pending_id?: (string | null);
 };
 
@@ -110,7 +107,6 @@ export type PrivateUserCreate = {
 };
 
 export type Token = {
-    access_token: string;
     token_type?: string;
 };
 

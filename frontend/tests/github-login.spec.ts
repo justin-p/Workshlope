@@ -75,8 +75,6 @@ test.describe("GitHub auth callback page", () => {
         body: JSON.stringify({
           status: "pending_approval",
           pending_id: "00000000-0000-0000-0000-000000000001",
-          access_token: null,
-          token_type: null,
         }),
       })
     })

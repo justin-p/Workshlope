@@ -20,7 +20,8 @@ def get_superuser_token_headers(client: TestClient) -> dict[str, str]:
         "password": settings.FIRST_SUPERUSER_PASSWORD,
     }
     r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
-    tokens = r.json()
-    a_token = tokens["access_token"]
+    a_token = r.cookies.get("access_token")
+    if not a_token:
+        raise RuntimeError("Missing access token cookie after login")
     headers = {"Authorization": f"Bearer {a_token}"}
     return headers

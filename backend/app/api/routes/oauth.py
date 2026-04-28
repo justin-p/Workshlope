@@ -111,8 +111,6 @@ def bridge_login(
         _set_access_cookie(response, access_token)
         return BridgeResponse(
             status="signed_in",
-            access_token=access_token,
-            token_type="bearer",
         )
 
     pending = crud.upsert_pending_github_login(

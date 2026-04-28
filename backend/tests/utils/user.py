@@ -13,8 +13,10 @@ def user_authentication_headers(
     data = {"username": email, "password": password}
 
     r = client.post(f"{settings.API_V1_STR}/login/access-token", data=data)
-    response = r.json()
-    auth_token = response["access_token"]
+    assert r.status_code == 200
+    auth_token = r.cookies.get("access_token")
+    if not auth_token:
+        raise RuntimeError("Missing access token cookie after login")
     headers = {"Authorization": f"Bearer {auth_token}"}
     return headers
 

@@ -35,7 +35,7 @@ function AuthCallback() {
         requestBody: { bridge_token: input.bridge_token },
       }),
     onSuccess: (data) => {
-      if (data.status === "signed_in" && data.access_token) {
+      if (data.status === "signed_in") {
         setAuthSessionHint()
         navigate({ to: "/" })
       }

@@ -57,7 +57,6 @@ export function signBridgeToken(input: BridgeTokenInput): string {
 export async function createPendingViaBridge(input: BridgeTokenInput): Promise<{
   status: "signed_in" | "pending_approval"
   pending_id: string | null
-  access_token: string | null
 }> {
   const bridgeToken = signBridgeToken(input)
   const res = await fetch(`${apiBase}/api/v1/oauth/github/bridge`, {
@@ -87,8 +86,18 @@ export async function getApiTokenAsSuperuser(): Promise<string> {
   if (!res.ok) {
     throw new Error(`Login failed (${res.status}): ${await res.text()}`)
   }
-  const body = (await res.json()) as { access_token: string }
-  return body.access_token
+  const setCookie = res.headers.get("set-cookie")
+  if (!setCookie) {
+    throw new Error("Login response missing set-cookie header")
+  }
+  const tokenPart = setCookie
+    .split(",")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("access_token="))
+  if (!tokenPart) {
+    throw new Error("access_token cookie not found in login response")
+  }
+  return tokenPart.split(";")[0].replace("access_token=", "")
 }
 
 export async function deleteAllPending(): Promise<void> {

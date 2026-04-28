@@ -54,7 +54,7 @@ def login_access_token(
         user.id, expires_delta=access_token_expires
     )
     _set_access_cookie(response, access_token)
-    return Token(access_token=access_token)
+    return Token()
 
 
 @router.post("/login/logout", response_model=Message)

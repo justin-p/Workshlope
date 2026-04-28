@@ -91,28 +91,6 @@ export const BridgeResponseSchema = {
             enum: ['signed_in', 'pending_approval'],
             title: 'Status'
         },
-        access_token: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Access Token'
-        },
-        token_type: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Token Type'
-        },
         pending_id: {
             anyOf: [
                 {
@@ -131,9 +109,8 @@ export const BridgeResponseSchema = {
     title: 'BridgeResponse',
     description: `Discriminated response from the GitHub bridge endpoint.
 
-- \`\`status="signed_in"\`\` -> \`\`access_token\`\` and \`\`token_type\`\` are set,
-  \`\`pending_id\`\` is null.
-- \`\`status="pending_approval"\`\` -> \`\`pending_id\`\` is set, token fields null.`
+- \`\`status="signed_in"\`\` -> session cookie is set and \`\`pending_id\`\` is null.
+- \`\`status="pending_approval"\`\` -> \`\`pending_id\`\` is set.`
 } as const;
 
 export const GitHubBridgeRequestSchema = {
@@ -505,10 +482,6 @@ export const PrivateUserCreateSchema = {
 
 export const TokenSchema = {
     properties: {
-        access_token: {
-            type: 'string',
-            title: 'Access Token'
-        },
         token_type: {
             type: 'string',
             title: 'Token Type',
@@ -516,7 +489,6 @@ export const TokenSchema = {
         }
     },
     type: 'object',
-    required: ['access_token'],
     title: 'Token'
 } as const;
 

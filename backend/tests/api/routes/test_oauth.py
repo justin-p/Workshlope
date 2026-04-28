@@ -104,11 +104,10 @@ class TestBridgeLinkedFlow:
         assert r.status_code == 200
         body = r.json()
         assert body["status"] == "signed_in"
-        assert body["token_type"] == "bearer"
         assert body["pending_id"] is None
-        decoded = jwt.decode(
-            body["access_token"], settings.SECRET_KEY, algorithms=["HS256"]
-        )
+        cookie_token = r.cookies.get("access_token")
+        assert cookie_token
+        decoded = jwt.decode(cookie_token, settings.SECRET_KEY, algorithms=["HS256"])
         assert decoded["sub"] == str(user.id)
 
     def test_linked_inactive_user_denied(self, client: TestClient, db: Session) -> None:
@@ -137,7 +136,6 @@ class TestBridgePendingFlow:
         assert r.status_code == 200
         body = r.json()
         assert body["status"] == "pending_approval"
-        assert body["access_token"] is None
         assert body["pending_id"]
 
         pending = crud.get_pending_github_login(
@@ -190,7 +188,8 @@ class TestBridgeRolePreservation:
         token = _bridge_token(provider_account_id="1000")
         r = client.post(f"{API}/oauth/github/bridge", json={"bridge_token": token})
         assert r.status_code == 200
-        access_token = r.json()["access_token"]
+        access_token = r.cookies.get("access_token")
+        assert access_token
 
         me = client.get(
             f"{API}/users/me",

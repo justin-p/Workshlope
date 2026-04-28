@@ -116,7 +116,6 @@ class Message(SQLModel):
 
 # JSON payload containing access token
 class Token(SQLModel):
-    access_token: str
     token_type: str = "bearer"
 
 
@@ -240,12 +239,9 @@ class GitHubBridgeRequest(SQLModel):
 class BridgeResponse(SQLModel):
     """Discriminated response from the GitHub bridge endpoint.
 
-    - ``status="signed_in"`` -> ``access_token`` and ``token_type`` are set,
-      ``pending_id`` is null.
-    - ``status="pending_approval"`` -> ``pending_id`` is set, token fields null.
+    - ``status="signed_in"`` -> session cookie is set and ``pending_id`` is null.
+    - ``status="pending_approval"`` -> ``pending_id`` is set.
     """
 
     status: Literal["signed_in", "pending_approval"]
-    access_token: str | None = None
-    token_type: str | None = None
     pending_id: uuid.UUID | None = None
