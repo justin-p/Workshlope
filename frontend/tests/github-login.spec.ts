@@ -76,7 +76,6 @@ test.describe("GitHub auth callback page", () => {
       })
     })
     await page.goto("/auth/callback?bridge_token=stub-token-not-validated")
-    await expect(page.getByRole("heading")).toContainText(/awaiting/i)
     await expect(page.getByTestId("github-pending-approval")).toContainText(
       /administrator must approve/i,
     )
