@@ -12,6 +12,8 @@ wheels/
 # Python tooling caches
 .pytest_cache/
 .mypy_cache/
+.coverage
+coverage.xml
 
 # Environment files
 .env
