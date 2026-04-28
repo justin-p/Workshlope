@@ -224,19 +224,14 @@ test("User can switch between theme modes", async ({ page }) => {
 test("Selected mode is preserved across sessions", async ({ page }) => {
   await page.goto("/settings")
 
-  const themeButton = page.getByTestId("theme-button").first()
-  const darkModeOption = page.locator('[data-testid="dark-mode"]:visible').first()
-  const lightModeOption = page.locator('[data-testid="light-mode"]:visible').first()
-
-  await themeButton.click()
-  await expect(page.locator('[data-testid="light-mode"]:visible, [data-testid="dark-mode"]:visible').first()).toBeVisible()
+  await page.getByTestId("theme-button").click()
   if (
     await page.evaluate(() =>
       document.documentElement.classList.contains("dark"),
     )
   ) {
-    await lightModeOption.click()
-    await themeButton.click()
+    await page.getByTestId("light-mode").click()
+    await page.getByTestId("theme-button").click()
   }
 
   const isLightMode = await page.evaluate(() =>
@@ -244,9 +239,8 @@ test("Selected mode is preserved across sessions", async ({ page }) => {
   )
   expect(isLightMode).toBe(true)
 
-  await themeButton.click()
-  await expect(darkModeOption).toBeVisible()
-  await darkModeOption.click()
+  await page.getByTestId("theme-button").click()
+  await page.getByTestId("dark-mode").click()
   let isDarkMode = await page.evaluate(() =>
     document.documentElement.classList.contains("dark"),
   )

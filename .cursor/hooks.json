@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/playwright-precommit-guard.sh",
+        "matcher": "^git\\s+commit\\b",
+        "failClosed": true
+      }
+    ]
+  }
+}
