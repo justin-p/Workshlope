@@ -144,8 +144,7 @@ export function ApprovePendingDialog({
                 <div>
                   <div className="font-medium">Link to existing user</div>
                   <div className="text-muted-foreground text-xs">
-                    Pick an existing local user to link this GitHub identity
-                    to.
+                    Pick an existing local user to link this GitHub identity to.
                   </div>
                 </div>
               </label>

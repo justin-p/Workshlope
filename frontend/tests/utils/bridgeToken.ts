@@ -54,9 +54,7 @@ export function signBridgeToken(input: BridgeTokenInput): string {
  * Calls the bridge endpoint with a signed token to create or refresh a
  * pending GitHub login row. Returns the bridge response.
  */
-export async function createPendingViaBridge(
-  input: BridgeTokenInput,
-): Promise<{
+export async function createPendingViaBridge(input: BridgeTokenInput): Promise<{
   status: "signed_in" | "pending_approval"
   pending_id: string | null
   access_token: string | null
@@ -68,9 +66,7 @@ export async function createPendingViaBridge(
     body: JSON.stringify({ bridge_token: bridgeToken }),
   })
   if (!res.ok) {
-    throw new Error(
-      `Bridge call failed (${res.status}): ${await res.text()}`,
-    )
+    throw new Error(`Bridge call failed (${res.status}): ${await res.text()}`)
   }
   return await res.json()
 }
@@ -97,12 +93,9 @@ export async function getApiTokenAsSuperuser(): Promise<string> {
 
 export async function deleteAllPending(): Promise<void> {
   const token = await getApiTokenAsSuperuser()
-  const list = await fetch(
-    `${apiBase}/api/v1/oauth/github/pending?limit=200`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  )
+  const list = await fetch(`${apiBase}/api/v1/oauth/github/pending?limit=200`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
   if (!list.ok) return
   const body = (await list.json()) as {
     data: Array<{ id: string }>

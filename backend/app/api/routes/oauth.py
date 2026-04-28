@@ -115,9 +115,7 @@ def bridge_login(*, session: SessionDep, body: GitHubBridgeRequest) -> Any:
     dependencies=[Depends(get_current_active_superuser)],
     response_model=PendingGitHubLoginsPublic,
 )
-def list_pending_logins(
-    *, session: SessionDep, skip: int = 0, limit: int = 100
-) -> Any:
+def list_pending_logins(*, session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
     """Admin: list pending GitHub login requests (most recent first)."""
     rows, count = crud.list_pending_github_logins(
         session=session, skip=skip, limit=limit
@@ -195,10 +193,7 @@ def approve_pending_login(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Pending request has no email; cannot create a new user",
             )
-        if (
-            crud.get_user_by_email(session=session, email=pending.email)
-            is not None
-        ):
+        if crud.get_user_by_email(session=session, email=pending.email) is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="A user with this email already exists",

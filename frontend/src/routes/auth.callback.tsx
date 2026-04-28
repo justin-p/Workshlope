@@ -55,9 +55,7 @@ function AuthCallback() {
   const failureDetail =
     !isPending &&
     (error ||
-      (bridgeMutation.isError
-        ? extractDetail(bridgeMutation.error)
-        : null) ||
+      (bridgeMutation.isError ? extractDetail(bridgeMutation.error) : null) ||
       (!bridge_token ? "Missing bridge token from Auth.js" : null))
 
   return (

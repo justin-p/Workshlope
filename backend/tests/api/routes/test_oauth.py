@@ -111,9 +111,7 @@ class TestBridgeLinkedFlow:
         )
         assert decoded["sub"] == str(user.id)
 
-    def test_linked_inactive_user_denied(
-        self, client: TestClient, db: Session
-    ) -> None:
+    def test_linked_inactive_user_denied(self, client: TestClient, db: Session) -> None:
         user = _create_active_user(db, is_active=False)
         crud.create_oauth_account(
             session=db,
@@ -129,9 +127,7 @@ class TestBridgeLinkedFlow:
 class TestBridgePendingFlow:
     """First-time GitHub identities create a pending-approval record."""
 
-    def test_unlinked_creates_pending(
-        self, client: TestClient, db: Session
-    ) -> None:
+    def test_unlinked_creates_pending(self, client: TestClient, db: Session) -> None:
         token = _bridge_token(
             provider_account_id="42",
             provider_login="newcomer",
@@ -176,9 +172,7 @@ class TestBridgePendingFlow:
 class TestBridgeRolePreservation:
     """GitHub login must not change a user's role flags."""
 
-    def test_superuser_role_is_preserved(
-        self, client: TestClient, db: Session
-    ) -> None:
+    def test_superuser_role_is_preserved(self, client: TestClient, db: Session) -> None:
         user = crud.create_user(
             session=db,
             user_create=UserCreate(
@@ -217,9 +211,7 @@ class TestAdminPendingList:
         client: TestClient,
         normal_user_token_headers: dict[str, str],
     ) -> None:
-        r = client.get(
-            f"{API}/oauth/github/pending", headers=normal_user_token_headers
-        )
+        r = client.get(f"{API}/oauth/github/pending", headers=normal_user_token_headers)
         assert r.status_code == 403
 
     def test_list_returns_pending_rows(
@@ -235,9 +227,7 @@ class TestAdminPendingList:
             provider_login="octo",
             email="octo@example.com",
         )
-        r = client.get(
-            f"{API}/oauth/github/pending", headers=superuser_token_headers
-        )
+        r = client.get(f"{API}/oauth/github/pending", headers=superuser_token_headers)
         assert r.status_code == 200
         body = r.json()
         assert body["count"] >= 1
@@ -273,9 +263,7 @@ class TestAdminApproveLinkExisting:
         assert body["provider_login"] == "bob"
         db.expire_all()
         assert (
-            crud.get_pending_github_login_by_id(
-                session=db, pending_id=pending_id
-            )
+            crud.get_pending_github_login_by_id(session=db, pending_id=pending_id)
             is None
         )
 
@@ -493,9 +481,7 @@ class TestAdminDenyPending:
         assert r.status_code == 200
         db.expire_all()
         assert (
-            crud.get_pending_github_login_by_id(
-                session=db, pending_id=pending_id
-            )
+            crud.get_pending_github_login_by_id(session=db, pending_id=pending_id)
             is None
         )
 

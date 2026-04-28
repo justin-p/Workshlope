@@ -19,9 +19,7 @@ export function GitHubLinkBadge({ userId }: GitHubLinkBadgeProps) {
   }
 
   if (!data) {
-    return (
-      <span className="text-muted-foreground text-xs">Not linked</span>
-    )
+    return <span className="text-muted-foreground text-xs">Not linked</span>
   }
 
   return (
