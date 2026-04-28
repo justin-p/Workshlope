@@ -32,6 +32,8 @@ const formSchema = z.object({
 }) satisfies z.ZodType<AccessToken>
 
 type FormData = z.infer<typeof formSchema>
+const isUserRegistrationEnabled =
+  import.meta.env.VITE_USER_REGISTRATION_ENABLED !== "false"
 
 export const Route = createFileRoute("/login")({
   component: Login,
@@ -137,12 +139,14 @@ function Login() {
             <GitHubLoginButton />
           </div>
 
-          <div className="text-center text-sm">
-            Don't have an account yet?{" "}
-            <RouterLink to="/signup" className="underline underline-offset-4">
-              Sign up
-            </RouterLink>
-          </div>
+          {isUserRegistrationEnabled ? (
+            <div className="text-center text-sm">
+              Don't have an account yet?{" "}
+              <RouterLink to="/signup" className="underline underline-offset-4">
+                Sign up
+              </RouterLink>
+            </div>
+          ) : null}
         </form>
       </Form>
     </AuthLayout>

@@ -38,10 +38,17 @@ const formSchema = z
   })
 
 type FormData = z.infer<typeof formSchema>
+const isUserRegistrationEnabled =
+  import.meta.env.VITE_USER_REGISTRATION_ENABLED !== "false"
 
 export const Route = createFileRoute("/signup")({
   component: SignUp,
   beforeLoad: async () => {
+    if (!isUserRegistrationEnabled) {
+      throw redirect({
+        to: "/login",
+      })
+    }
     if (isLoggedIn()) {
       throw redirect({
         to: "/",

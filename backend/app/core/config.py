@@ -89,6 +89,7 @@ class Settings(BaseSettings):
     GITHUB_BRIDGE_SECRET: str | None = None
     GITHUB_BRIDGE_AUDIENCE: str = "fastapi-bridge"
     GITHUB_BRIDGE_ISSUER: str = "authjs"
+    USER_REGISTRATION_ENABLED: bool = True
 
     @computed_field  # type: ignore[prop-decorator]
     @property
