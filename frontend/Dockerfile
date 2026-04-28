@@ -13,6 +13,7 @@ RUN bun install
 
 COPY ./frontend /app/frontend
 ARG VITE_API_URL
+ARG VITE_AUTHJS_URL
 
 RUN bun run build
 

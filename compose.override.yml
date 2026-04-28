@@ -49,6 +49,8 @@ services:
     restart: "no"
     ports:
       - "5432:5432"
+    env_file:
+      - .env.local
 
   adminer:
     restart: "no"
@@ -86,12 +88,21 @@ services:
       SMTP_PORT: "1025"
       SMTP_TLS: "false"
       EMAILS_FROM_EMAIL: "noreply@example.com"
+    env_file:
+      - .env.local
 
   mailcatcher:
     image: schickling/mailcatcher
     ports:
       - "1080:1080"
       - "1025:1025"
+
+  authjs-service:
+    restart: "no"
+    ports:
+      # Bind only to localhost so the Auth.js bridge isn't exposed to the LAN
+      # in dev. The frontend running on the host can still reach it.
+      - "127.0.0.1:3001:3001"
 
   frontend:
     restart: "no"
@@ -102,6 +113,7 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         - VITE_API_URL=http://localhost:8000
+        - VITE_AUTHJS_URL=http://localhost:3001
         - NODE_ENV=development
 
   playwright:
@@ -110,13 +122,14 @@ services:
       dockerfile: frontend/Dockerfile.playwright
       args:
         - VITE_API_URL=http://backend:8000
+        - VITE_AUTHJS_URL=http://localhost:3001
         - NODE_ENV=production
     ipc: host
     depends_on:
       - backend
       - mailcatcher
     env_file:
-      - .env
+      - .env.local
     environment:
       - VITE_API_URL=http://backend:8000
       - MAILCATCHER_HOST=http://mailcatcher:1080

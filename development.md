@@ -113,7 +113,7 @@ There is a main `compose.yml` file with all the configurations that apply to the
 
 And there's also a `compose.override.yml` with overrides for development, for example to mount the source code as a volume. It is used automatically by `docker compose` to apply overrides on top of `compose.yml`.
 
-These Docker Compose files use the `.env` file containing configurations to be injected as environment variables in the containers.
+These Docker Compose files use the `.env.local` file containing configurations to be injected as environment variables in the containers.
 
 They also use some additional configurations taken from environment variables set in the scripts before calling the `docker compose` command.
 
@@ -123,9 +123,9 @@ After changing variables, make sure you restart the stack:
 docker compose watch
 ```
 
-## The .env file
+## The .env.local file
 
-The `.env` file is the one that contains all your configurations, generated keys and passwords, etc.
+The `.env.local` file is the one that contains all your local configurations, generated keys and passwords, etc.
 
 Depending on your workflow, you could want to exclude it from Git, for example if your project is public. In that case, you would have to make sure to set up a way for your CI tools to obtain it while building or deploying your project.
 
@@ -180,6 +180,66 @@ ruff-format..............................................................Passed
 biome check..............................................................Passed
 ```
 
+## GitHub sign-in (pending-approval flow)
+
+The optional GitHub OAuth path goes through a sidecar Next.js service running
+[Auth.js](https://authjs.dev) (NextAuth v5). The flow is:
+
+1. The user clicks **Continue with GitHub** on `/login`. The frontend
+   redirects to `http://localhost:3001/api/auth/signin?provider=github`.
+2. Auth.js performs the OAuth dance with GitHub, then redirects to its own
+   `/api/bridge` route, which mints an HS256 JWT (the **bridge token**) using
+   the shared `GITHUB_BRIDGE_SECRET` and redirects the browser to
+   `http://localhost:5173/auth/callback?bridge_token=...`.
+3. The frontend posts the bridge token to
+   `POST /api/v1/oauth/github/bridge` on the FastAPI backend. The backend
+   verifies the token (signature, audience, issuer, expiry) and either:
+   - returns `status="signed_in"` with an API JWT (the GitHub identity is
+     already linked to an active user), or
+   - returns `status="pending_approval"` and upserts a row in
+     `pending_github_login` (the GitHub identity is unknown or unlinked).
+4. Inactive linked users are rejected with `403`.
+5. The **Pending GitHub** tab in `/admin` lists pending requests. Superusers
+   approve them by either linking to an existing user or creating a new local
+   user from the pending profile (no usable password). Denying a request
+   deletes the row.
+
+### Local setup
+
+- Backend `.env.local` (top-level): set `GITHUB_BRIDGE_SECRET` to a strong random
+  value (must match `authjs-service/.env`'s `BRIDGE_SECRET`).
+- `authjs-service/.env`: copy from `authjs-service/.env.example` and fill in
+  `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from a GitHub OAuth app whose
+  authorization callback URL is `http://localhost:3001/api/auth/callback/github`.
+  Set `BRIDGE_SECRET` to the same value as `GITHUB_BRIDGE_SECRET` in the
+  backend `.env`.
+- Bring the stack up with `docker compose up -d`. Health-check the bridge:
+
+```bash
+curl -s http://localhost:3001/api/bridge/health | jq
+```
+
+### Testing the bridge directly (no GitHub round-trip)
+
+You can sign a bridge token in code (HS256, shared secret) and POST it
+straight to the backend to exercise the pending/approve/deny flow without
+hitting GitHub. The Playwright tests in
+`frontend/tests/admin-github-pending.spec.ts` use this approach via
+`frontend/tests/utils/bridgeToken.ts`.
+
+### Schema and routes
+
+- DB table: `pending_github_login` (unique on `provider`,
+  `provider_account_id`).
+- New routes (all admin-only except `bridge`):
+  - `POST /api/v1/oauth/github/bridge` (public, takes bridge token)
+  - `GET  /api/v1/oauth/github/pending`
+  - `POST /api/v1/oauth/github/pending/{id}/approve` — body must contain
+    exactly one of `user_id` or `create_user=true`.
+  - `DELETE /api/v1/oauth/github/pending/{id}` — deny / delete.
+  - `GET    /api/v1/oauth/github/users/{user_id}/status`
+  - `DELETE /api/v1/oauth/github/users/{user_id}/link` — unlink.
+
 ## URLs
 
 The production or staging URLs would use these same paths, but with your own domain.
@@ -195,6 +255,10 @@ Backend: <http://localhost:8000>
 Automatic Interactive Docs (Swagger UI): <http://localhost:8000/docs>
 
 Automatic Alternative Docs (ReDoc): <http://localhost:8000/redoc>
+
+Auth.js bridge service: <http://localhost:3001>
+
+Auth.js bridge health: <http://localhost:3001/api/bridge/health>
 
 Adminer: <http://localhost:8080>
 

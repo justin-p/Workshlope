@@ -56,7 +56,10 @@ test("Log in with invalid email", async ({ page }) => {
   await fillForm(page, "invalidemail", firstSuperuserPassword)
   await page.getByRole("button", { name: "Log In" }).click()
 
-  await expect(page.getByText("Invalid email address")).toBeVisible()
+  await expect(page.getByTestId("email-input")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  )
 })
 
 test("Log in with invalid password", async ({ page }) => {

@@ -34,3 +34,51 @@ def verify_password(
 
 def get_password_hash(password: str) -> str:
     return password_hash.hash(password)
+
+
+def verify_bridge_token(token: str) -> dict[str, Any]:
+    """Verify a signed bridge token issued by the Auth.js service.
+
+    Validates signature, audience, and expiry. Raises jwt.InvalidTokenError on any
+    failure (caller should map to HTTP 401).
+    """
+    if not settings.GITHUB_BRIDGE_SECRET:
+        raise jwt.InvalidTokenError("GITHUB_BRIDGE_SECRET is not configured")
+    return jwt.decode(
+        token,
+        settings.GITHUB_BRIDGE_SECRET,
+        algorithms=[ALGORITHM],
+        audience=settings.GITHUB_BRIDGE_AUDIENCE,
+        issuer=settings.GITHUB_BRIDGE_ISSUER,
+    )
+
+
+def create_bridge_token(
+    *,
+    provider: str = "github",
+    provider_account_id: str,
+    provider_login: str | None = None,
+    email: str | None = None,
+    expires_delta: timedelta | None = None,
+) -> str:
+    """Create a signed bridge token. Used by the Auth.js service and tests.
+
+    Production Auth.js service uses the same shared secret (HS256) to sign.
+    """
+    if not settings.GITHUB_BRIDGE_SECRET:
+        raise RuntimeError("GITHUB_BRIDGE_SECRET is not configured")
+    expires_delta = expires_delta or timedelta(minutes=5)
+    now = datetime.now(timezone.utc)
+    payload: dict[str, Any] = {
+        "iss": settings.GITHUB_BRIDGE_ISSUER,
+        "aud": settings.GITHUB_BRIDGE_AUDIENCE,
+        "iat": now,
+        "exp": now + expires_delta,
+        "provider": provider,
+        "provider_account_id": str(provider_account_id),
+    }
+    if provider_login is not None:
+        payload["provider_login"] = provider_login
+    if email is not None:
+        payload["email"] = email
+    return jwt.encode(payload, settings.GITHUB_BRIDGE_SECRET, algorithm=ALGORITHM)

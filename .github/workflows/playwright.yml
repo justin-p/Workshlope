@@ -68,6 +68,11 @@ jobs:
     - run: bun ci
       working-directory: frontend
     - run: bash scripts/generate-client.sh
+    - name: Prepare local env file
+      run: |
+        cp .env .env.local
+        echo "USER_REGISTRATION_ENABLED=true" >> .env.local
+        echo "VITE_USER_REGISTRATION_ENABLED=true" >> .env.local
     - run: docker compose build
     - run: docker compose down -v --remove-orphans
     - name: Run Playwright tests
