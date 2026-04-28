@@ -208,6 +208,8 @@ export type LoginLoginAccessTokenData = {
 
 export type LoginLoginAccessTokenResponse = (Token);
 
+export type LoginLogoutResponse = (Message);
+
 export type LoginTestTokenResponse = (UserPublic);
 
 export type LoginRecoverPasswordData = {

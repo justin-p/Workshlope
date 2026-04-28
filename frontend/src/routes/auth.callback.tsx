@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react"
 import { OauthService } from "@/client"
 import { AuthLayout } from "@/components/Common/AuthLayout"
 import { Button } from "@/components/ui/button"
+import { setAuthSessionHint } from "@/utils/authSession"
 
 interface CallbackSearch {
   bridge_token?: string
@@ -35,7 +36,7 @@ function AuthCallback() {
       }),
     onSuccess: (data) => {
       if (data.status === "signed_in" && data.access_token) {
-        localStorage.setItem("access_token", data.access_token)
+        setAuthSessionHint()
         navigate({ to: "/" })
       }
     },

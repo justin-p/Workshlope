@@ -9,10 +9,15 @@ import {
   UsersService,
 } from "@/client"
 import { handleError } from "@/utils"
+import {
+  clearAuthSessionHint,
+  hasAuthSessionHint,
+  setAuthSessionHint,
+} from "@/utils/authSession"
 import useCustomToast from "./useCustomToast"
 
 const isLoggedIn = () => {
-  return localStorage.getItem("access_token") !== null
+  return hasAuthSessionHint()
 }
 
 const useAuth = () => {
@@ -39,10 +44,10 @@ const useAuth = () => {
   })
 
   const login = async (data: AccessToken) => {
-    const response = await LoginService.loginAccessToken({
+    await LoginService.loginAccessToken({
       formData: data,
     })
-    localStorage.setItem("access_token", response.access_token)
+    setAuthSessionHint()
   }
 
   const loginMutation = useMutation({
@@ -53,8 +58,12 @@ const useAuth = () => {
     onError: handleError.bind(showErrorToast),
   })
 
-  const logout = () => {
-    localStorage.removeItem("access_token")
+  const logout = async () => {
+    await fetch(`${import.meta.env.VITE_API_URL}/api/v1/login/logout`, {
+      method: "POST",
+      credentials: "include",
+    })
+    clearAuthSessionHint()
     navigate({ to: "/login" })
   }
 

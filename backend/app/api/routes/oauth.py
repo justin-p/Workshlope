@@ -15,7 +15,7 @@ import uuid
 from datetime import timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from jwt.exceptions import InvalidTokenError
 
 from app import crud
@@ -36,6 +36,7 @@ from app.models import (
 router = APIRouter(prefix="/oauth/github", tags=["oauth"])
 
 PROVIDER = "github"
+ACCESS_TOKEN_COOKIE_NAME = "access_token"
 
 
 def _issue_access_token(user_id: uuid.UUID) -> str:
@@ -43,8 +44,22 @@ def _issue_access_token(user_id: uuid.UUID) -> str:
     return security.create_access_token(user_id, expires_delta=expires)
 
 
+def _set_access_cookie(response: Response, access_token: str) -> None:
+    response.set_cookie(
+        key=ACCESS_TOKEN_COOKIE_NAME,
+        value=access_token,
+        httponly=True,
+        secure=settings.ENVIRONMENT != "local",
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+
 @router.post("/bridge", response_model=BridgeResponse)
-def bridge_login(*, session: SessionDep, body: GitHubBridgeRequest) -> Any:
+def bridge_login(
+    *, response: Response, session: SessionDep, body: GitHubBridgeRequest
+) -> Any:
     """Exchange a verified GitHub identity for an API JWT, or queue a pending request.
 
     - If the GitHub identity is already linked to an active user, returns
@@ -92,9 +107,11 @@ def bridge_login(*, session: SessionDep, body: GitHubBridgeRequest) -> Any:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User is not active",
             )
+        access_token = _issue_access_token(user.id)
+        _set_access_cookie(response, access_token)
         return BridgeResponse(
             status="signed_in",
-            access_token=_issue_access_token(user.id),
+            access_token=access_token,
             token_type="bearer",
         )
 
