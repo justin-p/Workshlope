@@ -1,20 +1,2 @@
-[project]
-name = "testing"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = []
-
-[project.scripts]
-testing = "testing.cli:main"
-
-[tool.uv]
-dev-dependencies = [
-    "pytest>=9.0.3",
-    "pytest-cov>=7.1.0",
-]
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
+[tool.uv.workspace]
+members = ["backend"]
