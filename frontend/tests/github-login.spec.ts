@@ -75,9 +75,17 @@ test.describe("GitHub auth callback page", () => {
         }),
       })
     })
+    const bridgeResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/v1/oauth/github/bridge") &&
+        response.request().method() === "POST",
+    )
+
     await page.goto("/auth/callback?bridge_token=stub-token-not-validated")
+    await bridgeResponse
     await expect(page.getByTestId("github-pending-approval")).toContainText(
       /administrator must approve/i,
+      { timeout: 15000 },
     )
   })
 })
