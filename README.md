@@ -53,7 +53,7 @@ signs in with a previously-unknown GitHub account:
 `is_active=false` always blocks sign-in, even when the GitHub account is
 linked.
 
-To run the bridge service locally, set the following in `.env`:
+To run the bridge service locally, set the following in `.env.local`:
 
 - `GITHUB_BRIDGE_SECRET` — strong random shared secret; used by both
   `authjs-service` and the FastAPI backend.

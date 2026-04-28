@@ -113,7 +113,7 @@ There is a main `compose.yml` file with all the configurations that apply to the
 
 And there's also a `compose.override.yml` with overrides for development, for example to mount the source code as a volume. It is used automatically by `docker compose` to apply overrides on top of `compose.yml`.
 
-These Docker Compose files use the `.env` file containing configurations to be injected as environment variables in the containers.
+These Docker Compose files use the `.env.local` file containing configurations to be injected as environment variables in the containers.
 
 They also use some additional configurations taken from environment variables set in the scripts before calling the `docker compose` command.
 
@@ -123,9 +123,9 @@ After changing variables, make sure you restart the stack:
 docker compose watch
 ```
 
-## The .env file
+## The .env.local file
 
-The `.env` file is the one that contains all your configurations, generated keys and passwords, etc.
+The `.env.local` file is the one that contains all your local configurations, generated keys and passwords, etc.
 
 Depending on your workflow, you could want to exclude it from Git, for example if your project is public. In that case, you would have to make sure to set up a way for your CI tools to obtain it while building or deploying your project.
 
@@ -206,7 +206,7 @@ The optional GitHub OAuth path goes through a sidecar Next.js service running
 
 ### Local setup
 
-- Backend `.env` (top-level): set `GITHUB_BRIDGE_SECRET` to a strong random
+- Backend `.env.local` (top-level): set `GITHUB_BRIDGE_SECRET` to a strong random
   value (must match `authjs-service/.env`'s `BRIDGE_SECRET`).
 - `authjs-service/.env`: copy from `authjs-service/.env.example` and fill in
   `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from a GitHub OAuth app whose

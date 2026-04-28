@@ -68,9 +68,7 @@ test.describe("Admin Users page - pending GitHub flow", () => {
     ).toHaveCount(0)
   })
 
-  test("admin can approve by linking to an existing user", async ({
-    page,
-  }) => {
+  test("admin can approve by linking to an existing user", async ({ page }) => {
     const { email } = await createUserViaAdminUi(page)
     const providerAccountId = await uniqueProviderAccountId()
     await createPendingViaBridge({
