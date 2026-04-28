@@ -17,3 +17,6 @@ Starter Python project managed with `uv`.
 - CI: GitHub Actions (`.github/workflows/ci.yml`)
 - Dependency updates: Renovate (`renovate.json`)
 - Git hooks: pre-commit with TruffleHog secret scanning
+
+
+test
