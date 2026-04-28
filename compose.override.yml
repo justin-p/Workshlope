@@ -49,7 +49,8 @@ services:
     restart: "no"
     ports:
       - "5432:5432"
-
+    env_file:
+      - .env.local
 
   adminer:
     restart: "no"
@@ -87,6 +88,8 @@ services:
       SMTP_PORT: "1025"
       SMTP_TLS: "false"
       EMAILS_FROM_EMAIL: "noreply@example.com"
+    env_file:
+      - .env.local
 
   mailcatcher:
     image: schickling/mailcatcher
@@ -129,6 +132,8 @@ services:
     depends_on:
       - backend
       - mailcatcher
+    env_file:
+      - .env.local
     environment:
       - VITE_API_URL=http://backend:8000
       - MAILCATCHER_HOST=http://mailcatcher:1080
