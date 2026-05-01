@@ -196,6 +196,14 @@ async def _dispatch_workshop_ws_text(
                     {"type": "error", "detail": "session_not_active"}
                 )
                 return
+            if workshop_row.status != "live":
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "detail": "live_status_requires_live_session",
+                    }
+                )
+                return
             participant = db.exec(
                 select(WorkshopParticipant).where(
                     WorkshopParticipant.session_id == session_id,

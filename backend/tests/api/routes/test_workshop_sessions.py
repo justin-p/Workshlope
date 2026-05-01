@@ -752,6 +752,88 @@ def test_ws_part_advance_denied_when_session_paused(
     }
 
 
+def test_ws_participant_live_status_rejected_when_session_paused(
+    client: TestClient,
+    db: Session,
+) -> None:
+    session_row = _create_live_session(db)
+    participant_headers = authentication_token_from_email(
+        client=client, email=settings.EMAIL_TEST_USER, db=db
+    )
+    participant_user = db.exec(
+        select(User).where(User.email == settings.EMAIL_TEST_USER)
+    ).first()
+    assert participant_user is not None
+
+    instructor_email = f"instructor-pause-ls-{uuid.uuid4()}@example.com"
+    instructor_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor_user = db.exec(
+        select(User).where(User.email == instructor_email)
+    ).first()
+    assert instructor_user is not None
+    instructor_user.is_instructor = True
+    db.add(instructor_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor_user.id,
+            role="lead",
+        )
+    )
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=participant_user.id,
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    participant_ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=participant_headers,
+    ).json()["ticket"]
+    instructor_ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=instructor_headers,
+    ).json()["ticket"]
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", participant_ticket],
+    ) as participant_ws:
+        assert participant_ws.receive_json()["type"] == "session.connected"
+        with client.websocket_connect(
+            _workshop_ws_path(session_row.id),
+            subprotocols=["ticket", instructor_ticket],
+        ) as instructor_ws:
+            assert instructor_ws.receive_json()["type"] == "session.connected"
+            instructor_ws.send_json({"type": "session.pause"})
+            assert instructor_ws.receive_json() == {
+                "type": "session.pause.ack",
+                "status": "paused",
+            }
+            assert instructor_ws.receive_json() == {
+                "type": "session.status_changed",
+                "session_id": str(session_row.id),
+                "status": "paused",
+            }
+        assert participant_ws.receive_json() == {
+            "type": "session.status_changed",
+            "session_id": str(session_row.id),
+            "status": "paused",
+        }
+        participant_ws.send_json({"type": "live_status", "live_status": "done"})
+        denied = participant_ws.receive_json()
+
+    assert denied == {
+        "type": "error",
+        "detail": "live_status_requires_live_session",
+    }
+
+
 def test_ws_instructor_pause_resume_broadcasts_status(
     client: TestClient,
     db: Session,
