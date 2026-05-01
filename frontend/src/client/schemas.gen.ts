@@ -558,6 +558,11 @@ export const UserCreateSchema = {
             title: 'Is Superuser',
             default: false
         },
+        is_instructor: {
+            type: 'boolean',
+            title: 'Is Instructor',
+            default: false
+        },
         full_name: {
             anyOf: [
                 {
@@ -598,6 +603,11 @@ export const UserPublicSchema = {
         is_superuser: {
             type: 'boolean',
             title: 'Is Superuser',
+            default: false
+        },
+        is_instructor: {
+            type: 'boolean',
+            title: 'Is Instructor',
             default: false
         },
         full_name: {
@@ -690,6 +700,11 @@ export const UserUpdateSchema = {
         is_superuser: {
             type: 'boolean',
             title: 'Is Superuser',
+            default: false
+        },
+        is_instructor: {
+            type: 'boolean',
+            title: 'Is Instructor',
             default: false
         },
         full_name: {
