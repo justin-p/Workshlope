@@ -406,3 +406,49 @@ def test_ws_instructor_can_advance_part_and_broadcast_to_participants(
     assert ack["part_index"] == 1
     assert broadcast["type"] == "session.part_changed"
     assert broadcast["part_index"] == 1
+
+
+def test_ws_part_advance_denied_when_session_paused(
+    client: TestClient,
+    db: Session,
+) -> None:
+    session_row = _create_live_session(db)
+    _add_two_parts_to_session_lesson(db, session_row)
+    instructor_email = f"instructor-{uuid.uuid4()}@example.com"
+    instructor_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor_user = db.exec(
+        select(User).where(User.email == instructor_email)
+    ).first()
+    assert instructor_user is not None
+    instructor_user.is_instructor = True
+    db.add(instructor_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor_user.id,
+            role="lead",
+        )
+    )
+    session_row.status = "paused"
+    db.add(session_row)
+    db.commit()
+
+    instructor_ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=instructor_headers,
+    ).json()["ticket"]
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", instructor_ticket],
+    ) as instructor_ws:
+        assert instructor_ws.receive_json()["type"] == "session.connected"
+        instructor_ws.send_json({"type": "part.advance", "part_index": 1})
+        denied = instructor_ws.receive_json()
+
+    assert denied == {
+        "type": "error",
+        "detail": "advance_requires_live_session",
+    }

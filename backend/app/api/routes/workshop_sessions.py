@@ -30,6 +30,8 @@ from app.services.workshop_realtime import (
 router = APIRouter(prefix="/workshop/sessions", tags=["workshop-sessions"])
 
 ALLOWED_WS_LIVE_STATUSES = frozenset({"busy", "done"})
+# Part moves are frozen unless the workshop is actively running (`live`).
+WS_PART_ADVANCE_REQUIRES_STATUS = frozenset({"live"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,6 +205,14 @@ async def _dispatch_workshop_ws_text(
             if workshop_session is None:
                 await websocket.send_json(
                     {"type": "error", "detail": "session_not_found"}
+                )
+                return
+            if workshop_session.status not in WS_PART_ADVANCE_REQUIRES_STATUS:
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "detail": "advance_requires_live_session",
+                    }
                 )
                 return
             lesson_parts = db.exec(
