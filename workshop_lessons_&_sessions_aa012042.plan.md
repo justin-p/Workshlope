@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-01 (part_generation mirror + stale WS gate) |
+| **Last synced** | 2026-05-01 (workshop tests for helpers + hub + HTTP/WS edges; ~94% backend coverage) |
 | **Active integration branch** | `ws-04-realtime-privacy` |
 | **Stack PR label** | Plan item **PR04 — RealtimePrivacy** (see Branch/PR chain below) |
 
