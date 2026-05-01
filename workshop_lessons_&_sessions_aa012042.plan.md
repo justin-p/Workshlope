@@ -170,9 +170,14 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 
 ### Next actions (suggested order on PR04)
 
-1. Add broader cockpit E2E beyond `/workshop/:id` (instructor roster/session cards) while keeping trainee privacy assertions.
-2. **Decision locked**: stay single-process in PR04; revisit Redis/multi-process hub only when observed scale/concurrency requires it.
-3. Resume checklist: re-run `backend/tests/api/routes/test_private.py` and `frontend/tests/workshop.spec.ts`, then spot-check full Playwright when infra is stable.
+1. **Bounded PR04 closure slice (no new routes/UI areas):**
+   - **In scope:** keep tests on `/workshop/:id` only; add exactly one multi-participant instructor assertion that roster-style events are visible to instructor but never to trainee.
+   - **Out of scope (defer to PR05+):** dashboard pages, session cards, roster management screens, nav/IA work, or any new cockpit route.
+   - **Done when:** `frontend/tests/workshop.spec.ts` contains and passes:
+     - two-user privacy/fan-out assertion (already present),
+     - instructor control lifecycle smoke (`start/pause/resume/advance/end`),
+     - trainee cannot see peer roster payload assertion.
+2. Resume checklist: re-run `backend/tests/api/routes/test_private.py` and `frontend/tests/workshop.spec.ts`, then spot-check full Playwright when infra is stable.
 
 ### YAML todos above
 
