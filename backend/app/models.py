@@ -110,6 +110,62 @@ class ItemsPublic(SQLModel):
     count: int
 
 
+# ---------------------------------------------------------------------------
+# Workshop lesson sync models
+# ---------------------------------------------------------------------------
+
+
+class LessonRepo(SQLModel, table=True):
+    __tablename__ = "lesson_repo"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    full_name: str = Field(max_length=255, unique=True, index=True)
+    default_branch: str = Field(default="main", max_length=255)
+    health: str = Field(default="healthy", max_length=32)
+    last_synced_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    lessons: list["Lesson"] = Relationship(back_populates="repo", cascade_delete=True)
+
+
+class Lesson(SQLModel, table=True):
+    __tablename__ = "lesson"
+    __table_args__ = (UniqueConstraint("repo_id", "slug", name="uq_lesson_repo_slug"),)
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    repo_id: uuid.UUID = Field(
+        foreign_key="lesson_repo.id", nullable=False, ondelete="CASCADE"
+    )
+    slug: str = Field(max_length=255)
+    title: str = Field(max_length=255)
+    summary: str | None = Field(default=None, max_length=2000)
+    lesson_sync_generation: int = Field(default=1)
+    repo: LessonRepo | None = Relationship(back_populates="lessons")
+    parts: list["LessonPart"] = Relationship(
+        back_populates="lesson", cascade_delete=True
+    )
+
+
+class LessonPart(SQLModel, table=True):
+    __tablename__ = "lesson_part"
+    __table_args__ = (
+        UniqueConstraint("lesson_id", "slug", name="uq_lesson_part_slug"),
+        UniqueConstraint("lesson_id", "ordering", name="uq_lesson_part_ordering"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    lesson_id: uuid.UUID = Field(
+        foreign_key="lesson.id", nullable=False, ondelete="CASCADE"
+    )
+    ordering: int = Field(ge=0)
+    slug: str = Field(max_length=255)
+    title: str = Field(max_length=255)
+    path: str = Field(max_length=512)
+    body_md: str = Field(default="")
+    lesson: Lesson | None = Relationship(back_populates="parts")
+
+
 # Generic message
 class Message(SQLModel):
     message: str
