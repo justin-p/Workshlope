@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-01 (`/workshop/:sessionId` trainee + instructor WS controls; bootstrap `omit_participant_seat` for instructor-role tickets; trainee + instructor Playwright smoke) |
+| **Last synced** | 2026-05-01 (`/workshop/:sessionId` trainee + instructor WS controls; bootstrap `omit_participant_seat` for instructor-role tickets; two-user Playwright privacy/fan-out assertion; fast local pre-commit hooks for scoped backend + Playwright tests) |
 | **Active integration branch** | `ws-04-realtime-privacy` |
 | **Stack PR label** | Plan item **PR04 — RealtimePrivacy** (see Branch/PR chain below) |
 
@@ -165,13 +165,14 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 | 01 | `ws-01-foundation-rbac` | 🟨 | `User.is_instructor` + migrations; confirm against `main` |
 | 02 | `ws-02-github-sync-manifest` | 🔲 | GitHub App + manifest sync not tracked here yet |
 | 03 | `ws-03-session-core` | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
-| 04 | `ws-04-realtime-privacy` | 🟨 | Backend ✅ incl. drift gate; minimal trainee UI + Playwright smoke 🟨; instructor UI / full E2E 🔲 |
+| 04 | `ws-04-realtime-privacy` | 🟨 | Backend ✅ incl. drift gate; trainee + instructor UI controls ✅; targeted Playwright incl. two-user privacy/fan-out ✅; full cross-suite E2E still 🔲 |
 | 05–10 | downstream | 🔲 | See Branch/PR chain later in this doc |
 
 ### Next actions (suggested order on PR04)
 
-1. Extend **Playwright** (instructor start/pause/advance, privacy assertions) and grow the **workshop UI** toward the cockpit spec.
+1. Add broader cockpit E2E beyond `/workshop/:id` (instructor roster/session cards + start/end flows) while keeping trainee privacy assertions.
 2. Decide **Redis** vs stay single-process until scale requires it.
+3. Resume checklist: re-run `backend/tests/api/routes/test_private.py` and `frontend/tests/workshop.spec.ts`, then spot-check full Playwright when infra is stable.
 
 ### YAML todos above
 
