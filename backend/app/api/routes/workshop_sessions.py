@@ -32,6 +32,8 @@ router = APIRouter(prefix="/workshop/sessions", tags=["workshop-sessions"])
 ALLOWED_WS_LIVE_STATUSES = frozenset({"busy", "done"})
 # Part moves are frozen unless the workshop is actively running (`live`).
 WS_PART_ADVANCE_REQUIRES_STATUS = frozenset({"live"})
+# Enter, ws-ticket, and websocket handshake only when the session is running or paused.
+WORKSHOP_ACTIVE_STATUSES = frozenset({"live", "paused"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +89,7 @@ def _authorize_workshop_ws_handshake(
     workshop_session = db.get(WorkshopSession, route_session_id)
     if workshop_session is None:
         return None
-    if workshop_session.status == "scheduled":
+    if workshop_session.status not in WORKSHOP_ACTIVE_STATUSES:
         return None
     if token_part_generation != workshop_session.part_generation:
         return None
@@ -128,6 +130,24 @@ def _authorize_workshop_ws_handshake(
     )
 
 
+def _require_workshop_instructor(
+    *, session_db: Session, session_id: uuid.UUID, current_user: User
+) -> None:
+    instructor = session_db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_id,
+            SessionInstructor.user_id == current_user.id,
+            col(SessionInstructor.removed_at).is_(None),
+        )
+    ).first()
+    if instructor is not None or current_user.is_superuser:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="User is not an instructor for this session",
+    )
+
+
 async def _dispatch_workshop_ws_text(
     *,
     websocket: WebSocket,
@@ -165,6 +185,17 @@ async def _dispatch_workshop_ws_text(
             return
 
         with Session(engine) as db:
+            workshop_row = db.get(WorkshopSession, session_id)
+            if workshop_row is None:
+                await websocket.send_json(
+                    {"type": "error", "detail": "session_not_found"}
+                )
+                return
+            if workshop_row.status not in WORKSHOP_ACTIVE_STATUSES:
+                await websocket.send_json(
+                    {"type": "error", "detail": "session_not_active"}
+                )
+                return
             participant = db.exec(
                 select(WorkshopParticipant).where(
                     WorkshopParticipant.session_id == session_id,
@@ -332,10 +363,15 @@ def enter_workshop_session(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
 
-    if workshop_session.status == "scheduled":
+    if workshop_session.status not in WORKSHOP_ACTIVE_STATUSES:
+        if workshop_session.status == "scheduled":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Session not started yet",
+            )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session not started yet",
+            detail="Session has ended",
         )
 
     participant = session.exec(
@@ -359,6 +395,60 @@ def enter_workshop_session(
     return Message(message="Entered session")
 
 
+@router.post("/{session_id}/start", response_model=Message)
+async def start_workshop_session(
+    *, session: SessionDep, current_user: CurrentUser, session_id: uuid.UUID
+) -> Message:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+    if workshop_session.status != "scheduled":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="start_requires_scheduled_session",
+        )
+    workshop_session.status = "live"
+    session.add(workshop_session)
+    session.commit()
+    await workshop_hub.publish_session_status_changed(
+        session_id=session_id,
+        status="live",
+    )
+    return Message(message="Session started")
+
+
+@router.post("/{session_id}/end", response_model=Message)
+async def end_workshop_session(
+    *, session: SessionDep, current_user: CurrentUser, session_id: uuid.UUID
+) -> Message:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+    if workshop_session.status not in WORKSHOP_ACTIVE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="end_requires_active_session",
+        )
+    workshop_session.status = "ended"
+    session.add(workshop_session)
+    session.commit()
+    await workshop_hub.publish_session_status_changed(
+        session_id=session_id,
+        status="ended",
+    )
+    return Message(message="Session ended")
+
+
 @router.post("/{session_id}/ws-ticket", response_model=WorkshopWsTicket)
 def create_workshop_ws_ticket(
     *, session: SessionDep, current_user: CurrentUser, session_id: uuid.UUID
@@ -368,10 +458,15 @@ def create_workshop_ws_ticket(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
-    if workshop_session.status == "scheduled":
+    if workshop_session.status not in WORKSHOP_ACTIVE_STATUSES:
+        if workshop_session.status == "scheduled":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Session not started yet",
+            )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session not started yet",
+            detail="Session has ended",
         )
 
     role = None

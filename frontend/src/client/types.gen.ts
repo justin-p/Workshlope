@@ -348,6 +348,18 @@ export type WorkshopSessionsEnterWorkshopSessionData = {
 
 export type WorkshopSessionsEnterWorkshopSessionResponse = (Message);
 
+export type WorkshopSessionsStartWorkshopSessionData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsStartWorkshopSessionResponse = (Message);
+
+export type WorkshopSessionsEndWorkshopSessionData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsEndWorkshopSessionResponse = (Message);
+
 export type WorkshopSessionsCreateWorkshopWsTicketData = {
     sessionId: string;
 };

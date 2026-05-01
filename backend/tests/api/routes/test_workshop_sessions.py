@@ -95,6 +95,304 @@ def test_enter_rejected_when_session_scheduled(
     assert response.status_code == 403
 
 
+def test_enter_rejected_when_session_ended(
+    client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
+) -> None:
+    session_row = _create_live_session(db)
+    session_row.status = "ended"
+    db.add(session_row)
+    db.commit()
+
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/enter",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Session has ended"
+
+
+def test_ws_ticket_rejected_when_session_ended(
+    client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
+) -> None:
+    session_row = _create_live_session(db)
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    session_row.status = "ended"
+    db.add(session_row)
+    db.commit()
+
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Session has ended"
+
+
+def test_http_start_requires_instructor_role(
+    client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
+) -> None:
+    session_row = _create_live_session(db)
+    session_row.status = "scheduled"
+    db.add(session_row)
+    db.commit()
+
+    resp = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/start",
+        headers=normal_user_token_headers,
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "User is not an instructor for this session"
+
+
+def test_http_start_scheduled_then_ws_ticket_allowed(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    session_row.status = "scheduled"
+    db.add(session_row)
+    db.commit()
+
+    instructor_email = f"instr-start-{uuid.uuid4()}@example.com"
+    inst_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    inst_user = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert inst_user is not None
+    inst_user.is_instructor = True
+    db.add(inst_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=inst_user.id,
+            role="lead",
+        )
+    )
+    participant_email = f"participant-start-{uuid.uuid4()}@example.com"
+    p_headers = authentication_token_from_email(
+        client=client, email=participant_email, db=db
+    )
+    p_user = db.exec(select(User).where(User.email == participant_email)).first()
+    assert p_user is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=p_user.id,
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    start = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/start",
+        headers=inst_headers,
+    )
+    assert start.status_code == 200
+    assert start.json()["message"] == "Session started"
+
+    ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=p_headers,
+    )
+    assert ticket.status_code == 200
+
+
+def test_http_second_start_rejected(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+    session_row.status = "scheduled"
+    db.add(session_row)
+    db.commit()
+    instructor_email = f"i2-{uuid.uuid4()}@example.com"
+    i_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    i_user = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert i_user is not None
+    i_user.is_instructor = True
+    db.add(i_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=i_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/start",
+            headers=i_headers,
+        ).status_code
+        == 200
+    )
+    again = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/start",
+        headers=i_headers,
+    )
+    assert again.status_code == 403
+    assert again.json()["detail"] == "start_requires_scheduled_session"
+
+
+def test_http_end_broadcast_blocked_when_scheduled(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    session_row.status = "scheduled"
+    db.add(session_row)
+    db.commit()
+    instructor_email = f"i3-{uuid.uuid4()}@example.com"
+    i_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    i_user = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert i_user is not None
+    i_user.is_instructor = True
+    db.add(i_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=i_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    resp = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/end",
+        headers=i_headers,
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "end_requires_active_session"
+
+
+def test_ws_connect_ticket_rejected_after_session_end(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    participant_headers = authentication_token_from_email(
+        client=client, email=settings.EMAIL_TEST_USER, db=db
+    )
+
+    instructor_email = f"i-end-{uuid.uuid4()}@example.com"
+    i_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    i_user = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert i_user is not None
+    i_user.is_instructor = True
+    db.add(i_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=i_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=participant_headers,
+    ).json()["ticket"]
+
+    end_resp = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/end",
+        headers=i_headers,
+    )
+    assert end_resp.status_code == 200
+
+    with pytest.raises(WebSocketDisconnect) as exc_info:
+        with client.websocket_connect(
+            _workshop_ws_path(session_row.id),
+            subprotocols=["ticket", ticket],
+        ):
+            pass
+    assert exc_info.value.code == 1008
+
+
+def test_ws_live_status_rejected_after_session_http_end(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    participant_headers = authentication_token_from_email(
+        client=client, email=settings.EMAIL_TEST_USER, db=db
+    )
+    ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=participant_headers,
+    ).json()["ticket"]
+
+    instructor_email = f"i-live-end-{uuid.uuid4()}@example.com"
+    i_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    i_user = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert i_user is not None
+    i_user.is_instructor = True
+    db.add(i_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=i_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", ticket],
+    ) as trainee_ws:
+        assert trainee_ws.receive_json()["type"] == "session.connected"
+        assert (
+            client.post(
+                f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/end",
+                headers=i_headers,
+            ).status_code
+            == 200
+        )
+        ended_push = trainee_ws.receive_json()
+        assert ended_push == {
+            "type": "session.status_changed",
+            "session_id": str(session_row.id),
+            "status": "ended",
+        }
+        trainee_ws.send_json({"type": "live_status", "live_status": "done"})
+        denied = trainee_ws.receive_json()
+
+    assert denied == {"type": "error", "detail": "session_not_active"}
+
+
 def test_ws_ticket_requires_roster_membership(
     client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
 ) -> None:
