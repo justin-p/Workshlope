@@ -14,6 +14,8 @@ class WorkshopWsConnection:
     session_id: uuid.UUID
     user_id: uuid.UUID
     role: Literal["participant", "instructor"]
+    #: Mutated in-process when instructors advance parts (see sync_bump_room_part_generation).
+    part_generation: int
 
 
 class WorkshopRealtimeHub:
@@ -63,6 +65,21 @@ class WorkshopRealtimeHub:
             except Exception:
                 # Best-effort fan-out; stale sockets are skipped.
                 continue
+
+    def sync_bump_room_part_generation(
+        self, session_id: uuid.UUID, part_generation: int
+    ) -> None:
+        """Align in-memory connection tokens with DB after ``part.advance`` commits.
+
+        Call synchronously immediately after committing the WorkshopSession generation
+        bump (same task, before any ``await``) so other coroutines cannot observe DB
+        ahead of mirrored connection state in the single-worker MVP.
+        """
+        room = self._rooms.get(session_id)
+        if not room:
+            return
+        for conn in list(room):
+            conn.part_generation = part_generation
 
     async def publish_session_part_changed(
         self,

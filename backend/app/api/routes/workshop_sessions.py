@@ -153,6 +153,7 @@ async def _dispatch_workshop_ws_text(
     websocket: WebSocket,
     session_id: uuid.UUID,
     handshake: WorkshopWsHandshake,
+    connection: WorkshopWsConnection,
     text: str,
 ) -> None:
     """Handle one client text JSON frame."""
@@ -166,6 +167,28 @@ async def _dispatch_workshop_ws_text(
         return
 
     msg_type = payload.get("type")
+    # Part advance bumps generation in-room before any awaits; staleness gates other frames.
+    if msg_type != "part.advance":
+        with Session(engine) as db_snap:
+            row_snap = db_snap.get(WorkshopSession, session_id)
+            if row_snap is None:
+                await websocket.send_json(
+                    {"type": "error", "detail": "session_not_found"}
+                )
+                return
+            if int(row_snap.part_generation) != connection.part_generation:
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "detail": "part_generation_stale",
+                        "part_generation": int(row_snap.part_generation),
+                    }
+                )
+                # Keep the socket usable for further frames after the client refreshes its ticket
+                # (mirrored ``connection.part_generation`` or reconnect); avoid closing here so the
+                # receive loop does not observe a disconnected socket mid-dispatch under TestClient.
+                return
+
     if msg_type == "live_status":
         if handshake.role != "participant":
             await websocket.send_json({"type": "error", "detail": "forbidden"})
@@ -281,6 +304,8 @@ async def _dispatch_workshop_ws_text(
                 db.add(participant)
             db.commit()
             next_generation = int(workshop_session.part_generation)
+
+        workshop_hub.sync_bump_room_part_generation(session_id, next_generation)
 
         await websocket.send_json(
             {
@@ -558,6 +583,7 @@ async def workshop_session_ws(websocket: WebSocket, session_id: uuid.UUID) -> No
         session_id=session_id,
         user_id=handshake.user_id,
         role=handshake.role,
+        part_generation=handshake.part_generation,
     )
     await workshop_hub.attach(connection)
     try:
@@ -575,6 +601,7 @@ async def workshop_session_ws(websocket: WebSocket, session_id: uuid.UUID) -> No
                 websocket=websocket,
                 session_id=session_id,
                 handshake=handshake,
+                connection=connection,
                 text=text,
             )
     except WebSocketDisconnect:

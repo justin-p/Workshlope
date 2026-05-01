@@ -27,18 +27,21 @@ def test_hub_publishes_participant_live_status_only_to_instructors() -> None:
             session_id=session_id,
             user_id=user_trainee,
             role="participant",
+            part_generation=1,
         )
         inst1 = WorkshopWsConnection(
             websocket=instructor_a,
             session_id=session_id,
             user_id=uuid.uuid4(),
             role="instructor",
+            part_generation=1,
         )
         inst2 = WorkshopWsConnection(
             websocket=instructor_b,
             session_id=session_id,
             user_id=uuid.uuid4(),
             role="instructor",
+            part_generation=1,
         )
 
         await hub.attach(trainee)
@@ -66,6 +69,39 @@ def test_hub_publishes_participant_live_status_only_to_instructors() -> None:
     asyncio.run(runner())
 
 
+def test_hub_sync_bump_room_aligns_connection_part_generation() -> None:
+    async def runner() -> None:
+        hub = WorkshopRealtimeHub()
+        session_id = uuid.uuid4()
+
+        a = WorkshopWsConnection(
+            websocket=AsyncMock(),
+            session_id=session_id,
+            user_id=uuid.uuid4(),
+            role="participant",
+            part_generation=1,
+        )
+        b = WorkshopWsConnection(
+            websocket=AsyncMock(),
+            session_id=session_id,
+            user_id=uuid.uuid4(),
+            role="instructor",
+            part_generation=1,
+        )
+        await hub.attach(a)
+        await hub.attach(b)
+
+        hub.sync_bump_room_part_generation(session_id, 9)
+
+        assert a.part_generation == 9
+        assert b.part_generation == 9
+
+        await hub.detach(a)
+        await hub.detach(b)
+
+    asyncio.run(runner())
+
+
 def test_hub_status_changed_reaches_participants_and_instructors() -> None:
     async def runner() -> None:
         hub = WorkshopRealtimeHub()
@@ -81,12 +117,14 @@ def test_hub_status_changed_reaches_participants_and_instructors() -> None:
             session_id=session_id,
             user_id=uuid.uuid4(),
             role="participant",
+            part_generation=1,
         )
         instructor = WorkshopWsConnection(
             websocket=instructor_socket,
             session_id=session_id,
             user_id=uuid.uuid4(),
             role="instructor",
+            part_generation=1,
         )
 
         await hub.attach(trainee)

@@ -639,6 +639,55 @@ def test_ws_participant_live_status_persists_ack_and_fanout_registered(
     assert published == [(session_row.id, user.id, "done")]
 
 
+def test_ws_rejects_when_db_part_generation_runs_ahead_of_connection_mirror(
+    client: TestClient,
+    db: Session,
+) -> None:
+    """If DB part_generation moves without mirroring into the hub connections, the
+    next inbound frame is rejected so the client must mint a fresh ws-ticket."""
+    session_row = _create_live_session(db)
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    headers = authentication_token_from_email(
+        client=client, email=settings.EMAIL_TEST_USER, db=db
+    )
+    ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=headers,
+    ).json()["ticket"]
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", ticket],
+    ) as ws:
+        assert ws.receive_json()["type"] == "session.connected"
+
+        ws_row = db.get(WorkshopSession, session_row.id)
+        assert ws_row is not None
+        ws_row.part_generation = int(ws_row.part_generation) + 1
+        db.add(ws_row)
+        db.commit()
+        expected_gen = int(ws_row.part_generation)
+
+        ws.send_json({"type": "live_status", "live_status": "done"})
+        err = ws.receive_json()
+
+    assert err == {
+        "type": "error",
+        "detail": "part_generation_stale",
+        "part_generation": expected_gen,
+    }
+
+
 def test_ws_instructor_can_advance_part_and_broadcast_to_participants(
     client: TestClient, db: Session
 ) -> None:

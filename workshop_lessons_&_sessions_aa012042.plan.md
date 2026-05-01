@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-01 |
+| **Last synced** | 2026-05-01 (part_generation mirror + stale WS gate) |
 | **Active integration branch** | `ws-04-realtime-privacy` |
 | **Stack PR label** | Plan item **PR04 — RealtimePrivacy** (see Branch/PR chain below) |
 
@@ -149,7 +149,7 @@ Aligned with plan bullets: ws-ticket, role-scoped fan-out, trainee privacy.
 | Instructor `POST …/end` (`live`\|`paused→ended`) + hub broadcast | ✅ | Does not bulk-set `finished_at` |
 | Enter + ws-ticket reject `scheduled` / `ended` with clear HTTP errors | ✅ | |
 | OpenAPI + regenerated TS client when HTTP contract changed | ✅ | Run pre-commit hook on API edits |
-| **Stale `part_generation` / reconnect** (close socket or force refresh) | 🔲 | Next backend slice |
+| **`part_generation` mirror + stale signal** (hub sync after advance; **`part_generation_stale`** + current gen → mint new ws-ticket and reconnect; connection left open until client disconnects) | ✅ | `WorkshopRealtimeHub.sync_bump_room_part_generation`; pre-frame DB vs `connection.part_generation` (skipped for `part.advance` inbound) |
 | **Multi-process realtime** (Redis or equivalent hub) | 🔲 | MVP is in-memory `WorkshopRealtimeHub` |
 | **Playwright** for instructor + trainee flows on these APIs | 🔲 | Plan DoD expects E2E with user-visible surfaces |
 
@@ -162,14 +162,13 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 | 01 | `ws-01-foundation-rbac` | 🟨 | `User.is_instructor` + migrations; confirm against `main` |
 | 02 | `ws-02-github-sync-manifest` | 🔲 | GitHub App + manifest sync not tracked here yet |
 | 03 | `ws-03-session-core` | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
-| 04 | `ws-04-realtime-privacy` | 🟨 | Backend behaviors above ✅; stale socket + E2E 🔲 |
+| 04 | `ws-04-realtime-privacy` | 🟨 | Backend ✅ incl. generation drift gate; Playwright/UI 🔲 |
 | 05–10 | downstream | 🔲 | See Branch/PR chain later in this doc |
 
 ### Next actions (suggested order on PR04)
 
-1. Define **part_generation drift** handling (disconnect code + client message shape + tests).
-2. Add **Playwright** once frontend wiring exists for workshop session UI (per DoD).
-3. Decide **Redis** vs stay single-process until scale requires it.
+1. Add **Playwright** once frontend wiring exists for workshop session UI (per DoD).
+2. Decide **Redis** vs stay single-process until scale requires it.
 
 ### YAML todos above
 
