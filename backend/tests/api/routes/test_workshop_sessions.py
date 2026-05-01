@@ -10,6 +10,7 @@ from starlette.websockets import WebSocketDisconnect
 from app.core.config import settings
 from app.core.security import ALGORITHM
 from app.models import Lesson, LessonRepo, User, WorkshopParticipant, WorkshopSession
+from app.services import workshop_realtime as workshop_realtime_mod
 from tests.utils.user import authentication_token_from_email
 
 
@@ -247,3 +248,60 @@ def test_ws_connect_denies_session_path_mismatch(
         ):
             pass
     assert exc_info.value.code == 1008
+
+
+def test_ws_participant_live_status_persists_ack_and_fanout_registered(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_row = _create_live_session(db)
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    participant_row = WorkshopParticipant(
+        session_id=session_row.id,
+        user_id=user.id,
+        joined_at=datetime.now(timezone.utc),
+    )
+    db.add(participant_row)
+    db.commit()
+    db.refresh(participant_row)
+    assert participant_row.live_status == "busy"
+
+    headers = authentication_token_from_email(
+        client=client, email=settings.EMAIL_TEST_USER, db=db
+    )
+    ticket_resp = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=headers,
+    )
+    ticket = ticket_resp.json()["ticket"]
+
+    published: list[tuple[uuid.UUID, uuid.UUID, str]] = []
+
+    async def capture_publish(
+        *,
+        session_id: uuid.UUID,
+        user_id: uuid.UUID,
+        live_status: str,
+    ) -> None:
+        published.append((session_id, user_id, live_status))
+
+    monkeypatch.setattr(
+        workshop_realtime_mod.workshop_hub,
+        "publish_participant_live_status",
+        capture_publish,
+    )
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", ticket],
+    ) as websocket:
+        assert websocket.receive_json()["type"] == "session.connected"
+        websocket.send_json({"type": "live_status", "live_status": "done"})
+        ack = websocket.receive_json()
+        assert ack == {"type": "live_status.ack", "live_status": "done"}
+
+    db.refresh(participant_row)
+    assert participant_row.live_status == "done"
+    assert published == [(session_row.id, user.id, "done")]
