@@ -171,7 +171,7 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 ### Next actions (suggested order on PR04)
 
 1. Add broader cockpit E2E beyond `/workshop/:id` (instructor roster/session cards + start/end flows) while keeping trainee privacy assertions.
-2. Decide **Redis** vs stay single-process until scale requires it.
+2. **Decision locked**: stay single-process in PR04; revisit Redis/multi-process hub only when observed scale/concurrency requires it.
 3. Resume checklist: re-run `backend/tests/api/routes/test_private.py` and `frontend/tests/workshop.spec.ts`, then spot-check full Playwright when infra is stable.
 
 ### YAML todos above
@@ -199,6 +199,7 @@ The YAML `todos` list in the frontmatter is a **high-level roadmap** for Cursor/
 | Member role conflict    | Add-member role conflicts are resolved by **always replace** semantics atomically (no manual conflict endpoint required).                                                                                                                                                                                                               |
 | OAuth/App setup         | **Separate OAuth App (login)** + **separate GitHub App (repo sync)** for MVP.                                                                                                                                                                                                                                                           |
 | Entitlement scope       | **Instructor-bound** by default; instructors can invite other instructors explicitly.                                                                                                                                                                                                                                                   |
+| Realtime scaling path   | **Stay single-process** hub in PR04; defer Redis/multi-process fan-out until measured scale/concurrency requires it.                                                                                                                                                                                                                   |
 | Avatar refresh          | Refresh stored avatar_url on each successful GitHub sign-in/link event (no periodic background refresh).                                                                                                                                                                                                                                |
 | Avatar unlink           | On GitHub unlink, clear stored avatar_url and fall back to initials/default avatar.                                                                                                                                                                                                                                                     |
 | API contract gate       | OpenAPI + TS client regeneration is **required on every API contract change**.                                                                                                                                                                                                                                                          |
