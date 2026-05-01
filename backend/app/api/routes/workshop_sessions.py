@@ -5,11 +5,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
 import jwt
-from fastapi import APIRouter, HTTPException, WebSocket, status
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
 from jwt.exceptions import PyJWTError
 from pydantic import BaseModel
 from sqlmodel import Session, col, select
-from starlette.websockets import WebSocketDisconnect
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings

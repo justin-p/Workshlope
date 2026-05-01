@@ -3,9 +3,9 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 import pytest
+from fastapi import WebSocketDisconnect
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
-from starlette.websockets import WebSocketDisconnect
 
 from app.core.config import settings
 from app.core.security import ALGORITHM
