@@ -109,6 +109,10 @@ export type PrivateUserCreate = {
     is_verified?: boolean;
 };
 
+export type PrivateWorkshopE2ELiveSessionResponse = {
+    session_id: string;
+};
+
 export type Token = {
     access_token: string;
     token_type?: string;
@@ -279,6 +283,12 @@ export type PrivateCreateUserData = {
 };
 
 export type PrivateCreateUserResponse = (UserPublic);
+
+export type PrivateBootstrapE2eWorkshopLiveSessionData = {
+    participantEmail?: (string | null);
+};
+
+export type PrivateBootstrapE2eWorkshopLiveSessionResponse = (PrivateWorkshopE2ELiveSessionResponse);
 
 export type UsersReadUsersData = {
     limit?: number;

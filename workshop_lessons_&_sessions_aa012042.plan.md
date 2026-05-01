@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-01 (workshop tests for helpers + hub + HTTP/WS edges; ~94% backend coverage) |
+| **Last synced** | 2026-05-01 (`/workshop/:sessionId` trainee page + WS; local-only `POST /private/workshop/e2e-live-session/` Playwright bootstrap; trainee Playwright smoke) |
 | **Active integration branch** | `ws-04-realtime-privacy` |
 | **Stack PR label** | Plan item **PR04 — RealtimePrivacy** (see Branch/PR chain below) |
 
@@ -131,6 +131,9 @@ This section is the **recoverable checklist** when chat history or IDE session i
 | In-memory fan-out hub | [`backend/app/services/workshop_realtime.py`](backend/app/services/workshop_realtime.py) |
 | API tests | [`backend/tests/api/routes/test_workshop_sessions.py`](backend/tests/api/routes/test_workshop_sessions.py) |
 | Hub unit tests | [`backend/tests/services/test_workshop_realtime.py`](backend/tests/services/test_workshop_realtime.py) |
+| Local E2E session bootstrap (`ENVIRONMENT=local` only) | [`backend/app/api/routes/private.py`](backend/app/api/routes/private.py) — `bootstrap_e2e_workshop_live_session` |
+| Trainee workshop UI (enter + ws-ticket + WebSocket) | [`frontend/src/routes/_layout/workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) |
+| Workshop Playwright | [`frontend/tests/workshop.spec.ts`](frontend/tests/workshop.spec.ts) |
 
 ### PR04 (`ws-04-realtime-privacy`) — detailed status
 
@@ -151,7 +154,7 @@ Aligned with plan bullets: ws-ticket, role-scoped fan-out, trainee privacy.
 | OpenAPI + regenerated TS client when HTTP contract changed | ✅ | Run pre-commit hook on API edits |
 | **`part_generation` mirror + stale teardown** (hub sync after advance; **`part_generation_stale`** payload then close **`1008`**; receive loop stops — mint new ws-ticket and reconnect) | ✅ | `_dispatch_workshop_ws_text` returns `False`; `sync_bump_room_part_generation` after advance commit |
 | **Multi-process realtime** (Redis or equivalent hub) | 🔲 | MVP is in-memory `WorkshopRealtimeHub` |
-| **Playwright** for instructor + trainee flows on these APIs | 🔲 | Plan DoD expects E2E with user-visible surfaces |
+| **Playwright** for instructor + trainee flows on these APIs | 🟨 | Trainee: bootstrap + `/workshop/:id` WS **connected** + **live_status.ack**; instructor cockpit flows still 🔲 |
 
 ### Stacked PRs — coarse roll-up
 
@@ -162,12 +165,12 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 | 01 | `ws-01-foundation-rbac` | 🟨 | `User.is_instructor` + migrations; confirm against `main` |
 | 02 | `ws-02-github-sync-manifest` | 🔲 | GitHub App + manifest sync not tracked here yet |
 | 03 | `ws-03-session-core` | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
-| 04 | `ws-04-realtime-privacy` | 🟨 | Backend ✅ incl. generation drift gate; Playwright/UI 🔲 |
+| 04 | `ws-04-realtime-privacy` | 🟨 | Backend ✅ incl. drift gate; minimal trainee UI + Playwright smoke 🟨; instructor UI / full E2E 🔲 |
 | 05–10 | downstream | 🔲 | See Branch/PR chain later in this doc |
 
 ### Next actions (suggested order on PR04)
 
-1. Add **Playwright** once frontend wiring exists for workshop session UI (per DoD).
+1. Extend **Playwright** (instructor start/pause/advance, privacy assertions) and grow the **workshop UI** toward the cockpit spec.
 2. Decide **Redis** vs stay single-process until scale requires it.
 
 ### YAML todos above

@@ -503,6 +503,19 @@ export const PrivateUserCreateSchema = {
     title: 'PrivateUserCreate'
 } as const;
 
+export const PrivateWorkshopE2ELiveSessionResponseSchema = {
+    properties: {
+        session_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Session Id'
+        }
+    },
+    type: 'object',
+    required: ['session_id'],
+    title: 'PrivateWorkshopE2ELiveSessionResponse'
+} as const;
+
 export const TokenSchema = {
     properties: {
         access_token: {

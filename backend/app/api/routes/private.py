@@ -1,13 +1,23 @@
-from typing import Any
+import uuid
+from datetime import datetime, timezone
+from typing import Annotated, Any
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import BaseModel, EmailStr
+from sqlmodel import select
 
 from app.api.deps import SessionDep
+from app.core.config import settings
 from app.core.security import get_password_hash
 from app.models import (
+    Lesson,
+    LessonPart,
+    LessonRepo,
+    SessionInstructor,
     User,
     UserPublic,
+    WorkshopParticipant,
+    WorkshopSession,
 )
 
 router = APIRouter(tags=["private"], prefix="/private")
@@ -36,3 +46,97 @@ def create_user(user_in: PrivateUserCreate, session: SessionDep) -> Any:
     session.commit()
 
     return user
+
+
+class PrivateWorkshopE2ELiveSessionResponse(BaseModel):
+    session_id: uuid.UUID
+
+
+@router.post(
+    "/workshop/e2e-live-session/",
+    response_model=PrivateWorkshopE2ELiveSessionResponse,
+)
+def bootstrap_e2e_workshop_live_session(
+    *,
+    session: SessionDep,
+    participant_email: Annotated[EmailStr | None, Query()] = None,
+) -> PrivateWorkshopE2ELiveSessionResponse:
+    """Create a live workshop session with lesson parts for local E2E only.
+
+    Roster ``FIRST_SUPERUSER`` (or ``participant_email``) as trainee + session
+    instructor. Exposed only when ``ENVIRONMENT == local`` via ``api_router``.
+    """
+    email = participant_email or settings.FIRST_SUPERUSER
+    user = session.exec(select(User).where(User.email == email)).first()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Participant user not found",
+        )
+
+    sid = uuid.uuid4()
+    repo = LessonRepo(
+        full_name=f"e2e/{sid}",
+        default_branch="main",
+        health="healthy",
+    )
+    session.add(repo)
+    session.commit()
+    session.refresh(repo)
+
+    lesson = Lesson(
+        repo_id=repo.id,
+        slug=f"e2e-lesson-{sid}",
+        title="E2E Lesson",
+        lesson_sync_generation=1,
+    )
+    session.add(lesson)
+    session.commit()
+    session.refresh(lesson)
+
+    session.add(
+        LessonPart(
+            lesson_id=lesson.id,
+            ordering=0,
+            slug=f"part-0-{sid}",
+            title="Part 0",
+            path="01-part-0.md",
+            body_md="# Part 0",
+        )
+    )
+    session.add(
+        LessonPart(
+            lesson_id=lesson.id,
+            ordering=1,
+            slug=f"part-1-{sid}",
+            title="Part 1",
+            path="02-part-1.md",
+            body_md="# Part 1",
+        )
+    )
+
+    workshop_session = WorkshopSession(
+        id=sid,
+        lesson_id=lesson.id,
+        status="live",
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(workshop_session)
+    session.add(
+        WorkshopParticipant(
+            session_id=sid,
+            user_id=user.id,
+            invited_at=datetime.now(timezone.utc),
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    session.add(
+        SessionInstructor(
+            session_id=sid,
+            user_id=user.id,
+            role="lead",
+        )
+    )
+    session.commit()
+
+    return PrivateWorkshopE2ELiveSessionResponse(session_id=sid)
