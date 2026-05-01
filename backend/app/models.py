@@ -166,6 +166,67 @@ class LessonPart(SQLModel, table=True):
     lesson: Lesson | None = Relationship(back_populates="parts")
 
 
+class WorkshopSession(SQLModel, table=True):
+    __tablename__ = "workshop_session"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    lesson_id: uuid.UUID = Field(
+        foreign_key="lesson.id", nullable=False, ondelete="CASCADE"
+    )
+    status: str = Field(default="scheduled", max_length=32)
+    current_part_index: int = Field(default=0, ge=0)
+    current_part_slug: str | None = Field(default=None, max_length=255)
+    part_generation: int = Field(default=1, ge=1)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class WorkshopParticipant(SQLModel, table=True):
+    __tablename__ = "workshop_participant"
+    __table_args__ = (
+        UniqueConstraint("session_id", "user_id", name="uq_workshop_participant_seat"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    session_id: uuid.UUID = Field(
+        foreign_key="workshop_session.id", nullable=False, ondelete="CASCADE"
+    )
+    user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", nullable=True, ondelete="SET NULL"
+    )
+    invited_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    joined_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    finished_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    live_status: str = Field(default="busy", max_length=16)
+    removed_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+
+
+class SessionInstructor(SQLModel, table=True):
+    __tablename__ = "session_instructor"
+    __table_args__ = (
+        UniqueConstraint("session_id", "user_id", name="uq_session_instructor_seat"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    session_id: uuid.UUID = Field(
+        foreign_key="workshop_session.id", nullable=False, ondelete="CASCADE"
+    )
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    role: str = Field(default="co_instructor", max_length=32)
+    assigned_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    removed_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+
+
 # Generic message
 class Message(SQLModel):
     message: str
