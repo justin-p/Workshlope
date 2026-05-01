@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
@@ -61,6 +61,7 @@ def bootstrap_e2e_workshop_live_session(
     session: SessionDep,
     participant_email: Annotated[EmailStr | None, Query()] = None,
     omit_participant_seat: Annotated[bool, Query()] = False,
+    initial_status: Annotated[Literal["live", "scheduled"], Query()] = "live",
 ) -> PrivateWorkshopE2ELiveSessionResponse:
     """Create a live workshop session with lesson parts for local E2E only.
 
@@ -69,6 +70,7 @@ def bootstrap_e2e_workshop_live_session(
     Pass ``omit_participant_seat=true`` to roster the user **only** as an
     instructor (no ``WorkshopParticipant`` row), so ``ws-ticket`` yields the
     **instructor** role while the frontend skips ``POST …/enter`` for that flow.
+    Pass ``initial_status=scheduled`` to exercise instructor start flows.
     """
     email = participant_email or settings.FIRST_SUPERUSER
     user = session.exec(select(User).where(User.email == email)).first()
@@ -122,7 +124,7 @@ def bootstrap_e2e_workshop_live_session(
     workshop_session = WorkshopSession(
         id=sid,
         lesson_id=lesson.id,
-        status="live",
+        status=initial_status,
         created_at=datetime.now(timezone.utc),
     )
     session.add(workshop_session)

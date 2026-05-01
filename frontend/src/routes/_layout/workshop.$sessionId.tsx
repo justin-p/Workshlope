@@ -72,7 +72,9 @@ function WorkshopSessionPage() {
   const [connectedRole, setConnectedRole] = useState<
     "participant" | "instructor" | null
   >(null)
-  const [roomStatus, setRoomStatus] = useState<"live" | "paused">("live")
+  const [roomStatus, setRoomStatus] = useState<"live" | "paused" | "ended">(
+    "live",
+  )
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
@@ -130,7 +132,9 @@ function WorkshopSessionPage() {
             }
             if (
               msg.type === "session.status_changed" &&
-              (msg.status === "live" || msg.status === "paused")
+              (msg.status === "live" ||
+                msg.status === "paused" ||
+                msg.status === "ended")
             ) {
               setRoomStatus(msg.status)
             }
@@ -180,6 +184,35 @@ function WorkshopSessionPage() {
     ws.send(JSON.stringify(payload))
   }
 
+  const endSession = async () => {
+    try {
+      await WorkshopSessionsService.endWorkshopSession({ sessionId })
+      setRoomStatus("ended")
+    } catch (e: unknown) {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    }
+  }
+
+  const startSession = async () => {
+    try {
+      await WorkshopSessionsService.startWorkshopSession({ sessionId })
+      // Force a clean reconnect path after scheduled->live transition.
+      window.location.reload()
+    } catch (e: unknown) {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    }
+  }
+
   const instructorReady = phase === "ready" && connectedRole === "instructor"
 
   return (
@@ -206,6 +239,18 @@ function WorkshopSessionPage() {
         <p className="text-sm text-destructive" data-testid="workshop-error">
           {errorDetail}
         </p>
+      ) : null}
+      {errorDetail === "Session not started yet" ? (
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            data-testid="workshop-instructor-start"
+            onClick={() => void startSession()}
+          >
+            Start session
+          </Button>
+        </div>
       ) : null}
 
       {connectedRole === "participant" ? (
@@ -262,6 +307,16 @@ function WorkshopSessionPage() {
             onClick={() => sendWsJson({ type: "part.advance", part_index: 1 })}
           >
             Advance to part 1
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            data-testid="workshop-instructor-end"
+            disabled={!instructorReady || roomStatus === "ended"}
+            onClick={() => void endSession()}
+          >
+            End session
           </Button>
         </div>
       ) : null}

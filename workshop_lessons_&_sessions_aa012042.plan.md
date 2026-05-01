@@ -154,7 +154,7 @@ Aligned with plan bullets: ws-ticket, role-scoped fan-out, trainee privacy.
 | OpenAPI + regenerated TS client when HTTP contract changed | ✅ | Run pre-commit hook on API edits |
 | **`part_generation` mirror + stale teardown** (hub sync after advance; **`part_generation_stale`** payload then close **`1008`**; receive loop stops — mint new ws-ticket and reconnect) | ✅ | `_dispatch_workshop_ws_text` returns `False`; `sync_bump_room_part_generation` after advance commit |
 | **Multi-process realtime** (Redis or equivalent hub) | 🔲 | MVP is in-memory `WorkshopRealtimeHub` |
-| **Playwright** for instructor + trainee flows on these APIs | 🟨 | Trainee + instructor: bootstrap (+ `omit_participant_seat`), `/workshop/:id` WS **pause / resume / advance** ack smoke, two-user assertion that participant `live_status` fan-outs to instructor while trainee stream remains peer-private; fuller cockpit assertions still 🔲 |
+| **Playwright** for instructor + trainee flows on these APIs | 🟨 | Trainee + instructor: bootstrap (+ `omit_participant_seat`), `/workshop/:id` WS **start / pause / resume / advance / end** smoke, two-user assertion that participant `live_status` fan-outs to instructor while trainee stream remains peer-private; fuller cockpit assertions still 🔲 |
 
 ### Stacked PRs — coarse roll-up
 
@@ -170,7 +170,7 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 
 ### Next actions (suggested order on PR04)
 
-1. Add broader cockpit E2E beyond `/workshop/:id` (instructor roster/session cards + start/end flows) while keeping trainee privacy assertions.
+1. Add broader cockpit E2E beyond `/workshop/:id` (instructor roster/session cards) while keeping trainee privacy assertions.
 2. **Decision locked**: stay single-process in PR04; revisit Redis/multi-process hub only when observed scale/concurrency requires it.
 3. Resume checklist: re-run `backend/tests/api/routes/test_private.py` and `frontend/tests/workshop.spec.ts`, then spot-check full Playwright when infra is stable.
 

@@ -91,6 +91,12 @@ test.describe("Workshop live session", () => {
     await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
       "part.advance.ack",
     )
+
+    await page.getByTestId("workshop-instructor-end").click()
+    await expect(page.getByTestId("workshop-ws-last-raw")).toContainText(
+      '"status":"ended"',
+    )
+    await expect(page.getByTestId("workshop-instructor-end")).toBeDisabled()
   })
 
   test("participant live_status fan-out is instructor-only", async ({
@@ -140,5 +146,26 @@ test.describe("Workshop live session", () => {
     )
 
     await participantContext.close()
+  })
+
+  test("scheduled session can be started from instructor page", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true&initial_status=scheduled`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(page.getByTestId("workshop-error")).toContainText(
+      "Session not started yet",
+    )
+    await page.getByTestId("workshop-instructor-start").click()
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      { timeout: 15_000 },
+    )
   })
 })

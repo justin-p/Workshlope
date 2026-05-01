@@ -81,3 +81,18 @@ def test_private_bootstrap_e2e_workshop_omits_participant_seat_when_requested(
         )
     ).first()
     assert inst is not None
+
+
+def test_private_bootstrap_e2e_workshop_can_start_scheduled(
+    client: TestClient, db: Session
+) -> None:
+    r = client.post(
+        f"{settings.API_V1_STR}/private/workshop/e2e-live-session/"
+        "?initial_status=scheduled",
+    )
+    assert r.status_code == 200
+
+    sid = uuid.UUID(r.json()["session_id"])
+    row = db.get(WorkshopSession, sid)
+    assert row is not None
+    assert row.status == "scheduled"
