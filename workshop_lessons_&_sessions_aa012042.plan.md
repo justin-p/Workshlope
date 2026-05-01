@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-01 (`/workshop/:sessionId` trainee page + WS; local-only `POST /private/workshop/e2e-live-session/` Playwright bootstrap; trainee Playwright smoke) |
+| **Last synced** | 2026-05-01 (`/workshop/:sessionId` trainee + instructor WS controls; bootstrap `omit_participant_seat` for instructor-role tickets; trainee + instructor Playwright smoke) |
 | **Active integration branch** | `ws-04-realtime-privacy` |
 | **Stack PR label** | Plan item **PR04 — RealtimePrivacy** (see Branch/PR chain below) |
 
@@ -154,7 +154,7 @@ Aligned with plan bullets: ws-ticket, role-scoped fan-out, trainee privacy.
 | OpenAPI + regenerated TS client when HTTP contract changed | ✅ | Run pre-commit hook on API edits |
 | **`part_generation` mirror + stale teardown** (hub sync after advance; **`part_generation_stale`** payload then close **`1008`**; receive loop stops — mint new ws-ticket and reconnect) | ✅ | `_dispatch_workshop_ws_text` returns `False`; `sync_bump_room_part_generation` after advance commit |
 | **Multi-process realtime** (Redis or equivalent hub) | 🔲 | MVP is in-memory `WorkshopRealtimeHub` |
-| **Playwright** for instructor + trainee flows on these APIs | 🟨 | Trainee: bootstrap + `/workshop/:id` WS **connected** + **live_status.ack**; instructor cockpit flows still 🔲 |
+| **Playwright** for instructor + trainee flows on these APIs | 🟨 | Trainee + instructor: bootstrap (+ `omit_participant_seat`), `/workshop/:id` WS **pause / resume / advance** ack smoke, two-user assertion that participant `live_status` fan-outs to instructor while trainee stream remains peer-private; fuller cockpit assertions still 🔲 |
 
 ### Stacked PRs — coarse roll-up
 

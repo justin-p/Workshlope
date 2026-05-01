@@ -28,10 +28,24 @@ Use this skill when staged or modified files include:
 
 ```bash
 cd frontend
-bunx playwright test --fail-on-flaky-tests
+bunx playwright test tests/workshop.spec.ts --project=chromium --fail-on-flaky-tests
 ```
 
-3. If tests fail, do not commit. Fix, rerun, then proceed.
+3. If the touched test is not `workshop.spec.ts`, run only touched specs first:
+
+```bash
+cd frontend
+bunx playwright test tests/<changed-spec>.spec.ts --project=chromium --fail-on-flaky-tests
+```
+
+4. Before commit/PR update, run a broader check:
+
+```bash
+cd frontend
+bunx playwright test --project=chromium --fail-on-flaky-tests
+```
+
+5. If tests fail, do not commit. Fix, rerun, then proceed.
 
 ## CI Babysitting Rule
 

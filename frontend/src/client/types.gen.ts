@@ -285,6 +285,7 @@ export type PrivateCreateUserData = {
 export type PrivateCreateUserResponse = (UserPublic);
 
 export type PrivateBootstrapE2eWorkshopLiveSessionData = {
+    omitParticipantSeat?: boolean;
     participantEmail?: (string | null);
 };
 

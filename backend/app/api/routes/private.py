@@ -60,11 +60,15 @@ def bootstrap_e2e_workshop_live_session(
     *,
     session: SessionDep,
     participant_email: Annotated[EmailStr | None, Query()] = None,
+    omit_participant_seat: Annotated[bool, Query()] = False,
 ) -> PrivateWorkshopE2ELiveSessionResponse:
     """Create a live workshop session with lesson parts for local E2E only.
 
     Roster ``FIRST_SUPERUSER`` (or ``participant_email``) as trainee + session
     instructor. Exposed only when ``ENVIRONMENT == local`` via ``api_router``.
+    Pass ``omit_participant_seat=true`` to roster the user **only** as an
+    instructor (no ``WorkshopParticipant`` row), so ``ws-ticket`` yields the
+    **instructor** role while the frontend skips ``POST …/enter`` for that flow.
     """
     email = participant_email or settings.FIRST_SUPERUSER
     user = session.exec(select(User).where(User.email == email)).first()
@@ -122,14 +126,15 @@ def bootstrap_e2e_workshop_live_session(
         created_at=datetime.now(timezone.utc),
     )
     session.add(workshop_session)
-    session.add(
-        WorkshopParticipant(
-            session_id=sid,
-            user_id=user.id,
-            invited_at=datetime.now(timezone.utc),
-            joined_at=datetime.now(timezone.utc),
+    if not omit_participant_seat:
+        session.add(
+            WorkshopParticipant(
+                session_id=sid,
+                user_id=user.id,
+                invited_at=datetime.now(timezone.utc),
+                joined_at=datetime.now(timezone.utc),
+            )
         )
-    )
     session.add(
         SessionInstructor(
             session_id=sid,

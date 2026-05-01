@@ -18,6 +18,42 @@ function httpToWsBase(httpBase: string): string {
   return httpBase
 }
 
+/** Decode JWT payload segment (no verification — UI routing only). */
+function decodeJwtPayloadJson(
+  rawToken: string,
+): Record<string, unknown> | null {
+  const parts = rawToken.split(".")
+  if (parts.length < 2) return null
+  const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/")
+  const pad = "=".repeat((4 - (b64.length % 4)) % 4)
+  try {
+    const json = atob(b64 + pad)
+    return JSON.parse(json) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+async function createWorkshopWsTicketWithOptionalEnter(sessionId: string) {
+  try {
+    return await WorkshopSessionsService.createWorkshopWsTicket({
+      sessionId,
+    })
+  } catch (e: unknown) {
+    if (e instanceof ApiError && e.status === 403) {
+      const body = e.body as { detail?: unknown } | undefined
+      const detail = typeof body?.detail === "string" ? body.detail : undefined
+      if (detail === "User must enter session first") {
+        await WorkshopSessionsService.enterWorkshopSession({ sessionId })
+        return await WorkshopSessionsService.createWorkshopWsTicket({
+          sessionId,
+        })
+      }
+    }
+    throw e
+  }
+}
+
 export const Route = createFileRoute("/_layout/workshop/$sessionId")({
   component: WorkshopSessionPage,
   head: () => ({
@@ -32,6 +68,11 @@ function WorkshopSessionPage() {
   >("idle")
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
   const [lastEvent, setLastEvent] = useState<string>("")
+  const [lastAckEvent, setLastAckEvent] = useState<string>("")
+  const [connectedRole, setConnectedRole] = useState<
+    "participant" | "instructor" | null
+  >(null)
+  const [roomStatus, setRoomStatus] = useState<"live" | "paused">("live")
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
@@ -46,12 +87,21 @@ function WorkshopSessionPage() {
     async function connect() {
       setPhase("entering")
       setErrorDetail(null)
+      setConnectedRole(null)
+      setRoomStatus("live")
+      setLastAckEvent("")
       try {
-        await WorkshopSessionsService.enterWorkshopSession({ sessionId })
-        const ticketRes = await WorkshopSessionsService.createWorkshopWsTicket({
-          sessionId,
-        })
+        const ticketRes =
+          await createWorkshopWsTicketWithOptionalEnter(sessionId)
         if (cancelled) return
+
+        const claims = decodeJwtPayloadJson(ticketRes.ticket)
+        const roleClaim = claims?.role
+        if (roleClaim !== "participant" && roleClaim !== "instructor") {
+          setPhase("error")
+          setErrorDetail("Invalid workshop ticket role")
+          return
+        }
 
         setPhase("ws_connecting")
         const apiBase = import.meta.env.VITE_API_URL as string
@@ -61,11 +111,28 @@ function WorkshopSessionPage() {
 
         ws.onmessage = (ev) => {
           if (cancelled) return
-          setLastEvent(String(ev.data))
+          const raw = String(ev.data)
+          setLastEvent(raw)
           try {
-            const msg = JSON.parse(String(ev.data)) as { type?: string }
+            const msg = JSON.parse(raw) as {
+              type?: string
+              role?: string
+              status?: string
+            }
+            if (typeof msg.type === "string" && msg.type.endsWith(".ack")) {
+              setLastAckEvent(raw)
+            }
             if (msg.type === "session.connected") {
+              if (msg.role === "participant" || msg.role === "instructor") {
+                setConnectedRole(msg.role)
+              }
               setPhase("ready")
+            }
+            if (
+              msg.type === "session.status_changed" &&
+              (msg.status === "live" || msg.status === "paused")
+            ) {
+              setRoomStatus(msg.status)
             }
           } catch {
             /* non-JSON frame */
@@ -107,6 +174,14 @@ function WorkshopSessionPage() {
     ws.send(JSON.stringify({ type: "live_status", live_status: liveStatus }))
   }
 
+  const sendWsJson = (payload: Record<string, unknown>) => {
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify(payload))
+  }
+
+  const instructorReady = phase === "ready" && connectedRole === "instructor"
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Workshop session</h1>
@@ -133,26 +208,63 @@ function WorkshopSessionPage() {
         </p>
       ) : null}
 
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={phase !== "ready"}
-          onClick={() => sendLiveStatus("busy")}
-        >
-          Mark busy
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={phase !== "ready"}
-          onClick={() => sendLiveStatus("done")}
-        >
-          Mark done
-        </Button>
-      </div>
+      {connectedRole === "participant" ? (
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={phase !== "ready" || roomStatus !== "live"}
+            onClick={() => sendLiveStatus("busy")}
+          >
+            Mark busy
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={phase !== "ready" || roomStatus !== "live"}
+            onClick={() => sendLiveStatus("done")}
+          >
+            Mark done
+          </Button>
+        </div>
+      ) : null}
+
+      {connectedRole === "instructor" ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-instructor-pause"
+            disabled={!instructorReady || roomStatus !== "live"}
+            onClick={() => sendWsJson({ type: "session.pause" })}
+          >
+            Pause room
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-instructor-resume"
+            disabled={!instructorReady || roomStatus !== "paused"}
+            onClick={() => sendWsJson({ type: "session.resume" })}
+          >
+            Resume room
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-instructor-advance"
+            disabled={!instructorReady || roomStatus !== "live"}
+            onClick={() => sendWsJson({ type: "part.advance", part_index: 1 })}
+          >
+            Advance to part 1
+          </Button>
+        </div>
+      ) : null}
 
       {lastEvent ? (
         <pre
@@ -160,6 +272,14 @@ function WorkshopSessionPage() {
           className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-48"
         >
           {lastEvent}
+        </pre>
+      ) : null}
+      {lastAckEvent ? (
+        <pre
+          data-testid="workshop-ws-last-ack"
+          className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-48"
+        >
+          {lastAckEvent}
         </pre>
       ) : null}
     </div>

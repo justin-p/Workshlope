@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.core.config import settings
-from app.models import User, WorkshopParticipant, WorkshopSession
+from app.models import SessionInstructor, User, WorkshopParticipant, WorkshopSession
 
 
 def test_create_user(client: TestClient, db: Session) -> None:
@@ -50,3 +50,34 @@ def test_private_bootstrap_e2e_workshop_live_session(
     ).first()
     assert seat is not None
     assert seat.joined_at is not None
+
+
+def test_private_bootstrap_e2e_workshop_omits_participant_seat_when_requested(
+    client: TestClient, db: Session
+) -> None:
+    su = db.exec(select(User).where(User.email == settings.FIRST_SUPERUSER)).first()
+    assert su is not None
+
+    r = client.post(
+        f"{settings.API_V1_STR}/private/workshop/e2e-live-session/"
+        "?omit_participant_seat=true",
+    )
+    assert r.status_code == 200
+
+    sid = uuid.UUID(r.json()["session_id"])
+
+    seat = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == sid,
+            WorkshopParticipant.user_id == su.id,
+        )
+    ).first()
+    assert seat is None
+
+    inst = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == sid,
+            SessionInstructor.user_id == su.id,
+        )
+    ).first()
+    assert inst is not None

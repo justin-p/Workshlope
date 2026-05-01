@@ -381,8 +381,12 @@ export class PrivateService {
      *
      * Roster ``FIRST_SUPERUSER`` (or ``participant_email``) as trainee + session
      * instructor. Exposed only when ``ENVIRONMENT == local`` via ``api_router``.
+     * Pass ``omit_participant_seat=true`` to roster the user **only** as an
+     * instructor (no ``WorkshopParticipant`` row), so ``ws-ticket`` yields the
+     * **instructor** role while the frontend skips ``POST …/enter`` for that flow.
      * @param data The data for the request.
      * @param data.participantEmail
+     * @param data.omitParticipantSeat
      * @returns PrivateWorkshopE2ELiveSessionResponse Successful Response
      * @throws ApiError
      */
@@ -391,7 +395,8 @@ export class PrivateService {
             method: 'POST',
             url: '/api/v1/private/workshop/e2e-live-session/',
             query: {
-                participant_email: data.participantEmail
+                participant_email: data.participantEmail,
+                omit_participant_seat: data.omitParticipantSeat
             },
             errors: {
                 422: 'Validation Error'

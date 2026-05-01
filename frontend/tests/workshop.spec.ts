@@ -1,6 +1,18 @@
 import { expect, test } from "@playwright/test"
+import { createUser } from "./utils/privateApi"
+import { randomEmail } from "./utils/random"
 
 const apiBase = process.env.VITE_API_URL ?? "http://localhost:8000"
+
+async function createParticipantUserForWorkshop() {
+  const email = randomEmail()
+  const password = "changethis123"
+  await createUser({
+    email,
+    password,
+  })
+  return { email, password }
+}
 
 test.describe("Workshop live session", () => {
   test("participant view connects WebSocket after enter + ticket", async ({
@@ -40,8 +52,93 @@ test.describe("Workshop live session", () => {
     )
 
     await page.getByRole("button", { name: "Mark done" }).click()
-    await expect(page.getByTestId("workshop-ws-last-raw")).toContainText(
+    await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
       "live_status.ack",
     )
+    await expect(page.getByTestId("workshop-ws-last-raw")).not.toContainText(
+      "participant.live_status",
+    )
+  })
+
+  test("instructor-only bootstrap: pause, resume, and advance ack without enter", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      { timeout: 15_000 },
+    )
+    await expect(page.getByRole("button", { name: "Mark done" })).toHaveCount(0)
+
+    await page.getByTestId("workshop-instructor-pause").click()
+    await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
+      "session.pause.ack",
+    )
+
+    await page.getByTestId("workshop-instructor-resume").click()
+    await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
+      "session.resume.ack",
+    )
+
+    await page.getByTestId("workshop-instructor-advance").click()
+    await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
+      "part.advance.ack",
+    )
+  })
+
+  test("participant live_status fan-out is instructor-only", async ({
+    page,
+    browser,
+    request,
+  }) => {
+    const participant = await createParticipantUserForWorkshop()
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?participant_email=${encodeURIComponent(participant.email)}`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    const participantContext = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    })
+    const participantPage = await participantContext.newPage()
+    await participantPage.goto("/login")
+    await participantPage.getByTestId("email-input").fill(participant.email)
+    await participantPage
+      .getByTestId("password-input")
+      .fill(participant.password)
+    await participantPage.getByRole("button", { name: "Log In" }).click()
+    await participantPage.waitForURL("/")
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      {
+        timeout: 15_000,
+      },
+    )
+
+    await participantPage.goto(`/workshop/${session_id}`)
+    await expect(participantPage.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      { timeout: 15_000 },
+    )
+
+    await participantPage.getByRole("button", { name: "Mark done" }).click()
+    await expect(
+      participantPage.getByTestId("workshop-ws-last-ack"),
+    ).toContainText("live_status.ack")
+    await expect(page.getByTestId("workshop-ws-last-raw")).toContainText(
+      "participant.live_status",
+    )
+
+    await participantContext.close()
   })
 })

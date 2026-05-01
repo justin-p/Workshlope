@@ -33,22 +33,29 @@ if [[ -z "${STAGED_FILES}" ]]; then
   exit 0
 fi
 
-if ! echo "${STAGED_FILES}" | python3 - <<'PY'
-import re
-import sys
-text = sys.stdin.read()
-patterns = [
-    r"^frontend/tests/",
-    r"^frontend/playwright\.config\.ts$",
-    r"^frontend/Dockerfile\.playwright$",
-    r"^\.github/workflows/playwright\.yml$",
-]
-for line in text.splitlines():
-    if any(re.search(p, line) for p in patterns):
-        sys.exit(0)
-sys.exit(1)
-PY
-then
+needs_playwright_gate=0
+needs_full_playwright_run=0
+spec_files=()
+
+while IFS= read -r file; do
+  [[ -z "${file}" ]] && continue
+  case "${file}" in
+    frontend/tests/*.spec.ts)
+      needs_playwright_gate=1
+      spec_files+=("${file#frontend/}")
+      ;;
+    frontend/tests/*)
+      needs_playwright_gate=1
+      needs_full_playwright_run=1
+      ;;
+    frontend/playwright.config.ts|frontend/Dockerfile.playwright|.github/workflows/playwright.yml)
+      needs_playwright_gate=1
+      needs_full_playwright_run=1
+      ;;
+  esac
+done <<< "${STAGED_FILES}"
+
+if [[ "${needs_playwright_gate}" -ne 1 ]]; then
   echo '{"permission":"allow"}'
   exit 0
 fi
@@ -70,14 +77,19 @@ EOF
   exit 0
 fi
 
+playwright_args=(--fail-on-flaky-tests --project=chromium)
+if [[ "${needs_full_playwright_run}" -ne 1 && ${#spec_files[@]} -gt 0 ]]; then
+  playwright_args+=("${spec_files[@]}")
+fi
+
 if ! (
   export BUN_INSTALL="${HOME}/.bun"
   export PATH="${BUN_INSTALL}/bin:${PATH}"
   cd frontend
-  bunx playwright test --fail-on-flaky-tests
+  bunx playwright test "${playwright_args[@]}"
 ) >/tmp/playwright-guard-test.log 2>&1; then
   cat <<'EOF'
-{"permission":"ask","user_message":"Playwright guard: local Playwright tests failed. Run `cd frontend && bunx playwright test --fail-on-flaky-tests` and fix failures before committing.","agent_message":"Commit blocked by Playwright guard because local Playwright tests failed."}
+{"permission":"ask","user_message":"Playwright guard: local Playwright tests failed. Run `cd frontend && bunx playwright test --project=chromium --fail-on-flaky-tests` (or the touched spec files) and fix failures before committing.","agent_message":"Commit blocked by Playwright guard because local Playwright tests failed."}
 EOF
   exit 0
 fi
