@@ -149,7 +149,7 @@ Aligned with plan bullets: ws-ticket, role-scoped fan-out, trainee privacy.
 | Instructor `POST …/end` (`live`\|`paused→ended`) + hub broadcast | ✅ | Does not bulk-set `finished_at` |
 | Enter + ws-ticket reject `scheduled` / `ended` with clear HTTP errors | ✅ | |
 | OpenAPI + regenerated TS client when HTTP contract changed | ✅ | Run pre-commit hook on API edits |
-| **`part_generation` mirror + stale signal** (hub sync after advance; **`part_generation_stale`** + current gen → mint new ws-ticket and reconnect; connection left open until client disconnects) | ✅ | `WorkshopRealtimeHub.sync_bump_room_part_generation`; pre-frame DB vs `connection.part_generation` (skipped for `part.advance` inbound) |
+| **`part_generation` mirror + stale teardown** (hub sync after advance; **`part_generation_stale`** payload then close **`1008`**; receive loop stops — mint new ws-ticket and reconnect) | ✅ | `_dispatch_workshop_ws_text` returns `False`; `sync_bump_room_part_generation` after advance commit |
 | **Multi-process realtime** (Redis or equivalent hub) | 🔲 | MVP is in-memory `WorkshopRealtimeHub` |
 | **Playwright** for instructor + trainee flows on these APIs | 🔲 | Plan DoD expects E2E with user-visible surfaces |
 

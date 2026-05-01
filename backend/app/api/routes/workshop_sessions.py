@@ -155,16 +155,20 @@ async def _dispatch_workshop_ws_text(
     handshake: WorkshopWsHandshake,
     connection: WorkshopWsConnection,
     text: str,
-) -> None:
-    """Handle one client text JSON frame."""
+) -> bool:
+    """Handle one client text JSON frame.
+
+    Returns ``False`` when the server's receive loop for this websocket should stop
+    (e.g. after policy close for stale ``part_generation``).
+    """
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
         await websocket.send_json({"type": "error", "detail": "invalid_json"})
-        return
+        return True
     if not isinstance(payload, dict):
         await websocket.send_json({"type": "error", "detail": "invalid_message"})
-        return
+        return True
 
     msg_type = payload.get("type")
     # Part advance bumps generation in-room before any awaits; staleness gates other frames.
@@ -175,7 +179,7 @@ async def _dispatch_workshop_ws_text(
                 await websocket.send_json(
                     {"type": "error", "detail": "session_not_found"}
                 )
-                return
+                return True
             if int(row_snap.part_generation) != connection.part_generation:
                 await websocket.send_json(
                     {
@@ -184,28 +188,26 @@ async def _dispatch_workshop_ws_text(
                         "part_generation": int(row_snap.part_generation),
                     }
                 )
-                # Keep the socket usable for further frames after the client refreshes its ticket
-                # (mirrored ``connection.part_generation`` or reconnect); avoid closing here so the
-                # receive loop does not observe a disconnected socket mid-dispatch under TestClient.
-                return
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return False
 
     if msg_type == "live_status":
         if handshake.role != "participant":
             await websocket.send_json({"type": "error", "detail": "forbidden"})
-            return
+            return True
 
         live_status_raw = payload.get("live_status")
         if not isinstance(live_status_raw, str):
             await websocket.send_json(
                 {"type": "error", "detail": "invalid_live_status"}
             )
-            return
+            return True
         live_status = live_status_raw.strip()[:16]
         if live_status not in ALLOWED_WS_LIVE_STATUSES:
             await websocket.send_json(
                 {"type": "error", "detail": "invalid_live_status"}
             )
-            return
+            return True
 
         with Session(engine) as db:
             workshop_row = db.get(WorkshopSession, session_id)
@@ -213,12 +215,12 @@ async def _dispatch_workshop_ws_text(
                 await websocket.send_json(
                     {"type": "error", "detail": "session_not_found"}
                 )
-                return
+                return True
             if workshop_row.status not in WORKSHOP_ACTIVE_STATUSES:
                 await websocket.send_json(
                     {"type": "error", "detail": "session_not_active"}
                 )
-                return
+                return True
             if workshop_row.status != "live":
                 await websocket.send_json(
                     {
@@ -226,7 +228,7 @@ async def _dispatch_workshop_ws_text(
                         "detail": "live_status_requires_live_session",
                     }
                 )
-                return
+                return True
             participant = db.exec(
                 select(WorkshopParticipant).where(
                     WorkshopParticipant.session_id == session_id,
@@ -238,7 +240,7 @@ async def _dispatch_workshop_ws_text(
                 await websocket.send_json(
                     {"type": "error", "detail": "participant_not_found"}
                 )
-                return
+                return True
             participant.live_status = live_status
             db.add(participant)
             db.commit()
@@ -251,16 +253,16 @@ async def _dispatch_workshop_ws_text(
         await websocket.send_json(
             {"type": "live_status.ack", "live_status": live_status}
         )
-        return
+        return True
 
     if msg_type == "part.advance":
         if handshake.role != "instructor":
             await websocket.send_json({"type": "error", "detail": "forbidden"})
-            return
+            return True
         part_index_raw = payload.get("part_index")
         if not isinstance(part_index_raw, int) or part_index_raw < 0:
             await websocket.send_json({"type": "error", "detail": "invalid_part_index"})
-            return
+            return True
 
         with Session(engine) as db:
             workshop_session = db.get(WorkshopSession, session_id)
@@ -268,7 +270,7 @@ async def _dispatch_workshop_ws_text(
                 await websocket.send_json(
                     {"type": "error", "detail": "session_not_found"}
                 )
-                return
+                return True
             if workshop_session.status not in WS_PART_ADVANCE_REQUIRES_STATUS:
                 await websocket.send_json(
                     {
@@ -276,7 +278,7 @@ async def _dispatch_workshop_ws_text(
                         "detail": "advance_requires_live_session",
                     }
                 )
-                return
+                return True
             lesson_parts = db.exec(
                 select(LessonPart)
                 .where(LessonPart.lesson_id == workshop_session.lesson_id)
@@ -286,7 +288,7 @@ async def _dispatch_workshop_ws_text(
                 await websocket.send_json(
                     {"type": "error", "detail": "invalid_part_index"}
                 )
-                return
+                return True
             target_part = lesson_parts[part_index_raw]
             target_part_slug = str(target_part.slug)
             workshop_session.current_part_index = part_index_raw
@@ -321,19 +323,19 @@ async def _dispatch_workshop_ws_text(
             part_slug=target_part_slug,
             part_generation=next_generation,
         )
-        return
+        return True
 
     if msg_type == "session.pause":
         if handshake.role != "instructor":
             await websocket.send_json({"type": "error", "detail": "forbidden"})
-            return
+            return True
         with Session(engine) as db:
             workshop_session_row = db.get(WorkshopSession, session_id)
             if workshop_session_row is None:
                 await websocket.send_json(
                     {"type": "error", "detail": "session_not_found"}
                 )
-                return
+                return True
             if workshop_session_row.status != "live":
                 await websocket.send_json(
                     {
@@ -341,7 +343,7 @@ async def _dispatch_workshop_ws_text(
                         "detail": "pause_requires_live_session",
                     }
                 )
-                return
+                return True
             workshop_session_row.status = "paused"
             db.add(workshop_session_row)
             db.commit()
@@ -351,19 +353,19 @@ async def _dispatch_workshop_ws_text(
             session_id=session_id,
             status="paused",
         )
-        return
+        return True
 
     if msg_type == "session.resume":
         if handshake.role != "instructor":
             await websocket.send_json({"type": "error", "detail": "forbidden"})
-            return
+            return True
         with Session(engine) as db:
             workshop_session_row = db.get(WorkshopSession, session_id)
             if workshop_session_row is None:
                 await websocket.send_json(
                     {"type": "error", "detail": "session_not_found"}
                 )
-                return
+                return True
             if workshop_session_row.status != "paused":
                 await websocket.send_json(
                     {
@@ -371,7 +373,7 @@ async def _dispatch_workshop_ws_text(
                         "detail": "resume_requires_paused_session",
                     }
                 )
-                return
+                return True
             workshop_session_row.status = "live"
             db.add(workshop_session_row)
             db.commit()
@@ -381,9 +383,10 @@ async def _dispatch_workshop_ws_text(
             session_id=session_id,
             status="live",
         )
-        return
+        return True
 
     await websocket.send_json({"type": "error", "detail": "unknown_message_type"})
+    return True
 
 
 @router.post("/{session_id}/enter", response_model=Message)
@@ -597,13 +600,15 @@ async def workshop_session_ws(websocket: WebSocket, session_id: uuid.UUID) -> No
         )
         while True:
             text = await websocket.receive_text()
-            await _dispatch_workshop_ws_text(
+            keep_receiving = await _dispatch_workshop_ws_text(
                 websocket=websocket,
                 session_id=session_id,
                 handshake=handshake,
                 connection=connection,
                 text=text,
             )
+            if not keep_receiving:
+                break
     except WebSocketDisconnect:
         return
     finally:
