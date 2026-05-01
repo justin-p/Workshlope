@@ -64,5 +64,28 @@ class WorkshopRealtimeHub:
                 # Best-effort fan-out; stale sockets are skipped.
                 continue
 
+    async def publish_session_part_changed(
+        self,
+        *,
+        session_id: uuid.UUID,
+        part_index: int,
+        part_slug: str,
+        part_generation: int,
+    ) -> None:
+        payload = {
+            "type": "session.part_changed",
+            "session_id": str(session_id),
+            "part_index": part_index,
+            "part_slug": part_slug,
+            "part_generation": part_generation,
+        }
+        async with self._lock:
+            room = list(self._rooms.get(session_id, []))
+        for conn in room:
+            try:
+                await conn.websocket.send_json(payload)
+            except Exception:
+                continue
+
 
 workshop_hub = WorkshopRealtimeHub()

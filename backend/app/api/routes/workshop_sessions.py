@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.db import engine
 from app.core.security import ALGORITHM
 from app.models import (
+    LessonPart,
     Message,
     SessionInstructor,
     User,
@@ -143,46 +144,112 @@ async def _dispatch_workshop_ws_text(
         return
 
     msg_type = payload.get("type")
-    if msg_type != "live_status":
-        await websocket.send_json({"type": "error", "detail": "unknown_message_type"})
-        return
+    if msg_type == "live_status":
+        if handshake.role != "participant":
+            await websocket.send_json({"type": "error", "detail": "forbidden"})
+            return
 
-    if handshake.role != "participant":
-        await websocket.send_json({"type": "error", "detail": "forbidden"})
-        return
-
-    live_status_raw = payload.get("live_status")
-    if not isinstance(live_status_raw, str):
-        await websocket.send_json({"type": "error", "detail": "invalid_live_status"})
-        return
-    live_status = live_status_raw.strip()[:16]
-    if live_status not in ALLOWED_WS_LIVE_STATUSES:
-        await websocket.send_json({"type": "error", "detail": "invalid_live_status"})
-        return
-
-    with Session(engine) as db:
-        participant = db.exec(
-            select(WorkshopParticipant).where(
-                WorkshopParticipant.session_id == session_id,
-                WorkshopParticipant.user_id == handshake.user_id,
-                col(WorkshopParticipant.removed_at).is_(None),
-            )
-        ).first()
-        if participant is None:
+        live_status_raw = payload.get("live_status")
+        if not isinstance(live_status_raw, str):
             await websocket.send_json(
-                {"type": "error", "detail": "participant_not_found"}
+                {"type": "error", "detail": "invalid_live_status"}
             )
             return
-        participant.live_status = live_status
-        db.add(participant)
-        db.commit()
+        live_status = live_status_raw.strip()[:16]
+        if live_status not in ALLOWED_WS_LIVE_STATUSES:
+            await websocket.send_json(
+                {"type": "error", "detail": "invalid_live_status"}
+            )
+            return
 
-    await workshop_hub.publish_participant_live_status(
-        session_id=session_id,
-        user_id=handshake.user_id,
-        live_status=live_status,
-    )
-    await websocket.send_json({"type": "live_status.ack", "live_status": live_status})
+        with Session(engine) as db:
+            participant = db.exec(
+                select(WorkshopParticipant).where(
+                    WorkshopParticipant.session_id == session_id,
+                    WorkshopParticipant.user_id == handshake.user_id,
+                    col(WorkshopParticipant.removed_at).is_(None),
+                )
+            ).first()
+            if participant is None:
+                await websocket.send_json(
+                    {"type": "error", "detail": "participant_not_found"}
+                )
+                return
+            participant.live_status = live_status
+            db.add(participant)
+            db.commit()
+
+        await workshop_hub.publish_participant_live_status(
+            session_id=session_id,
+            user_id=handshake.user_id,
+            live_status=live_status,
+        )
+        await websocket.send_json(
+            {"type": "live_status.ack", "live_status": live_status}
+        )
+        return
+
+    if msg_type == "part.advance":
+        if handshake.role != "instructor":
+            await websocket.send_json({"type": "error", "detail": "forbidden"})
+            return
+        part_index_raw = payload.get("part_index")
+        if not isinstance(part_index_raw, int) or part_index_raw < 0:
+            await websocket.send_json({"type": "error", "detail": "invalid_part_index"})
+            return
+
+        with Session(engine) as db:
+            workshop_session = db.get(WorkshopSession, session_id)
+            if workshop_session is None:
+                await websocket.send_json(
+                    {"type": "error", "detail": "session_not_found"}
+                )
+                return
+            lesson_parts = db.exec(
+                select(LessonPart)
+                .where(LessonPart.lesson_id == workshop_session.lesson_id)
+                .order_by(col(LessonPart.ordering))
+            ).all()
+            if part_index_raw >= len(lesson_parts):
+                await websocket.send_json(
+                    {"type": "error", "detail": "invalid_part_index"}
+                )
+                return
+            target_part = lesson_parts[part_index_raw]
+            target_part_slug = str(target_part.slug)
+            workshop_session.current_part_index = part_index_raw
+            workshop_session.current_part_slug = target_part_slug
+            workshop_session.part_generation = int(workshop_session.part_generation) + 1
+            db.add(workshop_session)
+            participants = db.exec(
+                select(WorkshopParticipant).where(
+                    WorkshopParticipant.session_id == session_id,
+                    col(WorkshopParticipant.removed_at).is_(None),
+                )
+            ).all()
+            for participant in participants:
+                participant.live_status = "busy"
+                db.add(participant)
+            db.commit()
+            next_generation = int(workshop_session.part_generation)
+
+        await websocket.send_json(
+            {
+                "type": "part.advance.ack",
+                "part_index": part_index_raw,
+                "part_slug": target_part_slug,
+                "part_generation": next_generation,
+            }
+        )
+        await workshop_hub.publish_session_part_changed(
+            session_id=session_id,
+            part_index=part_index_raw,
+            part_slug=target_part_slug,
+            part_generation=next_generation,
+        )
+        return
+
+    await websocket.send_json({"type": "error", "detail": "unknown_message_type"})
 
 
 @router.post("/{session_id}/enter", response_model=Message)

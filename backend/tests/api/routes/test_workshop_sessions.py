@@ -9,7 +9,15 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.core.security import ALGORITHM
-from app.models import Lesson, LessonRepo, User, WorkshopParticipant, WorkshopSession
+from app.models import (
+    Lesson,
+    LessonPart,
+    LessonRepo,
+    SessionInstructor,
+    User,
+    WorkshopParticipant,
+    WorkshopSession,
+)
 from app.services import workshop_realtime as workshop_realtime_mod
 from tests.utils.user import authentication_token_from_email
 
@@ -43,6 +51,32 @@ def _create_live_session(db: Session) -> WorkshopSession:
     db.commit()
     db.refresh(session)
     return session
+
+
+def _add_two_parts_to_session_lesson(db: Session, session: WorkshopSession) -> None:
+    lesson = db.get(Lesson, session.lesson_id)
+    assert lesson is not None
+    db.add(
+        LessonPart(
+            lesson_id=lesson.id,
+            ordering=0,
+            slug=f"part-0-{uuid.uuid4()}",
+            title="Part 0",
+            path="01-part-0.md",
+            body_md="# Part 0",
+        )
+    )
+    db.add(
+        LessonPart(
+            lesson_id=lesson.id,
+            ordering=1,
+            slug=f"part-1-{uuid.uuid4()}",
+            title="Part 1",
+            path="02-part-1.md",
+            body_md="# Part 1",
+        )
+    )
+    db.commit()
 
 
 def test_enter_rejected_when_session_scheduled(
@@ -305,3 +339,70 @@ def test_ws_participant_live_status_persists_ack_and_fanout_registered(
     db.refresh(participant_row)
     assert participant_row.live_status == "done"
     assert published == [(session_row.id, user.id, "done")]
+
+
+def test_ws_instructor_can_advance_part_and_broadcast_to_participants(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    _add_two_parts_to_session_lesson(db, session_row)
+    participant_headers = authentication_token_from_email(
+        client=client, email=settings.EMAIL_TEST_USER, db=db
+    )
+    participant_user = db.exec(
+        select(User).where(User.email == settings.EMAIL_TEST_USER)
+    ).first()
+    assert participant_user is not None
+    instructor_email = f"instructor-{uuid.uuid4()}@example.com"
+    instructor_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor_user = db.exec(
+        select(User).where(User.email == instructor_email)
+    ).first()
+    assert instructor_user is not None
+    instructor_user.is_instructor = True
+    db.add(instructor_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor_user.id,
+            role="lead",
+        )
+    )
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=participant_user.id,
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    participant_ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=participant_headers,
+    ).json()["ticket"]
+    instructor_ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=instructor_headers,
+    ).json()["ticket"]
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", participant_ticket],
+    ) as participant_ws:
+        assert participant_ws.receive_json()["type"] == "session.connected"
+        with client.websocket_connect(
+            _workshop_ws_path(session_row.id),
+            subprotocols=["ticket", instructor_ticket],
+        ) as instructor_ws:
+            assert instructor_ws.receive_json()["type"] == "session.connected"
+            instructor_ws.send_json({"type": "part.advance", "part_index": 1})
+            ack = instructor_ws.receive_json()
+            broadcast = participant_ws.receive_json()
+
+    assert ack["type"] == "part.advance.ack"
+    assert ack["part_index"] == 1
+    assert broadcast["type"] == "session.part_changed"
+    assert broadcast["part_index"] == 1
