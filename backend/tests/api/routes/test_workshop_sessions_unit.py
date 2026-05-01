@@ -293,6 +293,40 @@ def test_authorize_ws_handshake_rejects_participant_not_entered(db: Session) -> 
     )
 
 
+def test_authorize_ws_handshake_rejects_soft_removed_participant(db: Session) -> None:
+    session = _make_live_session_and_lesson(db)
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"soft-removed-{uuid.uuid4()}@example.com",
+            password=settings.FIRST_SUPERUSER_PASSWORD,
+        ),
+    )
+    participant = WorkshopParticipant(
+        session_id=session.id,
+        user_id=user.id,
+        joined_at=datetime.now(timezone.utc),
+        removed_at=datetime.now(timezone.utc),
+    )
+    db.add(participant)
+    db.commit()
+
+    claims = {
+        "sid": str(session.id),
+        "uid": str(user.id),
+        "role": "participant",
+        "pg": session.part_generation,
+    }
+    assert (
+        ws_mod._authorize_workshop_ws_handshake(
+            db,
+            route_session_id=session.id,
+            claims=claims,
+        )
+        is None
+    )
+
+
 def test_authorize_ws_handshake_rejects_unknown_role_claim(db: Session) -> None:
     session = _make_live_session_and_lesson(db)
     user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()

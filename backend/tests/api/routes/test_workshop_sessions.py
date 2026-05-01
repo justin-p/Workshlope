@@ -1330,3 +1330,241 @@ def test_ws_part_advance_requires_integer_part_index(
 
         ws.send_json({"type": "part.advance", "part_index": 99})
         assert ws.receive_json() == {"type": "error", "detail": "invalid_part_index"}
+
+
+def test_http_enter_creates_participant_when_user_not_rostered_yet(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+
+    trainee_email = f"walk-in-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=trainee_email, db=db)
+    user = db.exec(select(User).where(User.email == trainee_email)).first()
+    assert user is not None
+
+    prior = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_row.id,
+            WorkshopParticipant.user_id == user.id,
+        )
+    ).first()
+    assert prior is None
+
+    resp = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/enter",
+        headers=headers,
+    )
+    assert resp.status_code == 200
+
+    rostered = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_row.id,
+            WorkshopParticipant.user_id == user.id,
+        )
+    ).first()
+    assert rostered is not None
+    assert rostered.joined_at is not None
+
+
+def test_http_ws_ticket_rejects_when_session_scheduled(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    session_row.status = "scheduled"
+    db.add(session_row)
+    db.commit()
+
+    instructor_email = f"scheduled-ticket-{uuid.uuid4()}@example.com"
+    i_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    i_user = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert i_user is not None
+    i_user.is_instructor = True
+    db.add(i_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=i_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    resp = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=i_headers,
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Session not started yet"
+
+
+def test_ws_snap_reports_session_deleted_for_non_advance_frames(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    participant_email = f"snap-delete-{uuid.uuid4()}@example.com"
+    participant_headers = authentication_token_from_email(
+        client=client, email=participant_email, db=db
+    )
+    user = db.exec(select(User).where(User.email == participant_email)).first()
+    assert user is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+    ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=participant_headers,
+    ).json()["ticket"]
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", ticket],
+    ) as trainee_ws:
+        assert trainee_ws.receive_json()["type"] == "session.connected"
+
+        row = db.get(WorkshopSession, session_row.id)
+        assert row is not None
+        sid = session_row.id
+        db.delete(row)
+        db.commit()
+
+        trainee_ws.send_json({"type": "live_status", "live_status": "done"})
+        err = trainee_ws.receive_json()
+
+    assert err == {"type": "error", "detail": "session_not_found"}
+    assert db.get(WorkshopSession, sid) is None
+
+
+def test_ws_live_status_errors_when_participant_soft_removed_mid_socket(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    participant_email = f"soft-rem-ws-{uuid.uuid4()}@example.com"
+    participant_headers = authentication_token_from_email(
+        client=client, email=participant_email, db=db
+    )
+    user = db.exec(select(User).where(User.email == participant_email)).first()
+    assert user is not None
+    roster = WorkshopParticipant(
+        session_id=session_row.id,
+        user_id=user.id,
+        joined_at=datetime.now(timezone.utc),
+    )
+    db.add(roster)
+    db.commit()
+    ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=participant_headers,
+    ).json()["ticket"]
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", ticket],
+    ) as trainee_ws:
+        assert trainee_ws.receive_json()["type"] == "session.connected"
+
+        db.refresh(roster)
+        roster.removed_at = datetime.now(timezone.utc)
+        db.add(roster)
+        db.commit()
+
+        trainee_ws.send_json({"type": "live_status", "live_status": "done"})
+        err = trainee_ws.receive_json()
+
+    assert err == {"type": "error", "detail": "participant_not_found"}
+
+
+def test_ws_part_advance_reports_session_not_found_when_row_deleted_skip_snap(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    _add_two_parts_to_session_lesson(db, session_row)
+
+    instructor_email = f"i-del-{uuid.uuid4()}@example.com"
+    i_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor_user = db.exec(
+        select(User).where(User.email == instructor_email)
+    ).first()
+    assert instructor_user is not None
+    instructor_user.is_instructor = True
+    db.add(instructor_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=i_headers,
+    ).json()["ticket"]
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", ticket],
+    ) as ws:
+        assert ws.receive_json()["type"] == "session.connected"
+
+        row = db.get(WorkshopSession, session_row.id)
+        assert row is not None
+        sid = session_row.id
+        db.delete(row)
+        db.commit()
+
+        ws.send_json({"type": "part.advance", "part_index": 0})
+        err = ws.receive_json()
+
+    assert err == {"type": "error", "detail": "session_not_found"}
+    assert db.get(WorkshopSession, sid) is None
+
+
+def test_ws_resume_requires_paused_session(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+
+    instructor_email = f"i-resume-{uuid.uuid4()}@example.com"
+    i_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor_user = db.exec(
+        select(User).where(User.email == instructor_email)
+    ).first()
+    assert instructor_user is not None
+    instructor_user.is_instructor = True
+    db.add(instructor_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=i_headers,
+    ).json()["ticket"]
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", ticket],
+    ) as instructor_ws:
+        assert instructor_ws.receive_json()["type"] == "session.connected"
+        instructor_ws.send_json({"type": "session.resume"})
+        err = instructor_ws.receive_json()
+
+    assert err == {
+        "type": "error",
+        "detail": "resume_requires_paused_session",
+    }
