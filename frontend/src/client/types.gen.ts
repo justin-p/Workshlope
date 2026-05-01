@@ -173,6 +173,11 @@ export type ValidationError = {
     };
 };
 
+export type WorkshopWsTicket = {
+    ticket: string;
+    expires_at: string;
+};
+
 export type ItemsReadItemsData = {
     limit?: number;
     skip?: number;
@@ -342,3 +347,9 @@ export type WorkshopSessionsEnterWorkshopSessionData = {
 };
 
 export type WorkshopSessionsEnterWorkshopSessionResponse = (Message);
+
+export type WorkshopSessionsCreateWorkshopWsTicketData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsCreateWorkshopWsTicketResponse = (WorkshopWsTicket);

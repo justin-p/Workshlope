@@ -824,3 +824,20 @@ export const ValidationErrorSchema = {
     required: ['loc', 'msg', 'type'],
     title: 'ValidationError'
 } as const;
+
+export const WorkshopWsTicketSchema = {
+    properties: {
+        ticket: {
+            type: 'string',
+            title: 'Ticket'
+        },
+        expires_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Expires At'
+        }
+    },
+    type: 'object',
+    required: ['ticket', 'expires_at'],
+    title: 'WorkshopWsTicket'
+} as const;
