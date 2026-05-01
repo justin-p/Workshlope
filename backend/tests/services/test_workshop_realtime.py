@@ -64,3 +64,47 @@ def test_hub_publishes_participant_live_status_only_to_instructors() -> None:
         await hub.detach(inst2)
 
     asyncio.run(runner())
+
+
+def test_hub_status_changed_reaches_participants_and_instructors() -> None:
+    async def runner() -> None:
+        hub = WorkshopRealtimeHub()
+        session_id = uuid.uuid4()
+
+        trainee_socket = AsyncMock()
+        trainee_socket.send_json = AsyncMock()
+        instructor_socket = AsyncMock()
+        instructor_socket.send_json = AsyncMock()
+
+        trainee = WorkshopWsConnection(
+            websocket=trainee_socket,
+            session_id=session_id,
+            user_id=uuid.uuid4(),
+            role="participant",
+        )
+        instructor = WorkshopWsConnection(
+            websocket=instructor_socket,
+            session_id=session_id,
+            user_id=uuid.uuid4(),
+            role="instructor",
+        )
+
+        await hub.attach(trainee)
+        await hub.attach(instructor)
+
+        await hub.publish_session_status_changed(
+            session_id=session_id,
+            status="paused",
+        )
+
+        for sock in (trainee_socket, instructor_socket):
+            sock.send_json.assert_awaited_once()
+            payload = sock.send_json.await_args.args[0]
+            assert payload["type"] == "session.status_changed"
+            assert payload["status"] == "paused"
+            assert payload["session_id"] == str(session_id)
+
+        await hub.detach(trainee)
+        await hub.detach(instructor)
+
+    asyncio.run(runner())

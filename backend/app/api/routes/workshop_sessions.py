@@ -259,6 +259,66 @@ async def _dispatch_workshop_ws_text(
         )
         return
 
+    if msg_type == "session.pause":
+        if handshake.role != "instructor":
+            await websocket.send_json({"type": "error", "detail": "forbidden"})
+            return
+        with Session(engine) as db:
+            workshop_session_row = db.get(WorkshopSession, session_id)
+            if workshop_session_row is None:
+                await websocket.send_json(
+                    {"type": "error", "detail": "session_not_found"}
+                )
+                return
+            if workshop_session_row.status != "live":
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "detail": "pause_requires_live_session",
+                    }
+                )
+                return
+            workshop_session_row.status = "paused"
+            db.add(workshop_session_row)
+            db.commit()
+
+        await websocket.send_json({"type": "session.pause.ack", "status": "paused"})
+        await workshop_hub.publish_session_status_changed(
+            session_id=session_id,
+            status="paused",
+        )
+        return
+
+    if msg_type == "session.resume":
+        if handshake.role != "instructor":
+            await websocket.send_json({"type": "error", "detail": "forbidden"})
+            return
+        with Session(engine) as db:
+            workshop_session_row = db.get(WorkshopSession, session_id)
+            if workshop_session_row is None:
+                await websocket.send_json(
+                    {"type": "error", "detail": "session_not_found"}
+                )
+                return
+            if workshop_session_row.status != "paused":
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "detail": "resume_requires_paused_session",
+                    }
+                )
+                return
+            workshop_session_row.status = "live"
+            db.add(workshop_session_row)
+            db.commit()
+
+        await websocket.send_json({"type": "session.resume.ack", "status": "live"})
+        await workshop_hub.publish_session_status_changed(
+            session_id=session_id,
+            status="live",
+        )
+        return
+
     await websocket.send_json({"type": "error", "detail": "unknown_message_type"})
 
 
