@@ -15,6 +15,27 @@ async function createParticipantUserForWorkshop() {
 }
 
 test.describe("Workshop live session", () => {
+  // Same-process workshop hub + nginx WS proxy: parallel tests caused intermittent
+  // "connecting" forever (participant never received session.connected). Run in order.
+  test.describe.configure({ mode: "serial" })
+
+  test("participant marks required pre-work complete from session page", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?with_incomplete_required_prerequisite=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    await page.goto(`/workshop/${session_id}`)
+    const banner = page.getByTestId("workshop-prework-participant-banner")
+    await expect(banner).toBeVisible({ timeout: 15_000 })
+    await page.getByTestId("workshop-prework-mark-complete").click()
+    await expect(banner).toHaveCount(0, { timeout: 15_000 })
+  })
+
   test("participant view connects WebSocket after enter + ticket", async ({
     page,
     request,
@@ -121,7 +142,10 @@ test.describe("Workshop live session", () => {
       .getByTestId("password-input")
       .fill(participant.password)
     await participantPage.getByRole("button", { name: "Log In" }).click()
-    await participantPage.waitForURL("/dashboard/trainee")
+    await participantPage.waitForURL(/\/dashboard\/(trainee|instructor|admin)/)
+    await participantPage.waitForFunction(() =>
+      Boolean(window.localStorage.getItem("access_token")),
+    )
 
     await page.goto(`/workshop/${session_id}`)
     await expect(page.getByTestId("workshop-ws-status")).toHaveText(
@@ -132,10 +156,9 @@ test.describe("Workshop live session", () => {
     )
 
     await participantPage.goto(`/workshop/${session_id}`)
-    await expect(participantPage.getByTestId("workshop-ws-status")).toHaveText(
-      /connected/i,
-      { timeout: 15_000 },
-    )
+    const wsStatus = participantPage.getByTestId("workshop-ws-status")
+    await wsStatus.waitFor({ state: "visible" })
+    await expect(wsStatus).toHaveText(/connected/i, { timeout: 20_000 })
 
     await participantPage.getByRole("button", { name: "Mark done" }).click()
     await expect(

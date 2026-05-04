@@ -520,6 +520,7 @@ export type PrivateBootstrapE2eWorkshopLiveSessionData = {
     initialStatus?: 'live' | 'scheduled';
     omitParticipantSeat?: boolean;
     participantEmail?: (string | null);
+    withIncompleteRequiredPrerequisite?: boolean;
 };
 
 export type PrivateBootstrapE2eWorkshopLiveSessionResponse = (PrivateWorkshopE2ELiveSessionResponse);

@@ -385,10 +385,19 @@ export class PrivateService {
      * instructor (no ``WorkshopParticipant`` row), so ``ws-ticket`` yields the
      * **instructor** role while the frontend skips ``POST …/enter`` for that flow.
      * Pass ``initial_status=scheduled`` to exercise instructor start flows.
+     * Pass ``with_incomplete_required_prerequisite=true`` to add one **required**
+     * lesson prerequisite with **no** completion row for the rostered trainee
+     * (participant flows / Playwright pre-work UI).
+     *
+     * When ``participant_email`` is set and differs from ``FIRST_SUPERUSER``, the
+     * trainee is rostered **only** as a participant and **``FIRST_SUPERUSER``** is
+     * the sole lead instructor (avoids dual instructor+participant seats on the
+     * trainee, which breaks HTTP ``view: participant`` and complicates WS E2E).
      * @param data The data for the request.
      * @param data.participantEmail
      * @param data.omitParticipantSeat
      * @param data.initialStatus
+     * @param data.withIncompleteRequiredPrerequisite
      * @returns PrivateWorkshopE2ELiveSessionResponse Successful Response
      * @throws ApiError
      */
@@ -399,7 +408,8 @@ export class PrivateService {
             query: {
                 participant_email: data.participantEmail,
                 omit_participant_seat: data.omitParticipantSeat,
-                initial_status: data.initialStatus
+                initial_status: data.initialStatus,
+                with_incomplete_required_prerequisite: data.withIncompleteRequiredPrerequisite
             },
             errors: {
                 422: 'Validation Error'

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
@@ -9,6 +9,7 @@ import {
 } from "@/client"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import useAuth from "@/hooks/useAuth"
 
 /** Matches UUID v4 from `uuid.uuid4()` used for workshop sessions. */
 const UUID_V4_RE =
@@ -69,6 +70,8 @@ export const Route = createFileRoute("/_layout/workshop/$sessionId")({
 
 function WorkshopSessionPage() {
   const { sessionId } = Route.useParams()
+  const queryClient = useQueryClient()
+  const { user: currentUser } = useAuth()
   const uuidOk = UUID_V4_RE.test(sessionId)
   const detailQuery = useQuery({
     queryKey: ["workshopSessionDetail", sessionId],
@@ -80,6 +83,13 @@ function WorkshopSessionPage() {
 
   const lessonId = detailQuery.data?.lesson.id
   const detailView = detailQuery.data?.view
+  const detail = detailQuery.data
+  /** HTTP detail is instructor-first when user has both seats; WS still uses participant. */
+  const userSeesTraineePrework =
+    detail?.view === "participant" ||
+    (detail?.view === "instructor" &&
+      currentUser?.id !== undefined &&
+      detail.participants.some((p) => p.user_id === currentUser.id))
 
   const myPrerequisitesQuery = useQuery({
     queryKey: ["workshopMyLessonPrerequisites", lessonId],
@@ -89,7 +99,7 @@ function WorkshopSessionPage() {
       uuidOk &&
       detailQuery.isSuccess &&
       lessonId !== undefined &&
-      detailView === "participant",
+      userSeesTraineePrework,
     retry: false,
   })
 
@@ -122,6 +132,26 @@ function WorkshopSessionPage() {
       detailView === "instructor",
     retry: false,
   })
+
+  const completePrerequisiteMutation = useMutation({
+    mutationFn: ({
+      lessonId: lid,
+      prerequisiteId,
+    }: {
+      lessonId: string
+      prerequisiteId: string
+    }) =>
+      WorkshopLessonsService.completeLessonPrerequisite({
+        lessonId: lid,
+        prerequisiteId,
+      }),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopMyLessonPrerequisites", variables.lessonId],
+      })
+    },
+  })
+
   const [phase, setPhase] = useState<
     "idle" | "entering" | "ws_connecting" | "ready" | "error"
   >("idle")
@@ -135,6 +165,7 @@ function WorkshopSessionPage() {
     "live",
   )
   const wsRef = useRef<WebSocket | null>(null)
+  const wsSessionReadyRef = useRef(false)
 
   useEffect(() => {
     if (!UUID_V4_RE.test(sessionId)) {
@@ -151,6 +182,7 @@ function WorkshopSessionPage() {
       setConnectedRole(null)
       setRoomStatus("live")
       setLastAckEvent("")
+      wsSessionReadyRef.current = false
       try {
         const ticketRes =
           await createWorkshopWsTicketWithOptionalEnter(sessionId)
@@ -193,6 +225,7 @@ function WorkshopSessionPage() {
               if (msg.role === "participant" || msg.role === "instructor") {
                 setConnectedRole(msg.role)
               }
+              wsSessionReadyRef.current = true
               setPhase("ready")
             }
             if (
@@ -215,6 +248,12 @@ function WorkshopSessionPage() {
         ws.onclose = () => {
           if (cancelled) return
           wsRef.current = null
+          if (!wsSessionReadyRef.current) {
+            setPhase("error")
+            setErrorDetail(
+              "Realtime disconnected before the session was ready.",
+            )
+          }
         }
       } catch (e: unknown) {
         if (cancelled) return
@@ -303,7 +342,7 @@ function WorkshopSessionPage() {
         ) : null}
       </p>
 
-      {detailView === "participant" &&
+      {userSeesTraineePrework &&
       overdueRequiredPrerequisites.length > 0 &&
       !myPrerequisitesQuery.isFetching ? (
         <Alert
@@ -315,21 +354,45 @@ function WorkshopSessionPage() {
             <span className="block mb-2">
               Finish these before class so you&apos;re ready to start.
             </span>
-            <ul className="list-disc ml-5 space-y-1">
+            <ul className="list-none space-y-2 pl-0">
               {overdueRequiredPrerequisites.map((p) => (
-                <li key={p.id}>
-                  {p.url ? (
-                    <a
-                      href={p.url}
-                      className="underline font-medium text-foreground"
-                      target="_blank"
-                      rel="noreferrer noopener"
+                <li
+                  key={p.id}
+                  className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2"
+                >
+                  <span className="min-w-0 text-sm">
+                    {p.url ? (
+                      <a
+                        href={p.url}
+                        className="underline font-medium text-foreground"
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        {p.title}
+                      </a>
+                    ) : (
+                      p.title
+                    )}
+                  </span>
+                  {lessonId ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={completePrerequisiteMutation.isPending}
+                      data-testid="workshop-prework-mark-complete"
+                      aria-label={`Mark “${p.title}” complete`}
+                      onClick={() =>
+                        completePrerequisiteMutation.mutate({
+                          lessonId,
+                          prerequisiteId: p.id,
+                        })
+                      }
                     >
-                      {p.title}
-                    </a>
-                  ) : (
-                    p.title
-                  )}
+                      Mark complete
+                    </Button>
+                  ) : null}
                 </li>
               ))}
             </ul>
