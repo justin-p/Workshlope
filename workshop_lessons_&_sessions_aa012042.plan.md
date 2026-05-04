@@ -103,8 +103,8 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-04** — **PR06 `ws-06-learning-workflows`**: same as prior row **plus** — **inline “Mark complete”** for required pre-work on [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx); **trainee pre-work query** when HTTP `view` is instructor but the user is still on the **participant roster** (dual-seat superuser case); **WS `onclose`** before `session.connected` → error (no infinite “connecting”). **Local E2E bootstrap** ([`private.py`](backend/app/api/routes/private.py)): `with_incomplete_required_prerequisite` seeds one incomplete required item; when **`participant_email` ≠ `FIRST_SUPERUSER`**, trainee is **participant-only** and **`FIRST_SUPERUSER`** is **lead instructor** (fixes multi-tab WS E2E). **Playwright** [`workshop.spec.ts`](frontend/tests/workshop.spec.ts): **`describe.configure({ mode: "serial" })`** for the workshop block; fan-out login waits; backend test for distinct-trainee bootstrap. **Docs:** **`2442940`** plan sync; **ship tip:** **`1633910`** `fix(workshop): stabilize E2E bootstrap and Playwright workshop suite`. |
-| **Branch tip (2026-05-04)** | **`1633910`** — `fix(workshop): stabilize E2E bootstrap and Playwright workshop suite` (stacked on **`990397d`** admin `is_instructor`, plan **`2442940`**). **`ws-06-learning-workflows`** → [PR #23](https://github.com/justin-p/testing/pull/23). **Local Playwright:** after backend/private or frontend changes, **`docker compose … build backend`** (and **`frontend`** if UI changed) before `bunx playwright test` — compose images do not mount live source. Verify **`git status`** before merging stray **Playwright workflow** / compose-only edits. |
+| **Last synced** | **2026-05-04** — **PR06 `ws-06-learning-workflows`**: **inline “Mark complete”** for required pre-work on [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx); **trainee pre-work query** when HTTP `view` is instructor but the user is still on the **participant roster** (dual-seat superuser case); **WS `onclose`** before `session.connected` → error (no infinite “connecting”). **Local E2E bootstrap** ([`private.py`](backend/app/api/routes/private.py)): `with_incomplete_required_prerequisite` seeds one incomplete required item; when **`participant_email` ≠ `FIRST_SUPERUSER`**, trainee is **participant-only** and **`FIRST_SUPERUSER`** is **lead instructor** (fixes multi-tab WS E2E). **Playwright** [`workshop.spec.ts`](frontend/tests/workshop.spec.ts): **`describe.configure({ mode: "serial" })`** for the workshop block; fan-out login waits; backend test for distinct-trainee bootstrap. **Plan:** **`349085b`** MVP scope trim, **Out of scope** table, **Appendix — archived scope**; PR stack text + [PR #22](https://github.com/justin-p/testing/pull/22)/[#23](https://github.com/justin-p/testing/pull/23) descriptions synced **2026-05-04**. Earlier ship refs: **`1633910`** E2E/Playwright; **`2442940`** plan sync. |
+| **Branch tip (2026-05-04)** | **`349085b`** — `docs(workshop): plan MVP trim, OOS table, archived scope appendix` (includes prerequisite/prework/E2E work from **`1633910`** and prior). **`ws-06-learning-workflows`** → [PR #23](https://github.com/justin-p/testing/pull/23). **Local Playwright:** after backend/private or frontend changes, **`docker compose … build backend`** (and **`frontend`** if UI changed) before `bunx playwright test` — compose images do not mount live source. Verify **`git status`** before merging stray **Playwright workflow** / compose-only edits. |
 | **Active integration branch** | `ws-06-learning-workflows` → [PR #23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
 | **Stack PR label** | **PR06 — LearningWorkflows** 🚧 open on [#23](https://github.com/justin-p/testing/pull/23); continue slicing prerequisites/prework APIs + UI |
 
@@ -118,7 +118,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-06-learning-workflows` |
 | PR | [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
-| Latest work | **E2E + Playwright:** distinct-trainee bootstrap, serial workshop specs, fan-out stability; **UI:** pre-work “Mark complete”, roster-aware trainee pre-work fetch, WS close handling. **Admin `is_instructor`** (prior commit on branch). |
+| Latest work | **E2E + Playwright:** distinct-trainee bootstrap, serial workshop specs, fan-out stability; **UI:** pre-work “Mark complete”, roster-aware trainee pre-work fetch, WS close handling. **Admin `is_instructor`** (prior commit on branch). **Plan:** MVP trim + archived-scope appendix (`349085b`); open PR [#22](https://github.com/justin-p/testing/pull/22)/[#23](https://github.com/justin-p/testing/pull/23) stack tables and titles synced with GitHub. |
 
 **Resume in this order:**
 
@@ -876,14 +876,14 @@ Use a fully stacked PR chain for implementation delivery.
 
 ### Branch/PR chain
 
-Open GitHub PRs for slices 01–05: see [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged). Add the same-style link here when PR06+ exist.
+Open GitHub PRs for workshop slices **01–06**: see [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged). PR07+ use the branch names below when opened.
 
 1. `ws-01-foundation-rbac` ([PR #18](https://github.com/justin-p/testing/pull/18) → `main`) — roles, RBAC groundwork, initial schema scaffolding.
 2. `ws-02-github-sync-manifest` ([PR #19](https://github.com/justin-p/testing/pull/19) → `ws-01-*`) — GitHub App sync and manifest-first lesson ingestion.
 3. `ws-03-session-core` ([PR #20](https://github.com/justin-p/testing/pull/20) → `ws-02-*`) — session lifecycle, rostering, enter semantics, role exclusivity.
 4. `ws-04-realtime-privacy` ([PR #21](https://github.com/justin-p/testing/pull/21) → `ws-03-*`) — ws-ticket flow, role-scoped fanout, privacy-safe DTO behavior.
 5. `ws-05-dashboard-nav` ([PR #22](https://github.com/justin-p/testing/pull/22) → `ws-04-*`) — post-login routing, instructor/trainee/admin homes, nav replacement.
-6. `ws-06-learning-workflows` — prerequisites/prework and learner workflow surfaces. *PR TBD*
+6. `ws-06-learning-workflows` ([PR #23](https://github.com/justin-p/testing/pull/23) → `ws-05-*`) — prerequisites/prework APIs + UI, E2E bootstrap, Playwright workshop suite, living plan scope alignment.
 7. `ws-07-pacing-timer` — session timer and pacing tools (part timers, overrun, instructor controls). *PR TBD*
 8. `ws-08-badges-revocation` — badge catalog, grants, revocation, leaderboard surfaces. *PR TBD*
 9. `ws-09-hardening-and-tests` — cross-cutting hardening, stabilization, and final test consolidation. *PR TBD*
