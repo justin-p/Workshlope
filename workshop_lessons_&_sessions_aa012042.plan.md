@@ -212,7 +212,7 @@ Fork from **`ws-05-dashboard-nav`** (or **`main`** after stack lands). Aligns wi
 
 | Planned capability | Notes |
 | ------------------ | ----- |
-| **Session list + detail GETs** | As per [delivery gap audit](#workshop-http-vs-realtime--delivery-gap-audit); prerequisite for wired dashboard cards. |
+| **Session list + detail GETs** | List + **`GET …/{id}`** ✅ on **`ws-05-dashboard-nav`** per [delivery gap audit](#workshop-http-vs-realtime--delivery-gap-audit); prerequisites + richer dashboard cards remain PR06. |
 | **Prerequisite / prework** data model | Per-lesson checklist; completion tracking linked to **`User`** and **Lesson**/session context; secure-by-default DTOs ([**Data model (illustrative)**](#data-model-illustrative) — `LessonPrerequisite`, `UserPrerequisiteCompletion`). |
 | Trainee UX | Pre-session **warnings / gating hints** where prerequisites incomplete (no trainee peer leakage). |
 | Instructor visibility | Scoped view of cohort prerequisite status (details TBD in slice RFC). |
