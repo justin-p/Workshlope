@@ -335,6 +335,15 @@ class WorkshopLessonPrerequisiteCreate(SQLModel):
     required_flag: bool = True
 
 
+class WorkshopLessonPrerequisitePatch(SQLModel):
+    type: str | None = Field(default=None, max_length=32)
+    title: str | None = Field(default=None, max_length=255)
+    details: str | None = Field(default=None, max_length=1024)
+    url: str | None = Field(default=None, max_length=1024)
+    ordering: int | None = Field(default=None, ge=0)
+    required_flag: bool | None = None
+
+
 class WorkshopLessonPrerequisitePublic(SQLModel):
     id: uuid.UUID
     lesson_id: uuid.UUID
@@ -348,6 +357,25 @@ class WorkshopLessonPrerequisitePublic(SQLModel):
 
 class WorkshopLessonPrerequisitesPublic(SQLModel):
     data: list[WorkshopLessonPrerequisitePublic]
+    count: int
+
+
+class WorkshopLessonPrerequisiteMyPublic(SQLModel):
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    type: str
+    title: str
+    details: str | None = None
+    url: str | None = None
+    ordering: int
+    required_flag: bool
+    is_completed: bool
+    completed_at: datetime | None = None
+    source: str | None = None
+
+
+class WorkshopLessonPrerequisitesMyPublic(SQLModel):
+    data: list[WorkshopLessonPrerequisiteMyPublic]
     count: int
 
 

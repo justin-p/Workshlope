@@ -200,6 +200,29 @@ export type WorkshopLessonPrerequisiteCreate = {
     required_flag?: boolean;
 };
 
+export type WorkshopLessonPrerequisiteMyPublic = {
+    id: string;
+    lesson_id: string;
+    type: string;
+    title: string;
+    details?: (string | null);
+    url?: (string | null);
+    ordering: number;
+    required_flag: boolean;
+    is_completed: boolean;
+    completed_at?: (string | null);
+    source?: (string | null);
+};
+
+export type WorkshopLessonPrerequisitePatch = {
+    type?: (string | null);
+    title?: (string | null);
+    details?: (string | null);
+    url?: (string | null);
+    ordering?: (number | null);
+    required_flag?: (boolean | null);
+};
+
 export type WorkshopLessonPrerequisitePublic = {
     id: string;
     lesson_id: string;
@@ -209,6 +232,11 @@ export type WorkshopLessonPrerequisitePublic = {
     url?: (string | null);
     ordering: number;
     required_flag: boolean;
+};
+
+export type WorkshopLessonPrerequisitesMyPublic = {
+    data: Array<WorkshopLessonPrerequisiteMyPublic>;
+    count: number;
 };
 
 export type WorkshopLessonPrerequisitesPublic = {
@@ -532,6 +560,20 @@ export type WorkshopLessonsReadLessonPrerequisitesData = {
 };
 
 export type WorkshopLessonsReadLessonPrerequisitesResponse = (WorkshopLessonPrerequisitesPublic);
+
+export type WorkshopLessonsPatchLessonPrerequisiteData = {
+    lessonId: string;
+    prerequisiteId: string;
+    requestBody: WorkshopLessonPrerequisitePatch;
+};
+
+export type WorkshopLessonsPatchLessonPrerequisiteResponse = (WorkshopLessonPrerequisitePublic);
+
+export type WorkshopLessonsReadMyLessonPrerequisitesData = {
+    lessonId: string;
+};
+
+export type WorkshopLessonsReadMyLessonPrerequisitesResponse = (WorkshopLessonPrerequisitesMyPublic);
 
 export type WorkshopLessonsCompleteLessonPrerequisiteData = {
     lessonId: string;

@@ -310,3 +310,173 @@ def test_complete_prerequisite_instructor_can_mark_other_user(
     ).first()
     assert completion is not None
     assert completion.source == "instructor"
+
+
+def test_read_my_lesson_prerequisites_includes_completion_status(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    learner_email = f"ws06-prereq-me-{uuid.uuid4()}@example.com"
+    learner_headers = authentication_token_from_email(
+        client=client, email=learner_email, db=db
+    )
+    learner = db.exec(select(User).where(User.email == learner_email)).first()
+    assert learner is not None
+
+    first = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Install uv",
+        ordering=1,
+        required_flag=True,
+    )
+    second = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Clone repo",
+        ordering=2,
+        required_flag=False,
+    )
+    db.add(first)
+    db.add(second)
+    db.commit()
+    db.refresh(first)
+    db.refresh(second)
+    db.add(
+        UserPrerequisiteCompletion(
+            user_id=learner.id,
+            lesson_id=lesson.id,
+            prerequisite_id=second.id,
+            source="self",
+        )
+    )
+    db.commit()
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/me",
+        headers=learner_headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 2
+    assert [item["title"] for item in payload["data"]] == ["Install uv", "Clone repo"]
+    assert payload["data"][0]["is_completed"] is False
+    assert payload["data"][1]["is_completed"] is True
+    assert payload["data"][1]["source"] == "self"
+
+
+def test_read_my_lesson_prerequisites_returns_404_for_missing_lesson(
+    client: TestClient, db: Session
+) -> None:
+    headers = authentication_token_from_email(
+        client=client,
+        email=f"ws06-prereq-me-missing-{uuid.uuid4()}@example.com",
+        db=db,
+    )
+    missing = uuid.uuid4()
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{missing}/prerequisites/me",
+        headers=headers,
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Lesson not found"
+
+
+def test_patch_lesson_prerequisite_requires_instructor(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    actor_headers = authentication_token_from_email(
+        client=client,
+        email=f"ws06-prereq-patch-actor-{uuid.uuid4()}@example.com",
+        db=db,
+    )
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Read intro",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{prerequisite.id}",
+        headers=actor_headers,
+        json={"title": "Read updated intro"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Instructor privileges required"
+
+
+def test_patch_lesson_prerequisite_updates_fields(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    instructor_email = f"ws06-prereq-patch-inst-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Old title",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{prerequisite.id}",
+        headers=headers,
+        json={"title": "New title", "required_flag": False, "ordering": 3},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["title"] == "New title"
+    assert payload["required_flag"] is False
+    assert payload["ordering"] == 3
+
+    db.refresh(prerequisite)
+    assert prerequisite.title == "New title"
+    assert prerequisite.required_flag is False
+    assert prerequisite.ordering == 3
+
+
+def test_patch_lesson_prerequisite_returns_404_for_missing_prerequisite(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    instructor_email = f"ws06-prereq-patch-missing-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    missing = uuid.uuid4()
+
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{missing}",
+        headers=headers,
+        json={"title": "No row"},
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Prerequisite not found"

@@ -937,6 +937,167 @@ export const WorkshopLessonPrerequisiteCreateSchema = {
     title: 'WorkshopLessonPrerequisiteCreate'
 } as const;
 
+export const WorkshopLessonPrerequisiteMyPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        lesson_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Id'
+        },
+        type: {
+            type: 'string',
+            title: 'Type'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        details: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        ordering: {
+            type: 'integer',
+            title: 'Ordering'
+        },
+        required_flag: {
+            type: 'boolean',
+            title: 'Required Flag'
+        },
+        is_completed: {
+            type: 'boolean',
+            title: 'Is Completed'
+        },
+        completed_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Completed At'
+        },
+        source: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source'
+        }
+    },
+    type: 'object',
+    required: ['id', 'lesson_id', 'type', 'title', 'ordering', 'required_flag', 'is_completed'],
+    title: 'WorkshopLessonPrerequisiteMyPublic'
+} as const;
+
+export const WorkshopLessonPrerequisitePatchSchema = {
+    properties: {
+        type: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 32
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Type'
+        },
+        title: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        details: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        ordering: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ordering'
+        },
+        required_flag: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Required Flag'
+        }
+    },
+    type: 'object',
+    title: 'WorkshopLessonPrerequisitePatch'
+} as const;
+
 export const WorkshopLessonPrerequisitePublicSchema = {
     properties: {
         id: {
@@ -991,6 +1152,25 @@ export const WorkshopLessonPrerequisitePublicSchema = {
     type: 'object',
     required: ['id', 'lesson_id', 'type', 'title', 'ordering', 'required_flag'],
     title: 'WorkshopLessonPrerequisitePublic'
+} as const;
+
+export const WorkshopLessonPrerequisitesMyPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPrerequisiteMyPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopLessonPrerequisitesMyPublic'
 } as const;
 
 export const WorkshopLessonPrerequisitesPublicSchema = {

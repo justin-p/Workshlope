@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, OauthBridgeLoginData, OauthBridgeLoginResponse, OauthListPendingLoginsData, OauthListPendingLoginsResponse, OauthApprovePendingLoginData, OauthApprovePendingLoginResponse, OauthDenyPendingLoginData, OauthDenyPendingLoginResponse, OauthGetLinkStatusData, OauthGetLinkStatusResponse, OauthAdminUnlinkGithubData, OauthAdminUnlinkGithubResponse, PrivateCreateUserData, PrivateCreateUserResponse, PrivateBootstrapE2eWorkshopLiveSessionData, PrivateBootstrapE2eWorkshopLiveSessionResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WorkshopLessonsCreateLessonPrerequisiteData, WorkshopLessonsCreateLessonPrerequisiteResponse, WorkshopLessonsReadLessonPrerequisitesData, WorkshopLessonsReadLessonPrerequisitesResponse, WorkshopLessonsCompleteLessonPrerequisiteData, WorkshopLessonsCompleteLessonPrerequisiteResponse, WorkshopSessionsReadWorkshopSessionsForUserData, WorkshopSessionsReadWorkshopSessionsForUserResponse, WorkshopSessionsReadWorkshopSessionDetailData, WorkshopSessionsReadWorkshopSessionDetailResponse, WorkshopSessionsPatchWorkshopSessionData, WorkshopSessionsPatchWorkshopSessionResponse, WorkshopSessionsUpsertWorkshopSessionMemberData, WorkshopSessionsUpsertWorkshopSessionMemberResponse, WorkshopSessionsRemoveWorkshopSessionParticipantData, WorkshopSessionsRemoveWorkshopSessionParticipantResponse, WorkshopSessionsPatchWorkshopSessionParticipantData, WorkshopSessionsPatchWorkshopSessionParticipantResponse, WorkshopSessionsEnterWorkshopSessionData, WorkshopSessionsEnterWorkshopSessionResponse, WorkshopSessionsStartWorkshopSessionData, WorkshopSessionsStartWorkshopSessionResponse, WorkshopSessionsEndWorkshopSessionData, WorkshopSessionsEndWorkshopSessionResponse, WorkshopSessionsCreateWorkshopWsTicketData, WorkshopSessionsCreateWorkshopWsTicketResponse } from './types.gen';
+import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, OauthBridgeLoginData, OauthBridgeLoginResponse, OauthListPendingLoginsData, OauthListPendingLoginsResponse, OauthApprovePendingLoginData, OauthApprovePendingLoginResponse, OauthDenyPendingLoginData, OauthDenyPendingLoginResponse, OauthGetLinkStatusData, OauthGetLinkStatusResponse, OauthAdminUnlinkGithubData, OauthAdminUnlinkGithubResponse, PrivateCreateUserData, PrivateCreateUserResponse, PrivateBootstrapE2eWorkshopLiveSessionData, PrivateBootstrapE2eWorkshopLiveSessionResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WorkshopLessonsCreateLessonPrerequisiteData, WorkshopLessonsCreateLessonPrerequisiteResponse, WorkshopLessonsReadLessonPrerequisitesData, WorkshopLessonsReadLessonPrerequisitesResponse, WorkshopLessonsPatchLessonPrerequisiteData, WorkshopLessonsPatchLessonPrerequisiteResponse, WorkshopLessonsReadMyLessonPrerequisitesData, WorkshopLessonsReadMyLessonPrerequisitesResponse, WorkshopLessonsCompleteLessonPrerequisiteData, WorkshopLessonsCompleteLessonPrerequisiteResponse, WorkshopSessionsReadWorkshopSessionsForUserData, WorkshopSessionsReadWorkshopSessionsForUserResponse, WorkshopSessionsReadWorkshopSessionDetailData, WorkshopSessionsReadWorkshopSessionDetailResponse, WorkshopSessionsPatchWorkshopSessionData, WorkshopSessionsPatchWorkshopSessionResponse, WorkshopSessionsUpsertWorkshopSessionMemberData, WorkshopSessionsUpsertWorkshopSessionMemberResponse, WorkshopSessionsRemoveWorkshopSessionParticipantData, WorkshopSessionsRemoveWorkshopSessionParticipantResponse, WorkshopSessionsPatchWorkshopSessionParticipantData, WorkshopSessionsPatchWorkshopSessionParticipantResponse, WorkshopSessionsEnterWorkshopSessionData, WorkshopSessionsEnterWorkshopSessionResponse, WorkshopSessionsStartWorkshopSessionData, WorkshopSessionsStartWorkshopSessionResponse, WorkshopSessionsEndWorkshopSessionData, WorkshopSessionsEndWorkshopSessionResponse, WorkshopSessionsCreateWorkshopWsTicketData, WorkshopSessionsCreateWorkshopWsTicketResponse } from './types.gen';
 
 export class ItemsService {
     /**
@@ -675,6 +675,51 @@ export class WorkshopLessonsService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites',
+            path: {
+                lesson_id: data.lessonId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Patch Lesson Prerequisite
+     * @param data The data for the request.
+     * @param data.lessonId
+     * @param data.prerequisiteId
+     * @param data.requestBody
+     * @returns WorkshopLessonPrerequisitePublic Successful Response
+     * @throws ApiError
+     */
+    public static patchLessonPrerequisite(data: WorkshopLessonsPatchLessonPrerequisiteData): CancelablePromise<WorkshopLessonsPatchLessonPrerequisiteResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites/{prerequisite_id}',
+            path: {
+                lesson_id: data.lessonId,
+                prerequisite_id: data.prerequisiteId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read My Lesson Prerequisites
+     * @param data The data for the request.
+     * @param data.lessonId
+     * @returns WorkshopLessonPrerequisitesMyPublic Successful Response
+     * @throws ApiError
+     */
+    public static readMyLessonPrerequisites(data: WorkshopLessonsReadMyLessonPrerequisitesData): CancelablePromise<WorkshopLessonsReadMyLessonPrerequisitesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites/me',
             path: {
                 lesson_id: data.lessonId
             },
