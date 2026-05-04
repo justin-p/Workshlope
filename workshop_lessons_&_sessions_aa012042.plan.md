@@ -115,13 +115,26 @@ Apply `/python-tdd-with-uv` for all Python backend changes in this plan:
 
 This section is the **recoverable checklist** when chat history or IDE session is gone. Prefer editing here over relying on conversational memory.
 
-**Maintenance rule:** After each meaningful backend/frontend/E2E slice, update **Last synced**, the **Active branch / PR**, and toggle ✅ / 🔲 in the matrices below.
+**Maintenance rule:** After each meaningful backend/frontend/E2E slice, update **Last synced**, the **Active branch / PR**, toggle ✅ / 🔲 in the matrices below, and keep **[GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged)** in sync (new PR, merge, or base-branch change).
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-04 — PR05 **opened** as [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`). PR04 [PR #21](https://github.com/justin-p/testing/pull/21) checks green for latest run — ready to merge ahead of or with stack rebase. Stub rails + OAuth landing + sidebar prefix-active + dashboard Playwright unchanged from prior row. |
-| **Active integration branch** | `ws-05-dashboard-nav` → **PR #22** (stacked on **PR04** `ws-04-realtime-privacy`) |
-| **Stack PR label** | **PR05 — DashboardNav** (#22); merge **#21** first (or rebase #22 onto `main` after #21 lands) |
+| **Last synced** | 2026-05-04 — Full workshop stack PR links: **#18 → #19 → #20 → #21 → #22** (see [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged)). PR05 feature work: stub rails, OAuth landing, sidebar prefix-active, dashboard Playwright. |
+| **Active integration branch** | `ws-05-dashboard-nav` → [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`) |
+| **Stack PR label** | **PR05 — DashboardNav**; merge from the **bottom of the stack** (#18) upward, or retarget after each merge (see stack table) |
+
+### GitHub PR stack (open — update when retargeted/merged)
+
+Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing). **Head → base** matches the locked stack model. When a PR merges, remove or mark it merged here and add the next open PR for that slice if you split/reopen.
+
+| Slice | Branch (head) | Pull request | Base branch |
+| ----- | --------------- | ------------ | ----------- |
+| PR01 | `ws-01-foundation-rbac` | [#18](https://github.com/justin-p/testing/pull/18) | `main` |
+| PR02 | `ws-02-github-sync-manifest` | [#19](https://github.com/justin-p/testing/pull/19) | `ws-01-foundation-rbac` |
+| PR03 | `ws-03-session-core` | [#20](https://github.com/justin-p/testing/pull/20) | `ws-02-github-sync-manifest` |
+| PR04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) | `ws-03-session-core` |
+| PR05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | `ws-04-realtime-privacy` |
+| PR06–PR10 | `ws-06-*` … `ws-10-*` | *not opened yet* | *(next PR targets prior branch when created)* |
 
 ### Backend code anchors (workshop realtime slice)
 
@@ -174,21 +187,21 @@ Aligned with plan bullets: ws-ticket, role-scoped fan-out, trainee privacy.
 
 ### Stacked PRs — coarse roll-up
 
-Use ✅ when the slice is merged to **`main`** (or materially complete on its integration branch if pre-merge). Use 🟨 for partial.
+Use ✅ when the slice is merged to **`main`** (or materially complete on its integration branch if pre-merge). Use 🟨 for partial. **GitHub:** see [PR stack table](#github-pr-stack-open--update-when-retargetedmerged) for current numbers and bases.
 
-| # | Branch (plan name) | Status | Notes |
-| - | ------------------ | ------ | ----- |
-| 01 | `ws-01-foundation-rbac` | 🟨 | `User.is_instructor` + migrations; confirm against `main` |
-| 02 | `ws-02-github-sync-manifest` | 🔲 | GitHub App + manifest sync not tracked here yet |
-| 03 | `ws-03-session-core` | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
-| 04 | `ws-04-realtime-privacy` | 🟨 | Bounded realtime/privacy + `/workshop` E2E ✅; **merge PR #21** when checks green |
-| 05 | `ws-05-dashboard-nav` | 🟨 | Landed on integration branch (see PR05 table above): routing + nav + E2E/infra fixes; widgets/cards 🔲 |
-| 06–10 | downstream | 🔲 | See Branch/PR chain later in this doc |
+| # | Branch (plan name) | GitHub PR | Status | Notes |
+| - | ------------------ | --------- | ------ | ----- |
+| 01 | `ws-01-foundation-rbac` | [#18](https://github.com/justin-p/testing/pull/18) | 🟨 | `User.is_instructor` + migrations; confirm against `main` |
+| 02 | `ws-02-github-sync-manifest` | [#19](https://github.com/justin-p/testing/pull/19) | 🔲 | GitHub App + manifest sync not tracked here yet |
+| 03 | `ws-03-session-core` | [#20](https://github.com/justin-p/testing/pull/20) | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
+| 04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) | 🟨 | Bounded realtime/privacy + `/workshop` E2E ✅ |
+| 05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | 🟨 | Routing + nav + E2E/infra (see PR05 table); live widgets 🔲 |
+| 06–10 | `ws-06-*` … `ws-10-*` | — | 🔲 | Branches/PRs in [Branch/PR chain](#branchpr-chain); open PRs when slicing |
 
 ### Next actions (suggested order)
 
-1. **PR04 merge:** [PR #21](https://github.com/justin-p/testing/pull/21) — checks were green on latest observed run; merge when review approves, then rebase or retarget [PR #22](https://github.com/justin-p/testing/pull/22) to `main` if GitHub does not auto-update the stack.
-2. **PR05:** [PR #22](https://github.com/justin-p/testing/pull/22) — review + CI; **widgets / session list APIs** remain 🔲 per PR05 table (PR06+).
+1. **Stack merge order:** land [#18](https://github.com/justin-p/testing/pull/18) → … → [#22](https://github.com/justin-p/testing/pull/22) (or retarget each head after its base merges to `main`). Track current links in [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged).
+2. **Tip of stack:** [PR #22](https://github.com/justin-p/testing/pull/22) — review + CI; **widgets / session list APIs** remain 🔲 (PR06+).
 3. **E2E discipline:** keep `scripts/e2e-backend-reset.sh` before local full Playwright when diagnosing DB drift; use Sonner-aware toast assertions for new flows.
 
 ### YAML todos above
@@ -893,16 +906,18 @@ Use a fully stacked PR chain for implementation delivery.
 
 ### Branch/PR chain
 
-1. `ws-01-foundation-rbac` - roles, RBAC groundwork, initial schema scaffolding.
-2. `ws-02-github-sync-manifest` - GitHub App sync and manifest-first lesson ingestion.
-3. `ws-03-session-core` - session lifecycle, rostering, enter semantics, role exclusivity.
-4. `ws-04-realtime-privacy` - ws-ticket flow, role-scoped fanout, privacy-safe DTO behavior.
-5. `ws-05-dashboard-nav` - post-login routing, instructor/trainee/admin homes, nav replacement.
-6. `ws-06-learning-workflows` - prerequisites/prework and learner workflow surfaces.
-7. `ws-07-cohorts-exports` - cohorts/teams model and attendance exports.
-8. `ws-08-notes-reminders-timer` - private notes, reminders, timer/pacing tools.
-9. `ws-09-badges-analytics-feedback` - badges/revocation, analytics, learner feedback.
-10. `ws-10-hardening-and-tests` - cross-cutting hardening, stabilization, and final test consolidation.
+Open GitHub PRs for slices 01–05: see [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged). Add the same-style link here when PR06+ exist.
+
+1. `ws-01-foundation-rbac` ([PR #18](https://github.com/justin-p/testing/pull/18) → `main`) — roles, RBAC groundwork, initial schema scaffolding.
+2. `ws-02-github-sync-manifest` ([PR #19](https://github.com/justin-p/testing/pull/19) → `ws-01-*`) — GitHub App sync and manifest-first lesson ingestion.
+3. `ws-03-session-core` ([PR #20](https://github.com/justin-p/testing/pull/20) → `ws-02-*`) — session lifecycle, rostering, enter semantics, role exclusivity.
+4. `ws-04-realtime-privacy` ([PR #21](https://github.com/justin-p/testing/pull/21) → `ws-03-*`) — ws-ticket flow, role-scoped fanout, privacy-safe DTO behavior.
+5. `ws-05-dashboard-nav` ([PR #22](https://github.com/justin-p/testing/pull/22) → `ws-04-*`) — post-login routing, instructor/trainee/admin homes, nav replacement.
+6. `ws-06-learning-workflows` — prerequisites/prework and learner workflow surfaces. *PR TBD*
+7. `ws-07-cohorts-exports` — cohorts/teams model and attendance exports. *PR TBD*
+8. `ws-08-notes-reminders-timer` — private notes, reminders, timer/pacing tools. *PR TBD*
+9. `ws-09-badges-analytics-feedback` — badges/revocation, analytics, learner feedback. *PR TBD*
+10. `ws-10-hardening-and-tests` — cross-cutting hardening, stabilization, and final test consolidation. *PR TBD*
 
 ### PR scope guardrails
 
@@ -922,23 +937,24 @@ Use a fully stacked PR chain for implementation delivery.
 
 ```mermaid
 flowchart TD
-  pr01[PR01_FoundationRBAC] --> pr02[PR02_GithubSyncManifest]
-  pr02 --> pr03[PR03_SessionCore]
-  pr03 --> pr04[PR04_RealtimePrivacy]
-  pr04 --> pr05[PR05_DashboardNav]
-  pr05 --> pr06[PR06_LearningWorkflows]
-  pr06 --> pr07[PR07_CohortsExports]
-  pr07 --> pr08[PR08_NotesRemindersTimer]
-  pr08 --> pr09[PR09_BadgesAnalyticsFeedback]
-  pr09 --> pr10[PR10_HardeningAndTests]
+  pr01["PR01 #18 ws-01"] --> pr02["PR02 #19 ws-02"]
+  pr02 --> pr03["PR03 #20 ws-03"]
+  pr03 --> pr04["PR04 #21 ws-04"]
+  pr04 --> pr05["PR05 #22 ws-05"]
+  pr05 --> pr06[PR06 LearningWorkflows]
+  pr06 --> pr07[PR07 CohortsExports]
+  pr07 --> pr08[PR08 NotesRemindersTimer]
+  pr08 --> pr09[PR09 BadgesAnalyticsFeedback]
+  pr09 --> pr10[PR10 HardeningAndTests]
 ```
+*(PR numbers for PR06–PR10 appear when those PRs are opened; update diagram with the stack table.)*
 
 ### `/split-to-prs` readiness checklist
 
 - Approve the split map before any branch/commit/push/PR operations.
 - Save a recoverable backup ref before moving work between slices.
 - Stage only named files/hunks for each slice (`no git add .` / `no git add -A`).
-- Report PR titles/URLs and remaining working-tree status after execution.
+- Report PR titles/URLs and remaining working-tree status after execution, and refresh **[GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged)** plus mermaid labels for opened slices.
 
 ## PR babysitting policy (locked)
 
