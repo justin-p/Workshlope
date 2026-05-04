@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-04** — **PR06 `ws-06-learning-workflows` progression**: prerequisite APIs now include **`GET /workshop/lessons/{id}/prerequisites/me`** for trainee/self progress snapshots (`is_completed`, `completed_at`, `source`), **`PATCH /workshop/lessons/{id}/prerequisites/{pid}`** / **`DELETE …/{pid}`** for instructor/superuser edits, **`GET /workshop/lessons/{id}/prerequisites/gaps?session_id=…`** for roster-scoped *required* prerequisite gaps (per-trainee identity + incomplete items), alongside create/list/complete endpoints. Completion writes remain idempotent and support instructor marking another user. `test_workshop_lessons.py` expanded accordingly; OpenAPI TS client regenerated. |
+| **Last synced** | **2026-05-04** — **PR06 `ws-06-learning-workflows` progression**: prerequisite APIs now include **`GET /workshop/lessons/{id}/prerequisites/me`** (trainee self-progress), **`GET …/prerequisites/gaps?session_id=`** (named roster gaps on *required* items), **`GET …/prerequisites/aggregates?session_id=`** (anonymous per-prerequisite **`completed_count` / `roster_count`** for widgets), plus **`PATCH`/`DELETE`** and create/list/complete. Completion writes remain idempotent and support instructor marking another user. Tests + OpenAPI TS client regenerated. |
 | **Active integration branch** | `ws-06-learning-workflows` → [PR #23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
 | **Stack PR label** | **PR06 — LearningWorkflows** 🚧 open on [#23](https://github.com/justin-p/testing/pull/23); continue slicing prerequisites/prework APIs + UI |
 
@@ -133,7 +133,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-06-learning-workflows` |
 | PR | [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
-| Latest work | Prerequisites API: create/list/patch/delete + completion + `/me` + instructor **`/prerequisites/gaps`** (session roster cohort); tests + client regen |
+| Latest work | Prerequisites API + instructor cohort reads: **`/prerequisites/gaps`** (who owes what) + **`/prerequisites/aggregates`** (counts only); tests + client regen |
 
 **Resume in this order:**
 
@@ -205,7 +205,7 @@ Forked from **`ws-05-dashboard-nav`** and tracked on [#23](https://github.com/ju
 | **Session list + detail GETs** | List + **`GET …/{id}`** ✅ on **`ws-05-dashboard-nav`** per [delivery gap audit](#workshop-http-vs-realtime--delivery-gap-audit); prerequisites + richer dashboard cards remain PR06. |
 | **Prerequisite / prework** data model | ✅ Landed: `LessonPrerequisite`, `UserPrerequisiteCompletion` (+ migration `4f6e7d8c9a01`) and prerequisite create/list/patch/delete/complete + self-progress (`/me`) + instructor **`/prerequisites/gaps`** (scoped to a `WorkshopSession` roster). |
 | Trainee UX | 🟨 Backend readiness improved via `/prerequisites/me` progress read; pre-session **warnings / gating hints** UI still pending. |
-| Instructor visibility | 🟨 Instructor can mark completion for another user and read **session roster gaps** (`GET …/prerequisites/gaps?session_id=`); dashboards/UI surfaces still pending. |
+| Instructor visibility | 🟨 Instructor can mark completion for another user and read **`/prerequisites/gaps`** + **`/prerequisites/aggregates`** (same `session_id` cohort); dashboards/UI wiring still pending. |
 | Tests | **`/python-tdd-with-uv`** backend; Playwright flows for trainee + instructor when UI ships. |
 | Stack hygiene | ✅ PR open: [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`); keep stack table + dependency graph in sync on retarget/merge. |
 

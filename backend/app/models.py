@@ -395,6 +395,21 @@ class WorkshopLessonPrerequisiteGapsPublic(SQLModel):
     count: int
 
 
+class WorkshopLessonPrerequisiteAggregatePublic(SQLModel):
+    """Session roster completion counts per prerequisite definition (no per-user identity)."""
+
+    prerequisite: WorkshopLessonPrerequisitePublic
+    roster_count: int = Field(ge=0, description="Active roster trainee seats.")
+    completed_count: int = Field(
+        ge=0, description="Roster trainees with a completion row for this prerequisite."
+    )
+
+
+class WorkshopLessonPrerequisiteAggregatesPublic(SQLModel):
+    data: list[WorkshopLessonPrerequisiteAggregatePublic]
+    count: int
+
+
 class WorkshopLessonPrerequisiteComplete(SQLModel):
     user_id: uuid.UUID | None = None
 

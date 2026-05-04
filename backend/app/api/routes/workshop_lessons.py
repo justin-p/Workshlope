@@ -1,4 +1,5 @@
 import uuid
+from collections import Counter
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlmodel import col, select
@@ -10,6 +11,8 @@ from app.models import (
     Message,
     User,
     UserPrerequisiteCompletion,
+    WorkshopLessonPrerequisiteAggregatePublic,
+    WorkshopLessonPrerequisiteAggregatesPublic,
     WorkshopLessonPrerequisiteComplete,
     WorkshopLessonPrerequisiteCreate,
     WorkshopLessonPrerequisiteGapPublic,
@@ -33,6 +36,43 @@ def _require_workshop_lesson_editor(*, current_user: User) -> None:
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Instructor privileges required",
     )
+
+
+def _workshop_lesson_session_or_raise_errors(
+    *, session: SessionDep, lesson_id: uuid.UUID, session_id: uuid.UUID
+) -> WorkshopSession:
+    if session.get(Lesson, lesson_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found"
+        )
+    ws_session = session.get(WorkshopSession, session_id)
+    if ws_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    if ws_session.lesson_id != lesson_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Session does not belong to this lesson",
+        )
+    return ws_session
+
+
+def _active_trainee_roster_user_ids_for_session(
+    *, session: SessionDep, session_id: uuid.UUID
+) -> list[uuid.UUID]:
+    participant_rows = session.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_id,
+            col(WorkshopParticipant.user_id).is_not(None),
+            col(WorkshopParticipant.removed_at).is_(None),
+        )
+    ).all()
+    ids: list[uuid.UUID] = []
+    for row in participant_rows:
+        if row.user_id is not None:
+            ids.append(row.user_id)
+    return ids
 
 
 @router.post(
@@ -184,22 +224,9 @@ def read_lesson_prerequisite_gaps_for_session_roster(
     """List session roster trainees who owe at least one *required* prerequisite (instructor tooling)."""
 
     _require_workshop_lesson_editor(current_user=current_user)
-    lesson = session.get(Lesson, lesson_id)
-    if lesson is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found"
-        )
-
-    ws_session = session.get(WorkshopSession, session_id)
-    if ws_session is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
-        )
-    if ws_session.lesson_id != lesson_id:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Session does not belong to this lesson",
-        )
+    _workshop_lesson_session_or_raise_errors(
+        session=session, lesson_id=lesson_id, session_id=session_id
+    )
 
     required_rows = session.exec(
         select(LessonPrerequisite)
@@ -210,19 +237,12 @@ def read_lesson_prerequisite_gaps_for_session_roster(
         .order_by(col(LessonPrerequisite.ordering))
     ).all()
 
-    participant_rows = session.exec(
-        select(WorkshopParticipant).where(
-            WorkshopParticipant.session_id == session_id,
-            col(WorkshopParticipant.user_id).is_not(None),
-            col(WorkshopParticipant.removed_at).is_(None),
-        )
-    ).all()
+    roster_user_ids = _active_trainee_roster_user_ids_for_session(
+        session=session, session_id=session_id
+    )
 
     gaps: list[WorkshopLessonPrerequisiteGapPublic] = []
-    for participant in participant_rows:
-        user_id = participant.user_id
-        if user_id is None:
-            continue
+    for user_id in roster_user_ids:
         completions = session.exec(
             select(UserPrerequisiteCompletion).where(
                 UserPrerequisiteCompletion.user_id == user_id,
@@ -254,6 +274,56 @@ def read_lesson_prerequisite_gaps_for_session_roster(
 
     gaps.sort(key=lambda row: row.email)
     return WorkshopLessonPrerequisiteGapsPublic(data=gaps, count=len(gaps))
+
+
+@router.get(
+    "/{lesson_id}/prerequisites/aggregates",
+    response_model=WorkshopLessonPrerequisiteAggregatesPublic,
+)
+def read_lesson_prerequisite_aggregates_for_session_roster(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    lesson_id: uuid.UUID,
+    session_id: uuid.UUID = Query(...),
+) -> WorkshopLessonPrerequisiteAggregatesPublic:
+    """Per-prerequisite completion counts for the session roster (widgets; no per-user fields)."""
+
+    _require_workshop_lesson_editor(current_user=current_user)
+    _workshop_lesson_session_or_raise_errors(
+        session=session, lesson_id=lesson_id, session_id=session_id
+    )
+
+    roster_user_ids = _active_trainee_roster_user_ids_for_session(
+        session=session, session_id=session_id
+    )
+    roster_count = len(roster_user_ids)
+    completion_rows: list[UserPrerequisiteCompletion] = []
+    if roster_user_ids:
+        completion_rows = list(
+            session.exec(
+                select(UserPrerequisiteCompletion).where(
+                    UserPrerequisiteCompletion.lesson_id == lesson_id,
+                    col(UserPrerequisiteCompletion.user_id).in_(roster_user_ids),
+                )
+            ).all()
+        )
+    completed_by_prereq = Counter(row.prerequisite_id for row in completion_rows)
+
+    prereq_rows = session.exec(
+        select(LessonPrerequisite)
+        .where(LessonPrerequisite.lesson_id == lesson_id)
+        .order_by(col(LessonPrerequisite.ordering))
+    ).all()
+    data = [
+        WorkshopLessonPrerequisiteAggregatePublic(
+            prerequisite=WorkshopLessonPrerequisitePublic.model_validate(row),
+            roster_count=roster_count,
+            completed_count=completed_by_prereq.get(row.id, 0),
+        )
+        for row in prereq_rows
+    ]
+    return WorkshopLessonPrerequisiteAggregatesPublic(data=data, count=len(data))
 
 
 @router.get(

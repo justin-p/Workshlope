@@ -187,6 +187,26 @@ export type WorkshopLessonPartBrief = {
     title: string;
 };
 
+/**
+ * Session roster completion counts per prerequisite definition (no per-user identity).
+ */
+export type WorkshopLessonPrerequisiteAggregatePublic = {
+    prerequisite: WorkshopLessonPrerequisitePublic;
+    /**
+     * Active roster trainee seats.
+     */
+    roster_count: number;
+    /**
+     * Roster trainees with a completion row for this prerequisite.
+     */
+    completed_count: number;
+};
+
+export type WorkshopLessonPrerequisiteAggregatesPublic = {
+    data: Array<WorkshopLessonPrerequisiteAggregatePublic>;
+    count: number;
+};
+
 export type WorkshopLessonPrerequisiteComplete = {
     user_id?: (string | null);
 };
@@ -600,6 +620,13 @@ export type WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterData = {
 };
 
 export type WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterResponse = (WorkshopLessonPrerequisiteGapsPublic);
+
+export type WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterData = {
+    lessonId: string;
+    sessionId: string;
+};
+
+export type WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterResponse = (WorkshopLessonPrerequisiteAggregatesPublic);
 
 export type WorkshopLessonsReadMyLessonPrerequisitesData = {
     lessonId: string;

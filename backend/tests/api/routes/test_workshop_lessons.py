@@ -917,3 +917,219 @@ def test_read_lesson_prerequisite_gaps_empty_when_all_required_complete(
     )
     assert response.status_code == 200
     assert response.json() == {"data": [], "count": 0}
+
+
+def test_read_lesson_prerequisite_aggregates_requires_instructor(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson)
+    headers = authentication_token_from_email(
+        client=client,
+        email=f"ws06-aggr-actor-{uuid.uuid4()}@example.com",
+        db=db,
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/aggregates",
+        headers=headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert response.status_code == 403
+
+
+def test_read_lesson_prerequisite_aggregates_requires_session_id_query(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    instructor_email = f"ws06-aggr-q-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/aggregates",
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+
+def test_read_lesson_prerequisite_aggregates_counts_roster_and_completions(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson)
+
+    email_a = f"ws06-aggr-a-{uuid.uuid4()}@example.com"
+    email_b = f"ws06-aggr-b-{uuid.uuid4()}@example.com"
+    authentication_token_from_email(client=client, email=email_a, db=db)
+    authentication_token_from_email(client=client, email=email_b, db=db)
+    user_a = db.exec(select(User).where(User.email == email_a)).first()
+    user_b = db.exec(select(User).where(User.email == email_b)).first()
+    assert user_a is not None
+    assert user_b is not None
+
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Shared checklist",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+
+    for u in (user_a, user_b):
+        db.add(
+            WorkshopParticipant(
+                session_id=ws.id,
+                user_id=u.id,
+                invited_at=datetime.now(timezone.utc),
+            )
+        )
+    db.add(
+        UserPrerequisiteCompletion(
+            user_id=user_a.id,
+            lesson_id=lesson.id,
+            prerequisite_id=prerequisite.id,
+            source="self",
+        )
+    )
+    db.commit()
+
+    instructor_email = f"ws06-aggr-inst-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/aggregates",
+        headers=headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    row = payload["data"][0]
+    assert row["roster_count"] == 2
+    assert row["completed_count"] == 1
+    assert row["prerequisite"]["title"] == "Shared checklist"
+
+
+def test_read_lesson_prerequisite_aggregates_zero_roster_still_lists_prerequisites(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson)
+    db.add(
+        LessonPrerequisite(
+            lesson_id=lesson.id,
+            type="task",
+            title="Solo prereq",
+            ordering=1,
+            required_flag=True,
+        )
+    )
+    db.commit()
+
+    instructor_email = f"ws06-aggr-zero-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/aggregates",
+        headers=headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    assert payload["data"][0]["roster_count"] == 0
+    assert payload["data"][0]["completed_count"] == 0
+
+
+def test_read_lesson_prerequisite_aggregates_excludes_removed_participant_from_roster(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson)
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Gate",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+
+    active_email = f"ws06-aggr-act-{uuid.uuid4()}@example.com"
+    removed_email = f"ws06-aggr-rem-{uuid.uuid4()}@example.com"
+    authentication_token_from_email(client=client, email=active_email, db=db)
+    authentication_token_from_email(client=client, email=removed_email, db=db)
+    active_user = db.exec(select(User).where(User.email == active_email)).first()
+    removed_user = db.exec(select(User).where(User.email == removed_email)).first()
+    assert active_user is not None and removed_user is not None
+
+    db.add(
+        WorkshopParticipant(
+            session_id=ws.id,
+            user_id=active_user.id,
+            invited_at=datetime.now(timezone.utc),
+        )
+    )
+    db.add(
+        WorkshopParticipant(
+            session_id=ws.id,
+            user_id=removed_user.id,
+            invited_at=datetime.now(timezone.utc),
+            removed_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    instructor_email = f"ws06-aggr-omit-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/aggregates",
+        headers=headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"][0]["roster_count"] == 1

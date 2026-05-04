@@ -864,6 +864,49 @@ export const WorkshopLessonPartBriefSchema = {
     description: 'Lesson part metadata for workshop session screens (body omitted).'
 } as const;
 
+export const WorkshopLessonPrerequisiteAggregatePublicSchema = {
+    properties: {
+        prerequisite: {
+            '$ref': '#/components/schemas/WorkshopLessonPrerequisitePublic'
+        },
+        roster_count: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Roster Count',
+            description: 'Active roster trainee seats.'
+        },
+        completed_count: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Completed Count',
+            description: 'Roster trainees with a completion row for this prerequisite.'
+        }
+    },
+    type: 'object',
+    required: ['prerequisite', 'roster_count', 'completed_count'],
+    title: 'WorkshopLessonPrerequisiteAggregatePublic',
+    description: 'Session roster completion counts per prerequisite definition (no per-user identity).'
+} as const;
+
+export const WorkshopLessonPrerequisiteAggregatesPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPrerequisiteAggregatePublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopLessonPrerequisiteAggregatesPublic'
+} as const;
+
 export const WorkshopLessonPrerequisiteCompleteSchema = {
     properties: {
         user_id: {
