@@ -187,6 +187,10 @@ export type WorkshopLessonPartBrief = {
     title: string;
 };
 
+export type WorkshopLessonPrerequisiteComplete = {
+    user_id?: (string | null);
+};
+
 export type WorkshopLessonPrerequisiteCreate = {
     type?: string;
     title: string;
@@ -528,6 +532,14 @@ export type WorkshopLessonsReadLessonPrerequisitesData = {
 };
 
 export type WorkshopLessonsReadLessonPrerequisitesResponse = (WorkshopLessonPrerequisitesPublic);
+
+export type WorkshopLessonsCompleteLessonPrerequisiteData = {
+    lessonId: string;
+    prerequisiteId: string;
+    requestBody?: (WorkshopLessonPrerequisiteComplete | null);
+};
+
+export type WorkshopLessonsCompleteLessonPrerequisiteResponse = (Message);
 
 export type WorkshopSessionsReadWorkshopSessionsForUserData = {
     limit?: number;

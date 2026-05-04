@@ -7,7 +7,14 @@ from sqlmodel import Session, select
 
 from app import crud
 from app.core.config import settings
-from app.models import Lesson, LessonPrerequisite, LessonRepo, UserCreate
+from app.models import (
+    Lesson,
+    LessonPrerequisite,
+    LessonRepo,
+    User,
+    UserCreate,
+    UserPrerequisiteCompletion,
+)
 from tests.utils.user import authentication_token_from_email
 
 
@@ -136,3 +143,170 @@ def test_read_lesson_prerequisites_ordered_for_instructor(
     payload = response.json()
     assert payload["count"] == 2
     assert [item["title"] for item in payload["data"]] == ["First", "Second"]
+
+
+def test_complete_prerequisite_creates_user_completion(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    learner_email = f"ws06-learner-{uuid.uuid4()}@example.com"
+    learner_headers = authentication_token_from_email(
+        client=client,
+        email=learner_email,
+        db=db,
+    )
+    learner = db.exec(select(User).where(User.email == learner_email)).first()
+    assert learner is not None
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Install uv",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{prerequisite.id}/complete",
+        headers=learner_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Prerequisite marked complete"
+
+    completion = db.exec(
+        select(UserPrerequisiteCompletion).where(
+            UserPrerequisiteCompletion.prerequisite_id == prerequisite.id
+        )
+    ).first()
+    assert completion is not None
+    assert completion.user_id == learner.id
+    assert completion.lesson_id == lesson.id
+    assert completion.source == "self"
+
+
+def test_complete_prerequisite_idempotent_for_same_user(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    learner_email = f"ws06-learner-idem-{uuid.uuid4()}@example.com"
+    learner_headers = authentication_token_from_email(
+        client=client,
+        email=learner_email,
+        db=db,
+    )
+    learner = db.exec(select(User).where(User.email == learner_email)).first()
+    assert learner is not None
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Clone repo",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+
+    url = f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{prerequisite.id}/complete"
+    r1 = client.post(url, headers=learner_headers)
+    r2 = client.post(url, headers=learner_headers)
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+
+    rows = db.exec(
+        select(UserPrerequisiteCompletion).where(
+            UserPrerequisiteCompletion.user_id == learner.id,
+            UserPrerequisiteCompletion.prerequisite_id == prerequisite.id,
+        )
+    ).all()
+    assert len(rows) == 1
+
+
+def test_complete_prerequisite_other_user_requires_instructor(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    actor_headers = authentication_token_from_email(
+        client=client,
+        email=f"ws06-non-inst-{uuid.uuid4()}@example.com",
+        db=db,
+    )
+    target_email = f"ws06-target-{uuid.uuid4()}@example.com"
+    target_headers = authentication_token_from_email(
+        client=client, email=target_email, db=db
+    )
+    del target_headers
+    target = db.exec(select(User).where(User.email == target_email)).first()
+    assert target is not None
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Read docs",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{prerequisite.id}/complete",
+        headers=actor_headers,
+        json={"user_id": str(target.id)},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Instructor privileges required"
+
+
+def test_complete_prerequisite_instructor_can_mark_other_user(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    instructor_email = f"ws06-inst-complete-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    instructor_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    learner_email = f"ws06-learner-target-{uuid.uuid4()}@example.com"
+    learner_headers = authentication_token_from_email(
+        client=client, email=learner_email, db=db
+    )
+    del learner_headers
+    learner = db.exec(select(User).where(User.email == learner_email)).first()
+    assert learner is not None
+
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Set up environment",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{prerequisite.id}/complete",
+        headers=instructor_headers,
+        json={"user_id": str(learner.id)},
+    )
+    assert response.status_code == 200
+
+    completion = db.exec(
+        select(UserPrerequisiteCompletion).where(
+            UserPrerequisiteCompletion.user_id == learner.id,
+            UserPrerequisiteCompletion.prerequisite_id == prerequisite.id,
+        )
+    ).first()
+    assert completion is not None
+    assert completion.source == "instructor"

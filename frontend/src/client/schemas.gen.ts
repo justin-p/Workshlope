@@ -864,6 +864,25 @@ export const WorkshopLessonPartBriefSchema = {
     description: 'Lesson part metadata for workshop session screens (body omitted).'
 } as const;
 
+export const WorkshopLessonPrerequisiteCompleteSchema = {
+    properties: {
+        user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'User Id'
+        }
+    },
+    type: 'object',
+    title: 'WorkshopLessonPrerequisiteComplete'
+} as const;
+
 export const WorkshopLessonPrerequisiteCreateSchema = {
     properties: {
         type: {

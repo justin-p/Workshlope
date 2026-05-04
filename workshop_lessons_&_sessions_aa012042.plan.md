@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-04** — **PR06 kickoff on `ws-06-learning-workflows`**: added prerequisite data model tables (**`LessonPrerequisite`**, **`UserPrerequisiteCompletion`**), migration **`4f6e7d8c9a01`**, and first lesson prerequisite APIs: **`POST /workshop/lessons/{id}/prerequisites`** + **`GET /workshop/lessons/{id}/prerequisites`** (instructor/superuser guard, ordered reads). Added focused API tests in `test_workshop_lessons.py`; regenerated OpenAPI TS client. |
+| **Last synced** | **2026-05-04** — **PR06 `ws-06-learning-workflows` progression**: prerequisite data model + migration **`4f6e7d8c9a01`** plus lesson prerequisite APIs now include **`POST /workshop/lessons/{id}/prerequisites/{pid}/complete`** with self-serve idempotency and instructor-overridden completion for another user (`source=self|instructor`) in `UserPrerequisiteCompletion`. `test_workshop_lessons.py` expanded for completion create/idempotency + instructor target-user guard/success; OpenAPI TS client regenerated. |
 | **Active integration branch** | `ws-06-learning-workflows` (*PR not opened yet; branch forked from `ws-05-dashboard-nav` tip*) |
 | **Stack PR label** | **PR06 — LearningWorkflows** 🚧 in progress on branch; open PR against `ws-05-dashboard-nav` (or retarget to `main` after stack merges) |
 

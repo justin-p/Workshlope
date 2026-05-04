@@ -351,6 +351,10 @@ class WorkshopLessonPrerequisitesPublic(SQLModel):
     count: int
 
 
+class WorkshopLessonPrerequisiteComplete(SQLModel):
+    user_id: uuid.UUID | None = None
+
+
 class WorkshopLessonPartBrief(SQLModel):
     """Lesson part metadata for workshop session screens (body omitted)."""
 
