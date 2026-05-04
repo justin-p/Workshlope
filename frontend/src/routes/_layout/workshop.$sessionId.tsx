@@ -2,7 +2,12 @@ import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
-import { ApiError, WorkshopSessionsService } from "@/client"
+import {
+  ApiError,
+  WorkshopLessonsService,
+  WorkshopSessionsService,
+} from "@/client"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 
 /** Matches UUID v4 from `uuid.uuid4()` used for workshop sessions. */
@@ -70,6 +75,51 @@ function WorkshopSessionPage() {
     queryFn: () =>
       WorkshopSessionsService.readWorkshopSessionDetail({ sessionId }),
     enabled: uuidOk,
+    retry: false,
+  })
+
+  const lessonId = detailQuery.data?.lesson.id
+  const detailView = detailQuery.data?.view
+
+  const myPrerequisitesQuery = useQuery({
+    queryKey: ["workshopMyLessonPrerequisites", lessonId],
+    queryFn: () =>
+      WorkshopLessonsService.readMyLessonPrerequisites({ lessonId: lessonId! }),
+    enabled:
+      uuidOk &&
+      detailQuery.isSuccess &&
+      lessonId !== undefined &&
+      detailView === "participant",
+    retry: false,
+  })
+
+  const aggregatesQuery = useQuery({
+    queryKey: ["workshopPrerequisiteAggregates", lessonId, sessionId],
+    queryFn: () =>
+      WorkshopLessonsService.readLessonPrerequisiteAggregatesForSessionRoster({
+        lessonId: lessonId!,
+        sessionId,
+      }),
+    enabled:
+      uuidOk &&
+      detailQuery.isSuccess &&
+      lessonId !== undefined &&
+      detailView === "instructor",
+    retry: false,
+  })
+
+  const gapsQuery = useQuery({
+    queryKey: ["workshopPrerequisiteGaps", lessonId, sessionId],
+    queryFn: () =>
+      WorkshopLessonsService.readLessonPrerequisiteGapsForSessionRoster({
+        lessonId: lessonId!,
+        sessionId,
+      }),
+    enabled:
+      uuidOk &&
+      detailQuery.isSuccess &&
+      lessonId !== undefined &&
+      detailView === "instructor",
     retry: false,
   })
   const [phase, setPhase] = useState<
@@ -230,6 +280,14 @@ function WorkshopSessionPage() {
 
   const instructorReady = phase === "ready" && connectedRole === "instructor"
 
+  const overdueRequiredPrerequisites =
+    myPrerequisitesQuery.data?.data.filter(
+      (p) => p.required_flag && !p.is_completed,
+    ) ?? []
+
+  const requiredAggregateRows =
+    aggregatesQuery.data?.data.filter((r) => r.prerequisite.required_flag) ?? []
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">
@@ -244,6 +302,94 @@ function WorkshopSessionPage() {
           </>
         ) : null}
       </p>
+
+      {detailView === "participant" &&
+      overdueRequiredPrerequisites.length > 0 &&
+      !myPrerequisitesQuery.isFetching ? (
+        <Alert
+          variant="destructive"
+          data-testid="workshop-prework-participant-banner"
+        >
+          <AlertTitle>Incomplete pre-work</AlertTitle>
+          <AlertDescription>
+            <span className="block mb-2">
+              Finish these before class so you&apos;re ready to start.
+            </span>
+            <ul className="list-disc ml-5 space-y-1">
+              {overdueRequiredPrerequisites.map((p) => (
+                <li key={p.id}>
+                  {p.url ? (
+                    <a
+                      href={p.url}
+                      className="underline font-medium text-foreground"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      {p.title}
+                    </a>
+                  ) : (
+                    p.title
+                  )}
+                </li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {detailView === "instructor" ? (
+        <div
+          className="rounded-lg border px-4 py-3 text-sm space-y-2 bg-card"
+          data-testid="workshop-prework-instructor-panel"
+        >
+          <div className="font-medium">Pre-work (rostered trainees)</div>
+          {aggregatesQuery.isLoading || gapsQuery.isLoading ? (
+            <p className="text-muted-foreground">Loading pre-work snapshot…</p>
+          ) : aggregatesQuery.isError ? (
+            <p className="text-destructive text-xs">
+              Could not load prerequisite aggregates for this roster.
+            </p>
+          ) : (aggregatesQuery.data?.data ?? []).length === 0 ? (
+            <p className="text-muted-foreground">
+              No lesson prerequisites are defined yet.
+            </p>
+          ) : (
+            <>
+              <p
+                className="text-muted-foreground text-xs"
+                data-testid="workshop-prework-instructor-gaps-count"
+              >
+                {gapsQuery.isError
+                  ? "Could not load who still owes required pre-work."
+                  : `${gapsQuery.data?.count ?? 0} trainee(s) still missing at least one required prerequisite.`}
+              </p>
+              {requiredAggregateRows.length === 0 ? (
+                <p className="text-muted-foreground">
+                  No required prerequisites to track across the roster.
+                </p>
+              ) : (
+                <ul className="space-y-1 list-disc ml-5 text-muted-foreground">
+                  {requiredAggregateRows.map((r) => (
+                    <li key={r.prerequisite.id}>
+                      <span className="text-foreground">
+                        {r.prerequisite.title}
+                      </span>
+                      {": "}
+                      {r.completed_count}/{r.roster_count} trainees done
+                      {r.roster_count === 0 ? (
+                        <span className="italic">
+                          {" "}
+                          — nobody on the roster yet
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-sm text-muted-foreground">Realtime:</span>

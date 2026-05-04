@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-04** — **PR06 `ws-06-learning-workflows` progression**: prerequisite APIs now include **`GET /workshop/lessons/{id}/prerequisites/me`** (trainee self-progress), **`GET …/prerequisites/gaps?session_id=`** (named roster gaps on *required* items), **`GET …/prerequisites/aggregates?session_id=`** (anonymous per-prerequisite **`completed_count` / `roster_count`** for widgets), plus **`PATCH`/`DELETE`** and create/list/complete. Completion writes remain idempotent and support instructor marking another user. Tests + OpenAPI TS client regenerated. |
+| **Last synced** | **2026-05-04** — **PR06 `ws-06-learning-workflows` progression**: prerequisite APIs (**`/me`**, **`/gaps`**, **`/aggregates`**, CRUD + complete) plus **workshop session UI surfaces**: trainee **incomplete required pre-work banner** and instructor **roster pre-work panel** on [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx). Completion writes remain idempotent; Playwright for these flows still optional. |
 | **Active integration branch** | `ws-06-learning-workflows` → [PR #23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
 | **Stack PR label** | **PR06 — LearningWorkflows** 🚧 open on [#23](https://github.com/justin-p/testing/pull/23); continue slicing prerequisites/prework APIs + UI |
 
@@ -133,7 +133,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-06-learning-workflows` |
 | PR | [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
-| Latest work | Prerequisites API + instructor cohort reads: **`/prerequisites/gaps`** (who owes what) + **`/prerequisites/aggregates`** (counts only); tests + client regen |
+| Latest work | Workshop session page wiring: trainee pre-work alert + instructor aggregates/gaps panel (React Query + generated client) |
 
 **Resume in this order:**
 
@@ -144,7 +144,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 **Open gaps (not blocking pause):**
 
 - Local Playwright **`auth.setup`** can time out without backend/`scripts/e2e-backend-reset.sh` — CI remains source of truth for E2E until env is reproduced locally.
-- **Prerequisite** endpoints from REST sketch are **partially implemented** (create/list/complete ✅, instructor cohort gaps ✅); remaining PR06 work includes prework trainee UX and exports-related slices.
+- **Prerequisite** stack is **mostly implemented** for MVP (HTTP + first-run UI on workshop session); exports-related slices and richer dashboard cards may still be 🔲.
 - Optional: expand Playwright coverage for trainee/instructor **dashboard list** widgets (beyond current admin assertion in `dashboard-routing.spec.ts`).
 
 ### GitHub PR stack (open — update when retargeted/merged)
@@ -186,7 +186,7 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 | **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove; **`PATCH …/sessions/{id}/participants/{user_id}`** instructor overrides (`live_status`/`joined_at`/`finished_at`); **`PATCH …/sessions/{id}`** — optional **`status`** (controlled transitions + realtime fanout on change), **`instructor_seat`** role updates, **`primary_instructor_user_id`** handoff (lead/co normalization), **`remove_instructor_user_id`** soft-remove with **409** when that would orphan a non-ended session; empty **422 `patch_requires_update`**; unknown seat **404** | Prerequisites; exports — see sketch table |
 | **WebSocket** | `/{id}/ws` — `part.advance`, `session.pause` / `session.resume`, `participant.live_status`, … | Redis / multi-process hub (explicitly deferred) |
 
-**Remaining vs dashboard/product polish:** session list/detail + roster + session `PATCH` are ✅; prerequisite stack is partially ✅ (full CRUD-ish + completion + `/me` + session-scoped **gaps** for instructors) with prework trainee UX + exports still 🔲.
+**Remaining vs dashboard/product polish:** session list/detail + roster + session `PATCH` are ✅; prerequisites + first **workshop** prework UI are ✅; dashboard cards + exports + dedicated Playwright for prework **surfaces** may still be 🔲.
 
 **Suggested PR06 vertical slices (backend `/python-tdd-with-uv` first):**
 
@@ -204,8 +204,8 @@ Forked from **`ws-05-dashboard-nav`** and tracked on [#23](https://github.com/ju
 | ------------------ | ----- |
 | **Session list + detail GETs** | List + **`GET …/{id}`** ✅ on **`ws-05-dashboard-nav`** per [delivery gap audit](#workshop-http-vs-realtime--delivery-gap-audit); prerequisites + richer dashboard cards remain PR06. |
 | **Prerequisite / prework** data model | ✅ Landed: `LessonPrerequisite`, `UserPrerequisiteCompletion` (+ migration `4f6e7d8c9a01`) and prerequisite create/list/patch/delete/complete + self-progress (`/me`) + instructor **`/prerequisites/gaps`** (scoped to a `WorkshopSession` roster). |
-| Trainee UX | 🟨 Backend readiness improved via `/prerequisites/me` progress read; pre-session **warnings / gating hints** UI still pending. |
-| Instructor visibility | 🟨 Instructor can mark completion for another user and read **`/prerequisites/gaps`** + **`/prerequisites/aggregates`** (same `session_id` cohort); dashboards/UI wiring still pending. |
+| Trainee UX | 🟨 Session page shows **required** incomplete pre-work banner (uses `/prerequisites/me`); optional “mark complete” inline / hard gating still future. |
+| Instructor visibility | 🟨 Session page shows roster **aggregates** + gaps headline (same `session_id`); richer roster drill-down / dashboard tiles still optional. |
 | Tests | **`/python-tdd-with-uv`** backend; Playwright flows for trainee + instructor when UI ships. |
 | Stack hygiene | ✅ PR open: [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`); keep stack table + dependency graph in sync on retarget/merge. |
 
