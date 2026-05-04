@@ -266,10 +266,12 @@ export type WorkshopSessionListItem = {
 };
 
 /**
- * Session-level PATCH body; fields are applied when present.
+ * Session-level PATCH body; at least one field must be present in the request.
  */
 export type WorkshopSessionPatch = {
+    status?: ('live' | 'paused' | 'ended' | null);
     instructor_seat?: (WorkshopSessionInstructorSeatRoleUpdate | null);
+    remove_instructor_user_id?: (string | null);
 };
 
 /**

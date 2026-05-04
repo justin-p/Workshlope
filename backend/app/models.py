@@ -271,9 +271,11 @@ class WorkshopSessionInstructorSeatRoleUpdate(SQLModel):
 
 
 class WorkshopSessionPatch(SQLModel):
-    """Session-level PATCH body; fields are applied when present."""
+    """Session-level PATCH body; at least one field must be present in the request."""
 
+    status: Literal["live", "paused", "ended"] | None = None
     instructor_seat: WorkshopSessionInstructorSeatRoleUpdate | None = None
+    remove_instructor_user_id: uuid.UUID | None = None
 
 
 class WorkshopLessonPartBrief(SQLModel):

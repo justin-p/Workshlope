@@ -690,7 +690,7 @@ export class WorkshopSessionsService {
     
     /**
      * Patch Workshop Session
-     * Instructor/superuser updates session metadata (e.g. instructor seat roles).
+     * Instructor/superuser updates session state (status), roster seats, or seat roles.
      * @param data The data for the request.
      * @param data.sessionId
      * @param data.requestBody

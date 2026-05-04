@@ -28,6 +28,37 @@ from tests.utils.user import (
 from tests.utils.utils import get_superuser_token_headers
 
 
+def _create_scheduled_session(db: Session) -> WorkshopSession:
+    repo = LessonRepo(
+        full_name=f"org/repo-{uuid.uuid4()}",
+        default_branch="main",
+        health="healthy",
+    )
+    db.add(repo)
+    db.commit()
+    db.refresh(repo)
+
+    lesson = Lesson(
+        repo_id=repo.id,
+        slug=f"intro-{uuid.uuid4()}",
+        title="Intro",
+        lesson_sync_generation=1,
+    )
+    db.add(lesson)
+    db.commit()
+    db.refresh(lesson)
+
+    session = WorkshopSession(
+        lesson_id=lesson.id,
+        status="scheduled",
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return session
+
+
 def _create_live_session(db: Session) -> WorkshopSession:
     repo = LessonRepo(
         full_name=f"org/repo-{uuid.uuid4()}",
@@ -2400,4 +2431,317 @@ def test_patch_session_empty_body_returns_422(client: TestClient, db: Session) -
         json={},
     )
     assert response.status_code == 422
-    assert response.json()["detail"] == "patch_requires_instructor_seat"
+    assert response.json()["detail"] == "patch_requires_update"
+
+
+def test_patch_session_conflicting_instructor_fields_returns_422(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-both-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    co = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"sess-patch-co-both-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id, user_id=co.id, role="co_instructor"
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={
+            "instructor_seat": {"user_id": str(co.id), "role": "lead"},
+            "remove_instructor_user_id": str(co.id),
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "conflicting_instructor_patch_fields"
+
+
+def test_patch_session_status_start_publishes_hub(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session_row = _create_scheduled_session(db)
+    lead_email = f"sess-patch-start-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+
+    published: list[tuple[uuid.UUID, str]] = []
+
+    async def capture_publish(*, session_id: uuid.UUID, status: str) -> None:
+        published.append((session_id, status))
+
+    monkeypatch.setattr(
+        workshop_realtime_mod.workshop_hub,
+        "publish_session_status_changed",
+        capture_publish,
+    )
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"status": "live"},
+    )
+    assert response.status_code == 200
+    db.refresh(session_row)
+    assert session_row.status == "live"
+    assert published == [(session_row.id, "live")]
+
+
+def test_patch_session_status_pause_and_resume(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-pause-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    r1 = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"status": "paused"},
+    )
+    assert r1.status_code == 200
+    db.refresh(session_row)
+    assert session_row.status == "paused"
+
+    r2 = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"status": "live"},
+    )
+    assert r2.status_code == 200
+    db.refresh(session_row)
+    assert session_row.status == "live"
+
+
+def test_patch_session_status_end_from_paused(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-end-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"status": "paused"},
+    )
+
+    published: list[tuple[uuid.UUID, str]] = []
+
+    async def capture_publish(*, session_id: uuid.UUID, status: str) -> None:
+        published.append((session_id, status))
+
+    monkeypatch.setattr(
+        workshop_realtime_mod.workshop_hub,
+        "publish_session_status_changed",
+        capture_publish,
+    )
+
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"status": "ended"},
+    )
+    assert response.status_code == 200
+    db.refresh(session_row)
+    assert session_row.status == "ended"
+    assert published == [(session_row.id, "ended")]
+
+
+def test_patch_session_invalid_status_transition_returns_403(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_scheduled_session(db)
+    lead_email = f"sess-patch-bad-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"status": "paused"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "pause_requires_live_session"
+
+
+def test_patch_session_remove_last_instructor_returns_409(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-rm409-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"remove_instructor_user_id": str(lead.id)},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "last_instructor_removal_blocked"
+
+
+def test_patch_session_remove_instructor_ok_when_co_remains(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-rmok-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    co = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"sess-patch-rm-co-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id, user_id=co.id, role="co_instructor"
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"remove_instructor_user_id": str(co.id)},
+    )
+    assert response.status_code == 200
+
+    co_seat = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_row.id,
+            SessionInstructor.user_id == co.id,
+        )
+    ).first()
+    assert co_seat is not None
+    assert co_seat.removed_at is not None
+
+
+def test_patch_session_end_and_remove_last_instructor_ok(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-endrm-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={
+            "status": "ended",
+            "remove_instructor_user_id": str(lead.id),
+        },
+    )
+    assert response.status_code == 200
+    db.refresh(session_row)
+    assert session_row.status == "ended"
+    seat = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_row.id,
+            SessionInstructor.user_id == lead.id,
+        )
+    ).first()
+    assert seat is not None
+    assert seat.removed_at is not None

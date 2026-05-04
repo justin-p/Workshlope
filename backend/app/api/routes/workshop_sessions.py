@@ -205,6 +205,61 @@ def _workshop_session_detail_view_kind(
     return None
 
 
+def _validate_workshop_session_status_transition(
+    *, current_status: str, target_status: str
+) -> None:
+    """Raise HTTPException when ``target_status`` is not allowed from ``current_status``."""
+    if current_status == target_status:
+        return
+    if current_status == "ended":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="session_already_ended",
+        )
+    if target_status == "live":
+        if current_status not in {"scheduled", "paused"}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="invalid_session_status_transition",
+            )
+    elif target_status == "paused":
+        if current_status != "live":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="pause_requires_live_session",
+            )
+    elif target_status == "ended":
+        if current_status not in {"live", "paused"}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="end_requires_active_session",
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="invalid_session_status_transition",
+        )
+
+
+def _count_active_session_instructors_excluding(
+    session_db: Session,
+    *,
+    session_id: uuid.UUID,
+    exclude_user_id: uuid.UUID,
+) -> int:
+    return int(
+        session_db.exec(
+            select(func.count())
+            .select_from(SessionInstructor)
+            .where(
+                SessionInstructor.session_id == session_id,
+                col(SessionInstructor.removed_at).is_(None),
+                SessionInstructor.user_id != exclude_user_id,
+            )
+        ).one()
+    )
+
+
 def _require_workshop_instructor(
     *, session_db: Session, session_id: uuid.UUID, current_user: User
 ) -> None:
@@ -701,14 +756,14 @@ def read_workshop_session_detail(
 
 
 @router.patch("/{session_id}", response_model=Message)
-def patch_workshop_session(
+async def patch_workshop_session(
     *,
     session: SessionDep,
     current_user: CurrentUser,
     session_id: uuid.UUID,
     body: WorkshopSessionPatch,
 ) -> Message:
-    """Instructor/superuser updates session metadata (e.g. instructor seat roles)."""
+    """Instructor/superuser updates session state (status), roster seats, or seat roles."""
     workshop_session = session.get(WorkshopSession, session_id)
     if workshop_session is None:
         raise HTTPException(
@@ -719,28 +774,84 @@ def patch_workshop_session(
         session_db=session, session_id=session_id, current_user=current_user
     )
 
-    if body.instructor_seat is None:
+    has_status = body.status is not None
+    has_seat_role = body.instructor_seat is not None
+    has_remove = body.remove_instructor_user_id is not None
+    if not has_status and not has_seat_role and not has_remove:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="patch_requires_instructor_seat",
+            detail="patch_requires_update",
         )
-
-    seat = session.exec(
-        select(SessionInstructor).where(
-            SessionInstructor.session_id == session_id,
-            SessionInstructor.user_id == body.instructor_seat.user_id,
-            col(SessionInstructor.removed_at).is_(None),
-        )
-    ).first()
-    if seat is None:
+    if has_seat_role and has_remove:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Instructor seat not found",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="conflicting_instructor_patch_fields",
         )
 
-    seat.role = body.instructor_seat.role
-    session.add(seat)
+    if has_status and body.status is not None:
+        _validate_workshop_session_status_transition(
+            current_status=str(workshop_session.status),
+            target_status=body.status,
+        )
+    tentative_status = str(body.status) if has_status else str(workshop_session.status)
+
+    if has_remove and body.remove_instructor_user_id is not None:
+        remaining = _count_active_session_instructors_excluding(
+            session,
+            session_id=session_id,
+            exclude_user_id=body.remove_instructor_user_id,
+        )
+        if remaining == 0 and tentative_status != "ended":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="last_instructor_removal_blocked",
+            )
+
+    status_changed = False
+    if has_status and body.status is not None:
+        if body.status != str(workshop_session.status):
+            workshop_session.status = body.status
+            session.add(workshop_session)
+            status_changed = True
+
+    if has_seat_role and body.instructor_seat is not None:
+        seat = session.exec(
+            select(SessionInstructor).where(
+                SessionInstructor.session_id == session_id,
+                SessionInstructor.user_id == body.instructor_seat.user_id,
+                col(SessionInstructor.removed_at).is_(None),
+            )
+        ).first()
+        if seat is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Instructor seat not found",
+            )
+        seat.role = body.instructor_seat.role
+        session.add(seat)
+
+    if has_remove and body.remove_instructor_user_id is not None:
+        remove_seat = session.exec(
+            select(SessionInstructor).where(
+                SessionInstructor.session_id == session_id,
+                SessionInstructor.user_id == body.remove_instructor_user_id,
+                col(SessionInstructor.removed_at).is_(None),
+            )
+        ).first()
+        if remove_seat is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Instructor seat not found",
+            )
+        remove_seat.removed_at = datetime.now(timezone.utc)
+        session.add(remove_seat)
+
     session.commit()
+    if status_changed and body.status is not None:
+        await workshop_hub.publish_session_status_changed(
+            session_id=session_id,
+            status=str(body.status),
+        )
     return Message(message="Session updated")
 
 

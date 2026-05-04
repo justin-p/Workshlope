@@ -1229,6 +1229,18 @@ export const WorkshopSessionListItemSchema = {
 
 export const WorkshopSessionPatchSchema = {
     properties: {
+        status: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['live', 'paused', 'ended']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status'
+        },
         instructor_seat: {
             anyOf: [
                 {
@@ -1238,11 +1250,23 @@ export const WorkshopSessionPatchSchema = {
                     type: 'null'
                 }
             ]
+        },
+        remove_instructor_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Remove Instructor User Id'
         }
     },
     type: 'object',
     title: 'WorkshopSessionPatch',
-    description: 'Session-level PATCH body; fields are applied when present.'
+    description: 'Session-level PATCH body; at least one field must be present in the request.'
 } as const;
 
 export const WorkshopSessionPublicInstructorSchema = {
