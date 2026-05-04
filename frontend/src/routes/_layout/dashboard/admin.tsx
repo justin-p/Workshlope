@@ -1,6 +1,7 @@
 import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router"
 import { UsersService } from "@/client"
 import { DashboardStubRails } from "@/components/dashboard/DashboardStubRails"
+import { DashboardWorkshopSessions } from "@/components/dashboard/DashboardWorkshopSessions"
 import { isLoggedIn } from "@/hooks/useAuth"
 import {
   type DashboardLandingPath,
@@ -36,6 +37,11 @@ function AdminDashboardHome() {
         <span className="font-medium text-foreground"> Admin </span>
         for user management tools today.
       </p>
+      <DashboardWorkshopSessions
+        className="mt-6"
+        workshopsHubLink
+        description="All workshop sessions in the system — open one to audit or join as superuser (seat required for controls)."
+      />
       <DashboardStubRails persona="admin" className="mt-6" />
     </div>
   )

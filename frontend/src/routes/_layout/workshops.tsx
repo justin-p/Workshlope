@@ -1,6 +1,7 @@
 import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router"
 
 import { UsersService } from "@/client"
+import { DashboardWorkshopSessions } from "@/components/dashboard/DashboardWorkshopSessions"
 import { isLoggedIn } from "@/hooks/useAuth"
 import {
   type DashboardLandingPath,
@@ -32,9 +33,9 @@ function WorkshopsHub() {
     <div className="space-y-2">
       <h1 className="text-2xl font-semibold tracking-tight">Workshops hub</h1>
       <p className="text-muted-foreground text-sm">
-        Lesson repos and session management will live here — placeholder for
-        PR05+ slicing.
+        Sessions you instruct or supervise; open one to manage live controls.
       </p>
+      <DashboardWorkshopSessions className="mt-4" heading="Sessions" />
     </div>
   )
 }

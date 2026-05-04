@@ -22,11 +22,6 @@ type StubCard = {
 const RAILS: Record<Persona, StubCard[]> = {
   trainee: [
     {
-      title: "Your sessions",
-      description:
-        "Soon: live and starting-soon tiles for workshops where you have a seat — scoped to you only (no peer roster here).",
-    },
-    {
       title: "Continue learning",
       description:
         "Soon: deep links back into the lesson part you last opened per session.",
@@ -47,7 +42,7 @@ const RAILS: Record<Persona, StubCard[]> = {
     {
       title: "Live & paused rooms",
       description:
-        "Soon: at-a-glance tiles for sessions you lead that are active or paused.",
+        "Use the workshop list on this page — open a session to run controls.",
       linkTo: "/workshops",
       linkLabel: "Workshops hub",
     },

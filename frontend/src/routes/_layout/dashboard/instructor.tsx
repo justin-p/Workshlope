@@ -1,6 +1,7 @@
 import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router"
 import { UsersService } from "@/client"
 import { DashboardStubRails } from "@/components/dashboard/DashboardStubRails"
+import { DashboardWorkshopSessions } from "@/components/dashboard/DashboardWorkshopSessions"
 import { isLoggedIn } from "@/hooks/useAuth"
 import {
   type DashboardLandingPath,
@@ -34,6 +35,7 @@ function InstructorDashboard() {
       <p className="text-muted-foreground text-sm">
         Sessions you lead and instructional tools ship here next.
       </p>
+      <DashboardWorkshopSessions className="mt-6" workshopsHubLink />
       <DashboardStubRails persona="instructor" className="mt-6" />
     </div>
   )

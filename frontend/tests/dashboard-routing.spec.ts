@@ -15,6 +15,7 @@ test("superuser without instructor flag lands on admin home after login", async 
     page.getByRole("heading", { level: 1, name: "Admin Home" }),
   ).toBeVisible()
   await expect(page.getByTestId("dashboard-stub-rail-admin")).toBeVisible()
+  await expect(page.getByTestId("dashboard-workshop-sessions")).toBeVisible()
 })
 
 test("root path redirects superuser to role dashboard", async ({ page }) => {

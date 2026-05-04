@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 
 import { DashboardStubRails } from "@/components/dashboard/DashboardStubRails"
+import { DashboardWorkshopSessions } from "@/components/dashboard/DashboardWorkshopSessions"
 
 export const Route = createFileRoute("/_layout/dashboard/trainee")({
   component: TraineeDashboard,
@@ -18,6 +19,7 @@ function TraineeDashboard() {
       <p className="text-muted-foreground text-sm">
         Your sessions and progress (no peer roster on this dashboard).
       </p>
+      <DashboardWorkshopSessions className="mt-6" />
       <DashboardStubRails persona="trainee" className="mt-6" />
     </div>
   )
