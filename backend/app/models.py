@@ -379,6 +379,22 @@ class WorkshopLessonPrerequisitesMyPublic(SQLModel):
     count: int
 
 
+class WorkshopLessonPrerequisiteGapPublic(SQLModel):
+    """Trainee prerequisite gap for instructor cohort views (scoped to a workshop session roster)."""
+
+    user_id: uuid.UUID
+    email: str
+    full_name: str | None = None
+    incomplete_required_prerequisites: list[WorkshopLessonPrerequisitePublic]
+
+
+class WorkshopLessonPrerequisiteGapsPublic(SQLModel):
+    """Users on the session roster who still owe at least one *required* prerequisite."""
+
+    data: list[WorkshopLessonPrerequisiteGapPublic]
+    count: int
+
+
 class WorkshopLessonPrerequisiteComplete(SQLModel):
     user_id: uuid.UUID | None = None
 

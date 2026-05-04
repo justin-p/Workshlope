@@ -937,6 +937,62 @@ export const WorkshopLessonPrerequisiteCreateSchema = {
     title: 'WorkshopLessonPrerequisiteCreate'
 } as const;
 
+export const WorkshopLessonPrerequisiteGapPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        incomplete_required_prerequisites: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPrerequisitePublic'
+            },
+            type: 'array',
+            title: 'Incomplete Required Prerequisites'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'email', 'incomplete_required_prerequisites'],
+    title: 'WorkshopLessonPrerequisiteGapPublic',
+    description: 'Trainee prerequisite gap for instructor cohort views (scoped to a workshop session roster).'
+} as const;
+
+export const WorkshopLessonPrerequisiteGapsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPrerequisiteGapPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopLessonPrerequisiteGapsPublic',
+    description: 'Users on the session roster who still owe at least one *required* prerequisite.'
+} as const;
+
 export const WorkshopLessonPrerequisiteMyPublicSchema = {
     properties: {
         id: {

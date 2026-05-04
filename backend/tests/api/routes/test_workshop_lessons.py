@@ -1,6 +1,7 @@
 """Workshop lesson prerequisites API behavior."""
 
 import uuid
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -14,6 +15,8 @@ from app.models import (
     User,
     UserCreate,
     UserPrerequisiteCompletion,
+    WorkshopParticipant,
+    WorkshopSession,
 )
 from tests.utils.user import authentication_token_from_email
 
@@ -37,6 +40,18 @@ def _create_lesson(db: Session) -> Lesson:
     db.commit()
     db.refresh(lesson)
     return lesson
+
+
+def _create_scheduled_workshop_session(db: Session, lesson: Lesson) -> WorkshopSession:
+    ws = WorkshopSession(
+        lesson_id=lesson.id,
+        status="scheduled",
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(ws)
+    db.commit()
+    db.refresh(ws)
+    return ws
 
 
 def test_create_lesson_prerequisite_requires_instructor(
@@ -573,3 +588,332 @@ def test_delete_lesson_prerequisite_returns_404_for_missing_prerequisite(
     )
     assert response.status_code == 404
     assert response.json()["detail"] == "Prerequisite not found"
+
+
+def test_read_lesson_prerequisite_gaps_requires_instructor(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson)
+    headers = authentication_token_from_email(
+        client=client,
+        email=f"ws06-gaps-actor-{uuid.uuid4()}@example.com",
+        db=db,
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/gaps",
+        headers=headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert response.status_code == 403
+
+
+def test_read_lesson_prerequisite_gaps_requires_session_id_query(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    instructor_email = f"ws06-gaps-q-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/gaps",
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+
+def test_read_lesson_prerequisite_gaps_lesson_not_found(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson)
+    instructor_email = f"ws06-gaps-lesson-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{uuid.uuid4()}/prerequisites/gaps",
+        headers=headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Lesson not found"
+
+
+def test_read_lesson_prerequisite_gaps_session_not_found(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    instructor_email = f"ws06-gaps-session-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/gaps",
+        headers=headers,
+        params={"session_id": str(uuid.uuid4())},
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Session not found"
+
+
+def test_read_lesson_prerequisite_gaps_session_lesson_mismatch_returns_422(
+    client: TestClient, db: Session
+) -> None:
+    lesson_a = _create_lesson(db)
+    lesson_b = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson_a)
+    instructor_email = f"ws06-gaps-mismatch-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson_b.id}/prerequisites/gaps",
+        headers=headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Session does not belong to this lesson"
+
+
+def test_read_lesson_prerequisite_gaps_lists_incomplete_required_with_identity(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson)
+
+    learner_email = f"ws06-gaps-learner-{uuid.uuid4()}@example.com"
+    authentication_token_from_email(client=client, email=learner_email, db=db)
+    learner = db.exec(select(User).where(User.email == learner_email)).first()
+    assert learner is not None
+
+    first = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Done task",
+        ordering=1,
+        required_flag=True,
+    )
+    second = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Still owed",
+        ordering=2,
+        required_flag=True,
+    )
+    db.add(first)
+    db.add(second)
+    db.commit()
+    db.refresh(first)
+    db.refresh(second)
+
+    db.add(
+        WorkshopParticipant(
+            session_id=ws.id,
+            user_id=learner.id,
+            invited_at=datetime.now(timezone.utc),
+        )
+    )
+    db.add(
+        UserPrerequisiteCompletion(
+            user_id=learner.id,
+            lesson_id=lesson.id,
+            prerequisite_id=first.id,
+            source="self",
+        )
+    )
+    db.commit()
+
+    instructor_email = f"ws06-gaps-inst-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    instructor_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/gaps",
+        headers=instructor_headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    row = payload["data"][0]
+    assert row["user_id"] == str(learner.id)
+    assert row["email"] == learner_email
+    titles = [p["title"] for p in row["incomplete_required_prerequisites"]]
+    assert titles == ["Still owed"]
+
+
+def test_read_lesson_prerequisite_gaps_omits_removed_participant(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson)
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Required gate",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+
+    active_email = f"ws06-gaps-active-{uuid.uuid4()}@example.com"
+    removed_email = f"ws06-gaps-removed-{uuid.uuid4()}@example.com"
+    authentication_token_from_email(client=client, email=active_email, db=db)
+    authentication_token_from_email(client=client, email=removed_email, db=db)
+    active_user = db.exec(select(User).where(User.email == active_email)).first()
+    removed_user = db.exec(select(User).where(User.email == removed_email)).first()
+    assert active_user is not None
+    assert removed_user is not None
+
+    db.add(
+        WorkshopParticipant(
+            session_id=ws.id,
+            user_id=active_user.id,
+            invited_at=datetime.now(timezone.utc),
+        )
+    )
+    removed_participant = WorkshopParticipant(
+        session_id=ws.id,
+        user_id=removed_user.id,
+        invited_at=datetime.now(timezone.utc),
+        removed_at=datetime.now(timezone.utc),
+    )
+    db.add(removed_participant)
+    db.commit()
+
+    instructor_email = f"ws06-gaps-omit-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    instructor_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/gaps",
+        headers=instructor_headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    assert payload["data"][0]["email"] == active_email
+
+
+def test_read_lesson_prerequisite_gaps_empty_when_all_required_complete(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson)
+    learner_email = f"ws06-gaps-clear-{uuid.uuid4()}@example.com"
+    authentication_token_from_email(client=client, email=learner_email, db=db)
+    learner = db.exec(select(User).where(User.email == learner_email)).first()
+    assert learner is not None
+
+    req = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Must do",
+        ordering=1,
+        required_flag=True,
+    )
+    opt = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Nice to have",
+        ordering=2,
+        required_flag=False,
+    )
+    db.add(req)
+    db.add(opt)
+    db.commit()
+    db.refresh(req)
+    db.refresh(opt)
+
+    db.add(
+        WorkshopParticipant(
+            session_id=ws.id,
+            user_id=learner.id,
+            invited_at=datetime.now(timezone.utc),
+        )
+    )
+    db.add(
+        UserPrerequisiteCompletion(
+            user_id=learner.id,
+            lesson_id=lesson.id,
+            prerequisite_id=req.id,
+            source="self",
+        )
+    )
+    db.commit()
+
+    instructor_email = f"ws06-gaps-empty-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    instructor_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/gaps",
+        headers=instructor_headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"data": [], "count": 0}

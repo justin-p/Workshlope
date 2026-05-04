@@ -200,6 +200,24 @@ export type WorkshopLessonPrerequisiteCreate = {
     required_flag?: boolean;
 };
 
+/**
+ * Trainee prerequisite gap for instructor cohort views (scoped to a workshop session roster).
+ */
+export type WorkshopLessonPrerequisiteGapPublic = {
+    user_id: string;
+    email: string;
+    full_name?: (string | null);
+    incomplete_required_prerequisites: Array<WorkshopLessonPrerequisitePublic>;
+};
+
+/**
+ * Users on the session roster who still owe at least one *required* prerequisite.
+ */
+export type WorkshopLessonPrerequisiteGapsPublic = {
+    data: Array<WorkshopLessonPrerequisiteGapPublic>;
+    count: number;
+};
+
 export type WorkshopLessonPrerequisiteMyPublic = {
     id: string;
     lesson_id: string;
@@ -575,6 +593,13 @@ export type WorkshopLessonsDeleteLessonPrerequisiteData = {
 };
 
 export type WorkshopLessonsDeleteLessonPrerequisiteResponse = (Message);
+
+export type WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterData = {
+    lessonId: string;
+    sessionId: string;
+};
+
+export type WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterResponse = (WorkshopLessonPrerequisiteGapsPublic);
 
 export type WorkshopLessonsReadMyLessonPrerequisitesData = {
     lessonId: string;

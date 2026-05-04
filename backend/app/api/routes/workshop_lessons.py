@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlmodel import col, select
 
 from app.api.deps import CurrentUser, SessionDep
@@ -12,11 +12,15 @@ from app.models import (
     UserPrerequisiteCompletion,
     WorkshopLessonPrerequisiteComplete,
     WorkshopLessonPrerequisiteCreate,
+    WorkshopLessonPrerequisiteGapPublic,
+    WorkshopLessonPrerequisiteGapsPublic,
     WorkshopLessonPrerequisiteMyPublic,
     WorkshopLessonPrerequisitePatch,
     WorkshopLessonPrerequisitePublic,
     WorkshopLessonPrerequisitesMyPublic,
     WorkshopLessonPrerequisitesPublic,
+    WorkshopParticipant,
+    WorkshopSession,
 )
 
 router = APIRouter(prefix="/workshop/lessons", tags=["workshop-lessons"])
@@ -164,6 +168,92 @@ def read_lesson_prerequisites(
         data=[WorkshopLessonPrerequisitePublic.model_validate(row) for row in rows],
         count=len(rows),
     )
+
+
+@router.get(
+    "/{lesson_id}/prerequisites/gaps",
+    response_model=WorkshopLessonPrerequisiteGapsPublic,
+)
+def read_lesson_prerequisite_gaps_for_session_roster(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    lesson_id: uuid.UUID,
+    session_id: uuid.UUID = Query(...),
+) -> WorkshopLessonPrerequisiteGapsPublic:
+    """List session roster trainees who owe at least one *required* prerequisite (instructor tooling)."""
+
+    _require_workshop_lesson_editor(current_user=current_user)
+    lesson = session.get(Lesson, lesson_id)
+    if lesson is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found"
+        )
+
+    ws_session = session.get(WorkshopSession, session_id)
+    if ws_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    if ws_session.lesson_id != lesson_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Session does not belong to this lesson",
+        )
+
+    required_rows = session.exec(
+        select(LessonPrerequisite)
+        .where(
+            LessonPrerequisite.lesson_id == lesson_id,
+            col(LessonPrerequisite.required_flag).is_(True),
+        )
+        .order_by(col(LessonPrerequisite.ordering))
+    ).all()
+
+    participant_rows = session.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_id,
+            col(WorkshopParticipant.user_id).is_not(None),
+            col(WorkshopParticipant.removed_at).is_(None),
+        )
+    ).all()
+
+    gaps: list[WorkshopLessonPrerequisiteGapPublic] = []
+    for participant in participant_rows:
+        user_id = participant.user_id
+        if user_id is None:
+            continue
+        completions = session.exec(
+            select(UserPrerequisiteCompletion).where(
+                UserPrerequisiteCompletion.user_id == user_id,
+                UserPrerequisiteCompletion.lesson_id == lesson_id,
+            )
+        ).all()
+        completed_ids = {row.prerequisite_id for row in completions}
+        incomplete = [
+            prerequisite
+            for prerequisite in required_rows
+            if prerequisite.id not in completed_ids
+        ]
+        if not incomplete:
+            continue
+        trainee = session.get(User, user_id)
+        if trainee is None:
+            continue
+        gaps.append(
+            WorkshopLessonPrerequisiteGapPublic(
+                user_id=user_id,
+                email=trainee.email,
+                full_name=trainee.full_name,
+                incomplete_required_prerequisites=[
+                    WorkshopLessonPrerequisitePublic.model_validate(p)
+                    for p in incomplete
+                ],
+            )
+        )
+
+    gaps.sort(key=lambda row: row.email)
+    return WorkshopLessonPrerequisiteGapsPublic(data=gaps, count=len(gaps))
 
 
 @router.get(
