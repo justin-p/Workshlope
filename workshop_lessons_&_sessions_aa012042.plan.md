@@ -120,6 +120,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 | Field | Value |
 | ------ | ------ |
 | **Last synced** | **2026-05-04** — **PR06 `ws-06-learning-workflows` progression**: prerequisite APIs (**`/me`**, **`/gaps`**, **`/aggregates`**, CRUD + complete) plus **workshop session UI surfaces**: trainee **incomplete required pre-work banner** and instructor **roster pre-work panel** on [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx). Completion writes remain idempotent; Playwright for these flows still optional. |
+| **Stop / handoff (this pause)** | **2026-05-04** — Voluntary stop; nothing left uncommitted on the integration branch at pause time. Repo tip (**`ws-06-learning-workflows`**) **`98fc1e2`** — `feat(workshop): surface pre-work checklist on session screen`. Prior agreement: leave **`.github/workflows/playwright.yml`** out of PR06 commits until you explicitly include it — reconcile local CI edits separately before push. |
 | **Active integration branch** | `ws-06-learning-workflows` → [PR #23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
 | **Stack PR label** | **PR06 — LearningWorkflows** 🚧 open on [#23](https://github.com/justin-p/testing/pull/23); continue slicing prerequisites/prework APIs + UI |
 
@@ -139,11 +140,12 @@ Use this section when reopening the project **after intentional stop**. Do **not
 
 1. `git checkout ws-06-learning-workflows && git pull`, then **`gh pr checks 23`** (or CI dashboard) — fix regressions on the **same head branch** if needed.
 2. Continue with **[Next actions](#next-actions-suggested-order)** — PR06 prerequisite backend/API slices are in progress on this branch.
-3. Keep [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) and this checkpoint synced whenever PR/base/branch state changes.
+3. Keep [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged), **Implementation tracker / Last synced / Stop-handoff**, and this checkpoint synced whenever PR/base/branch state changes — **especially after each intentional stop or resume.**
 
 **Open gaps (not blocking pause):**
 
 - Local Playwright **`auth.setup`** can time out without backend/`scripts/e2e-backend-reset.sh` — CI remains source of truth for E2E until env is reproduced locally.
+- **`.github/workflows/playwright.yml`**: intentionally not bundled with recent PR06 UI/API slices; verify `git diff` vs remote before merging any local workflow experiments.
 - **Prerequisite** stack is **mostly implemented** for MVP (HTTP + first-run UI on workshop session); exports-related slices and richer dashboard cards may still be 🔲.
 - Optional: expand Playwright coverage for trainee/instructor **dashboard list** widgets (beyond current admin assertion in `dashboard-routing.spec.ts`).
 
