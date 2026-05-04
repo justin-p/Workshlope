@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-04 — intentional pause.** **`ws-05-dashboard-nav`** @ **`297fc20`** carries the **pause handoff** section + checklist sync. Jump to [Pause / resume checkpoint](#pause--resume-checkpoint-handoff), then **`git pull`**. |
+| **Last synced** | **2026-05-04 — intentional pause** on **`ws-05-dashboard-nav`**. **Resume:** open [Pause / resume checkpoint](#pause--resume-checkpoint-handoff), then `git pull` and `gh pr checks 22`. *(Don’t pin a single SHA here — `git log -1` after pull is authoritative.)* |
 | **Active integration branch** | `ws-05-dashboard-nav` → [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`). **Successor branch:** `ws-06-learning-workflows` (*not created until PR06 slice starts*) |
 | **Stack PR label** | **PR05 — DashboardNav** ✅ on branch; **`main`** after stacked merge (**#18** → … → **#22**) or retarget per [stack table](#github-pr-stack-open--update-when-retargetedmerged) |
 
