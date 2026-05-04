@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-04 — work paused here.** Tip branch **`ws-05-dashboard-nav`** @ **`e90450d`** pushed. Full handoff: [Pause / resume checkpoint](#pause--resume-checkpoint-handoff). |
+| **Last synced** | **2026-05-04 — intentional pause.** **`ws-05-dashboard-nav`** @ **`308b8e6`** (includes pause handoff doc). Older feature tip: **`e90450d`**. Jump to [Pause / resume checkpoint](#pause--resume-checkpoint-handoff). |
 | **Active integration branch** | `ws-05-dashboard-nav` → [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`). **Successor branch:** `ws-06-learning-workflows` (*not created until PR06 slice starts*) |
 | **Stack PR label** | **PR05 — DashboardNav** ✅ on branch; **`main`** after stacked merge (**#18** → … → **#22**) or retarget per [stack table](#github-pr-stack-open--update-when-retargetedmerged) |
 
@@ -134,7 +134,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | Item | Value |
 | ---- | ----- |
 | Branch | `ws-05-dashboard-nav` |
-| Latest pushed commits | `e90450d` — `docs(plan): mark PR06 session GET row satisfied on ws-05 branch` ← `de9f1c5` — `feat(api): GET /workshop/sessions/{id} scoped session detail` ← `2f85219` — `feat(frontend): workshop session list on dashboards and workshops hub` ← `20f8e0f` — `feat(api): GET /workshop/sessions scoped list for dashboards` |
+| Latest commits (newest → older) | `308b8e6` — this **pause handoff** update ← `e90450d` ← `de9f1c5` (GET detail) ← `2f85219` (dashboard list UI) ← `20f8e0f` (GET list API) ← … |
 | PR | [#22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`) |
 
 **Shipped on this branch since last stack merge expectation:**
