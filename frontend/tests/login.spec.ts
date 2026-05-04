@@ -2,6 +2,7 @@ import { expect, type Page, test } from "@playwright/test"
 import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
 import { expectLandingAfterLogin } from "./utils/loggedInDashboard.ts"
 import { randomPassword } from "./utils/random.ts"
+import { expectErrorToastDescription } from "./utils/sonnerToast.ts"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -38,16 +39,18 @@ test("Forgot Password link is visible", async ({ page }) => {
   ).toBeVisible()
 })
 
-test("Log in with valid email and password ", async ({ page }) => {
+test("Log in with valid first superuser credentials", async ({ page }) => {
   await page.goto("/login")
 
   await fillForm(page, firstSuperuser, firstSuperuserPassword)
   await page.getByRole("button", { name: "Log In" }).click()
 
-  await page.waitForURL("/dashboard/admin")
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Admin Home" }),
-  ).toBeVisible()
+  await expectLandingAfterLogin(page)
+  // Routing prefers instructor dashboard when FIRST_SUPERUSER is also an instructor;
+  // a fresh seeded superuser lands on Admin Home (`getDashboardLandingPath`).
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    /^(Admin Home|Instructor Home)$/,
+  )
 })
 
 test("Log in with invalid email", async ({ page }) => {
@@ -69,7 +72,7 @@ test("Log in with invalid password", async ({ page }) => {
   await fillForm(page, firstSuperuser, password)
   await page.getByRole("button", { name: "Log In" }).click()
 
-  await expect(page.getByText("Incorrect email or password")).toBeVisible()
+  await expectErrorToastDescription(page, "Incorrect email or password")
 })
 
 test("Successful log out", async ({ page }) => {

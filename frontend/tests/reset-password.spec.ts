@@ -1,10 +1,25 @@
 import { expect, test } from "@playwright/test"
-import { findLastEmail } from "./utils/mailcatcher"
+import { findLastEmail, mailFiltersToMailbox } from "./utils/mailcatcher"
 import { randomEmail, randomPassword } from "./utils/random"
-import { expectSuccessToastDescription } from "./utils/sonnerToast.ts"
+import {
+  expectErrorToastDescription,
+  expectSuccessToastDescription,
+} from "./utils/sonnerToast.ts"
 import { logInUser, signUpNewUser } from "./utils/user"
 
+test.describe.configure({ mode: "serial", timeout: 120_000 })
+
 test.use({ storageState: { cookies: [], origins: [] } })
+
+/** Mail HTML uses backend FRONTEND_HOST; swap origin for the browser (e.g. http://frontend in Docker). */
+function appUrlFromMailHref(href: string | null): string {
+  expect(href, "reset link href missing in mail HTML").toBeTruthy()
+  const appOrigin = (
+    process.env.PLAYWRIGHT_MAIL_LINK_ORIGIN ?? "http://127.0.0.1:5173"
+  ).replace(/\/+$/, "")
+  const resolved = new URL(href!, appOrigin)
+  return `${appOrigin}${resolved.pathname}${resolved.search}${resolved.hash}`
+}
 
 test("Password Recovery title is visible", async ({ page }) => {
   await page.goto("/recover-password")
@@ -47,20 +62,19 @@ test("User can reset password successfully using the link", async ({
 
   const emailData = await findLastEmail({
     request,
-    filter: (e) => e.recipients.includes(`<${email}>`),
-    timeout: 5000,
+    filter: mailFiltersToMailbox(email),
+    timeout: 30_000,
   })
 
   await page.goto(
     `${process.env.MAILCATCHER_HOST}/messages/${emailData.id}.html`,
   )
 
-  const selector = 'a[href*="/reset-password?token="]'
-
-  let url = await page.getAttribute(selector, "href")
-
-  // TODO: update var instead of doing a replace
-  url = url!.replace("http://localhost/", "http://localhost:5173/")
+  const url = appUrlFromMailHref(
+    await page
+      .getByRole("link", { name: "Reset password" })
+      .getAttribute("href"),
+  )
 
   // Set the new password and confirm it
   await page.goto(url)
@@ -84,7 +98,7 @@ test("Expired or invalid reset link", async ({ page }) => {
   await page.getByTestId("confirm-password-input").fill(password)
   await page.getByRole("button", { name: "Reset Password" }).click()
 
-  await expect(page.getByText("Invalid token")).toBeVisible()
+  await expectErrorToastDescription(page, "Invalid token")
 })
 
 test("Weak new password validation", async ({ page, request }) => {
@@ -102,17 +116,19 @@ test("Weak new password validation", async ({ page, request }) => {
 
   const emailData = await findLastEmail({
     request,
-    filter: (e) => e.recipients.includes(`<${email}>`),
-    timeout: 5000,
+    filter: mailFiltersToMailbox(email),
+    timeout: 30_000,
   })
 
   await page.goto(
     `${process.env.MAILCATCHER_HOST}/messages/${emailData.id}.html`,
   )
 
-  const selector = 'a[href*="/reset-password?token="]'
-  let url = await page.getAttribute(selector, "href")
-  url = url!.replace("http://localhost/", "http://localhost:5173/")
+  const url = appUrlFromMailHref(
+    await page
+      .getByRole("link", { name: "Reset password" })
+      .getAttribute("href"),
+  )
 
   // Set a weak new password
   await page.goto(url)

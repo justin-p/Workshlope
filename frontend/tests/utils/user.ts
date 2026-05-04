@@ -15,7 +15,7 @@ export async function signUpNewUser(
   await page.getByTestId("password-input").fill(password)
   await page.getByTestId("confirm-password-input").fill(password)
   await page.getByRole("button", { name: "Sign Up" }).click()
-  await page.goto("/login")
+  await page.waitForURL("**/login", { timeout: 15_000 })
 }
 
 export async function logInUser(page: Page, email: string, password: string) {

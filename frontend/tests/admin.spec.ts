@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
+import { maximizeAdminUsersTablePageSize } from "./utils/adminUsersTable"
 import { createUser } from "./utils/privateApi"
 import { randomEmail, randomPassword } from "./utils/random"
 import { expectSuccessToastDescription } from "./utils/sonnerToast.ts"
@@ -19,6 +20,7 @@ test("Add User button is visible", async ({ page }) => {
 test.describe("Admin user management", () => {
   test("Create a new user successfully", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     const email = randomEmail()
     const password = randomPassword()
@@ -42,6 +44,7 @@ test.describe("Admin user management", () => {
 
   test("Create a superuser", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     const email = randomEmail()
     const password = randomPassword()
@@ -65,6 +68,7 @@ test.describe("Admin user management", () => {
 
   test("Edit a user successfully", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     const email = randomEmail()
     const password = randomPassword()
@@ -90,11 +94,14 @@ test.describe("Admin user management", () => {
     await page.getByRole("button", { name: "Save" }).click()
 
     await expectSuccessToastDescription(page, "User updated successfully")
-    await expect(userRow).toContainText(updatedName)
+    await expect(
+      page.getByRole("row").filter({ hasText: email }),
+    ).toContainText(updatedName)
   })
 
   test("Delete a user successfully", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     const email = randomEmail()
     const password = randomPassword()
@@ -127,6 +134,7 @@ test.describe("Admin user management", () => {
 
   test("Cancel user creation", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     await page.getByRole("button", { name: "Add User" }).click()
     await page.getByPlaceholder("Email").fill("test@example.com")
@@ -138,6 +146,7 @@ test.describe("Admin user management", () => {
 
   test("Email is required and must be valid", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     await page.getByRole("button", { name: "Add User" }).click()
 
@@ -149,6 +158,7 @@ test.describe("Admin user management", () => {
 
   test("Password must be at least 8 characters", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     await page.getByRole("button", { name: "Add User" }).click()
 
@@ -164,6 +174,7 @@ test.describe("Admin user management", () => {
 
   test("Passwords must match", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     await page.getByRole("button", { name: "Add User" }).click()
 

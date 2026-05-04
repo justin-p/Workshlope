@@ -14,6 +14,12 @@ RUN bun install
 COPY ./frontend /app/frontend
 ARG VITE_API_URL
 ARG VITE_AUTHJS_URL
+# Same logical flag as backend USER_REGISTRATION_ENABLED; Vite only reads VITE_* at build time.
+ARG USER_REGISTRATION_ENABLED=true
+
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_AUTHJS_URL=$VITE_AUTHJS_URL \
+    VITE_USER_REGISTRATION_ENABLED=$USER_REGISTRATION_ENABLED
 
 RUN bun run build
 
@@ -23,5 +29,6 @@ FROM nginx:1
 
 COPY --from=build-stage /app/frontend/dist/ /usr/share/nginx/html
 
+COPY ./frontend/nginx-upgrade-map.conf /etc/nginx/conf.d/00-upgrade-map.conf
 COPY ./frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY ./frontend/nginx-backend-not-found.conf /etc/nginx/extra-conf.d/backend-not-found.conf

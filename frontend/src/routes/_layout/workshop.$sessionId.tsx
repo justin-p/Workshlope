@@ -115,8 +115,14 @@ function WorkshopSessionPage() {
         }
 
         setPhase("ws_connecting")
-        const apiBase = import.meta.env.VITE_API_URL as string
-        const wsUrl = `${httpToWsBase(apiBase)}/api/v1/workshop/sessions/${sessionId}/ws`
+        const rawBase = (
+          import.meta.env.VITE_API_URL as string | undefined
+        )?.trim()
+        const apiHttpBase =
+          rawBase !== undefined && rawBase !== ""
+            ? rawBase
+            : window.location.origin
+        const wsUrl = `${httpToWsBase(apiHttpBase)}/api/v1/workshop/sessions/${sessionId}/ws`
         const ws = new WebSocket(wsUrl, ["ticket", ticketRes.ticket])
         wsRef.current = ws
 

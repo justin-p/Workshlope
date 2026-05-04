@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 
+import { maximizeAdminUsersTablePageSize } from "./utils/adminUsersTable"
 import { createPendingViaBridge, deleteAllPending } from "./utils/bridgeToken"
 import { randomEmail, randomPassword } from "./utils/random"
 import { expectSuccessToastDescription } from "./utils/sonnerToast.ts"
@@ -14,6 +15,7 @@ async function createUserViaAdminUi(page: Page) {
   await page.getByPlaceholder("Password").last().fill(password)
   await page.getByRole("button", { name: "Save" }).click()
   await expectSuccessToastDescription(page, "User created successfully")
+  await maximizeAdminUsersTablePageSize(page)
   return { email, password }
 }
 
@@ -63,7 +65,7 @@ test.describe("Admin Users page - pending GitHub flow", () => {
 
     await gotoPendingTab(page)
     await page.getByTestId(`pending-deny-${providerAccountId}`).click()
-    await expect(page.getByText("Pending request denied")).toBeVisible()
+    await expectSuccessToastDescription(page, "Pending request denied")
     await expect(
       page.getByTestId(`pending-row-${providerAccountId}`),
     ).toHaveCount(0)
@@ -88,13 +90,14 @@ test.describe("Admin Users page - pending GitHub flow", () => {
     await page.getByTestId(`approve-link-user-${email}`).click()
     await page.getByTestId("approve-pending-submit").click()
 
-    await expect(page.getByText("Pending request approved")).toBeVisible()
+    await expectSuccessToastDescription(page, "Pending request approved")
     await expect(
       page.getByTestId(`pending-row-${providerAccountId}`),
     ).toHaveCount(0)
 
     // Confirm user is linked by checking the Manage GitHub status dialog.
     await page.getByTestId("users-tab-users").click()
+    await maximizeAdminUsersTablePageSize(page)
     const userRow = page.getByRole("row").filter({ hasText: email })
     await expect(userRow).toBeVisible()
     await userRow.getByRole("button").last().click()
@@ -122,13 +125,14 @@ test.describe("Admin Users page - pending GitHub flow", () => {
     // create mode should be the default when email is present
     await page.getByTestId("approve-pending-submit").click()
 
-    await expect(page.getByText("Pending request approved")).toBeVisible()
+    await expectSuccessToastDescription(page, "Pending request approved")
     await expect(
       page.getByTestId(`pending-row-${providerAccountId}`),
     ).toHaveCount(0)
 
     // The new user should now appear in the Users table with the GitHub badge.
     await page.getByTestId("users-tab-users").click()
+    await maximizeAdminUsersTablePageSize(page)
     const userRow = page.getByRole("row").filter({ hasText: newEmail })
     await expect(userRow).toBeVisible()
     await expect(userRow.getByText("octo-create")).toBeVisible()
@@ -140,6 +144,7 @@ test.describe("Admin Users page - simplified Manage GitHub", () => {
     page,
   }) => {
     const { email } = await createUserViaAdminUi(page)
+    await maximizeAdminUsersTablePageSize(page)
     const userRow = page.getByRole("row").filter({ hasText: email })
     await userRow.getByRole("button").last().click()
     await page.getByRole("menuitem", { name: "Manage GitHub" }).click()

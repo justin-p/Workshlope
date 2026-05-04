@@ -26,7 +26,7 @@ bash scripts/e2e-backend-reset.sh
 
 This is also run automatically via `globalSetup` in `frontend/playwright.config.ts` when you execute Playwright **on the host** (not inside the Playwright Docker service, where CI already resets the stack). To skip the automated reset: `SKIP_E2E_BACKEND_RESET=1`.
 
-The reset script starts the backend with `USER_REGISTRATION_ENABLED=true` so sign-up specs pass even when `.env.local` disables registration. The Playwright-started Vite dev server forces `VITE_USER_REGISTRATION_ENABLED=true` for the same reason.
+The reset script starts the backend with `USER_REGISTRATION_ENABLED=true` so sign-up specs pass even when `.env.local` disables registration. For host `vite` dev, only `USER_REGISTRATION_ENABLED` in repo-root `.env.local` needs to stay in sync—the Vite client flag is derived unless you set `VITE_USER_REGISTRATION_ENABLED` explicitly.
 
 2. Run Playwright from `frontend`:
 

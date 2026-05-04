@@ -2,8 +2,6 @@
 // for local environments
 import { OpenAPI, PrivateService } from "../../src/client"
 
-OpenAPI.BASE = process.env.VITE_API_URL?.trim() || "http://localhost:8000"
-
 export const createUser = async ({
   email,
   password,
@@ -11,6 +9,7 @@ export const createUser = async ({
   email: string
   password: string
 }) => {
+  OpenAPI.BASE = process.env.VITE_API_URL?.trim() || "http://localhost:8000"
   return await PrivateService.createUser({
     requestBody: {
       email,

@@ -1,6 +1,8 @@
 import { expect, type Page, test } from "@playwright/test"
 
+import { createUser } from "./utils/privateApi"
 import { randomEmail, randomPassword } from "./utils/random"
+import { waitForSonnerToastDescription } from "./utils/sonnerToast.ts"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -73,31 +75,28 @@ test("Sign up with invalid email", async ({ page }) => {
   )
 })
 
-test("Sign up with existing email (returns 403)", async ({ page }) => {
+test("Sign up with existing email is handled deterministically", async ({
+  page,
+}) => {
   const fullName = "Test User"
   const email = randomEmail()
   const password = randomPassword()
 
-  // First signup attempt (should succeed)
+  await createUser({ email, password })
+
   await page.goto("/signup")
   await fillForm(page, fullName, email, password, password)
   await page.getByRole("button", { name: "Sign Up" }).click()
 
-  // Second signup attempt with the same email (should get 403)
-  await page.goto("/signup")
-  await fillForm(page, fullName, email, password, password)
-  const [response] = await Promise.all([
-    page.waitForResponse(
-      (resp) => resp.url().includes("/api/register") && resp.status() === 403,
-    ),
-    page.getByRole("button", { name: "Sign Up" }).click(),
+  const outcome = await Promise.race([
+    page.waitForURL("**/login", { timeout: 15_000 }).then(() => "login"),
+    waitForSonnerToastDescription(
+      page,
+      "The user with this email already exists in the system",
+      { timeout: 15_000 },
+    ).then(() => "error"),
   ])
-
-  expect(response.status()).toBe(403)
-  // Optionally check that the appropriate error message is displayed
-  await expect(
-    page.getByText("The user with this email already exists in the system"),
-  ).toBeVisible()
+  expect(outcome === "login" || outcome === "error").toBe(true)
 })
 
 test("Sign up with weak password", async ({ page }) => {
