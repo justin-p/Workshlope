@@ -1,6 +1,6 @@
 ---
 name: Workshop Lessons & Sessions
-overview: "Living delivery status: scroll to **Implementation tracker** in this file. Update that section whenever a stacked PR slice merges or behavior changes materially."
+overview: "Living delivery status: scroll to **Implementation tracker** and **[Pause / resume checkpoint](#pause--resume-checkpoint-handoff)** after a stop. Update the tracker whenever a stacked PR slice merges or behavior changes materially."
 todos:
   - id: role-instructor
     content: User.is_instructor + RBAC — superuser has full workshop/session management APIs; instructors own sessions or any session where they are assigned as instructor/rostered participant; gate GitHub App install prompts to instructor-only surfaces
@@ -18,7 +18,7 @@ todos:
     content: ws-ticket via Sec-WebSocket-Protocol; part_generation reconnect; pause gates; trainee WS/API payloads omit peer identities and peer live_status (instructor-only fanout full roster)
     status: pending
   - id: replace-items-nav
-    content: "Sidebar IA + post-login dashboards (`getDashboardLandingPath`, `/dashboard/*`), workshops stub `/workshops`, OAuth→dashboard parity, Playwright + Sonner harness — **on [PR #22](https://github.com/justin-p/testing/pull/22)**; stack merge to `main` pending; **live list widgets** still PR06+ APIs"
+    content: "Dashboard nav + **`GET /workshop/sessions/`** list widgets + **`GET /workshop/sessions/{id}`** cockpit heading — shipped on **`ws-05-dashboard-nav` / [#22](https://github.com/justin-p/testing/pull/22)**; stack merge pending. **Paused 2026-05-04** — resume from [Pause / resume checkpoint](#pause--resume-checkpoint-handoff)."
     status: completed
   - id: badges-awards
     content: Instructor-verified badge issuance on completion (single + bulk); badge catalog + user badge grants with per-badge points; profile/session/instructor surfaces + public leaderboard
@@ -119,9 +119,43 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-04 — Same stack as below. **`GET /workshop/sessions/{id}`** detail (participant vs instructor DTOs) + regenerated SDK; `/workshop/:id` page hydrates **lesson title** from that GET. **`PR #22`:** confirm CI before merge (`gh pr checks 22`). **Next:** stack merge (#18↑) → **PR06** prerequisites / workflow slice. |
+| **Last synced** | **2026-05-04 — work paused here.** Tip branch **`ws-05-dashboard-nav`** @ **`e90450d`** pushed. Full handoff: [Pause / resume checkpoint](#pause--resume-checkpoint-handoff). |
 | **Active integration branch** | `ws-05-dashboard-nav` → [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`). **Successor branch:** `ws-06-learning-workflows` (*not created until PR06 slice starts*) |
 | **Stack PR label** | **PR05 — DashboardNav** ✅ on branch; **`main`** after stacked merge (**#18** → … → **#22**) or retarget per [stack table](#github-pr-stack-open--update-when-retargetedmerged) |
+
+### Pause / resume checkpoint (handoff)
+
+Use this section when reopening the project **after intentional stop**. Do **not** rely on chat history beyond what is committed and linked here.
+
+**Stopped:** 2026-05-04.
+
+**Git tip (must match when resuming work on this slice):**
+
+| Item | Value |
+| ---- | ----- |
+| Branch | `ws-05-dashboard-nav` |
+| Latest pushed commits | `e90450d` — `docs(plan): mark PR06 session GET row satisfied on ws-05 branch` ← `de9f1c5` — `feat(api): GET /workshop/sessions/{id} scoped session detail` ← `2f85219` — `feat(frontend): workshop session list on dashboards and workshops hub` ← `20f8e0f` — `feat(api): GET /workshop/sessions scoped list for dashboards` |
+| PR | [#22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`) |
+
+**Shipped on this branch since last stack merge expectation:**
+
+- **`GET /api/v1/workshop/sessions/`** — scoped list (`WorkshopSessionsPublic`); dashboards + `/workshops` use [`DashboardWorkshopSessions`](frontend/src/components/dashboard/DashboardWorkshopSessions.tsx) + `WorkshopSessionsService.readWorkshopSessionsForUser`.
+- **`GET /api/v1/workshop/sessions/{id}`** — participant vs instructor DTOs (`WorkshopSessionPublicParticipant` \| `WorkshopSessionPublicInstructor`); superuser ⇒ instructor-shaped view; roster **`avatar_url`** is always **`null`** until **`User.avatar_url`** exists in schema.
+- **`/workshop/$sessionId`** — hydrates lesson **title/slug** via `WorkshopSessionsService.readWorkshopSessionDetail` (`useQuery`), then existing ws-ticket/WebSocket flow.
+- **Tests:** new cases in [`test_workshop_sessions.py`](backend/tests/api/routes/test_workshop_sessions.py) for detail; full file was green at pause (`uv run pytest tests/api/routes/test_workshop_sessions.py`).
+- **Client:** regenerated under [`frontend/src/client/`](frontend/src/client/) whenever OpenAPI changed (pre-commit `generate-frontend-sdk`).
+
+**Resume in this order:**
+
+1. `git checkout ws-05-dashboard-nav && git pull`, then **`gh pr checks 22`** (or CI dashboard) — fix regressions on the **same head branch** if needed.
+2. Proceed with **[Next actions](#next-actions-suggested-order)** — note item 4 is updated: HTTP gap slices **(1)-(2)** are **done** on this branch; next vertical work is roster sketch / **PR06** prerequisites unless you reorder the stack.
+3. When starting **PR06**: fork **`ws-06-learning-workflows`** from current **`ws-05`** tip (or from **`main`** if #18–#22 have landed), update [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) + mermaid dependency graph nodes.
+
+**Open gaps (not blocking pause):**
+
+- Local Playwright **`auth.setup`** can time out without backend/`scripts/e2e-backend-reset.sh` — CI remains source of truth for E2E until env is reproduced locally.
+- **Roster `POST/PATCH`** and **prerequisite** endpoints from REST sketch remain 🔲 ([gap audit](#workshop-http-vs-realtime--delivery-gap-audit)).
+- Optional: expand Playwright coverage for trainee/instructor **dashboard list** widgets (beyond current admin assertion in `dashboard-routing.spec.ts`).
 
 ### GitHub PR stack (open — update when retargeted/merged)
 
@@ -208,7 +242,7 @@ All rows below reflect **`ws-05-dashboard-nav` / [#22](https://github.com/justin
 
 ### PR06 (`ws-06-learning-workflows`) — planned next slice (*PR not opened*)
 
-Fork from **`ws-05-dashboard-nav`** (or **`main`** after stack lands). Aligns with [Branch/PR chain](#branchpr-chain) item 6 and the frontmatter roadmap id **`prework-prerequisites`**. Consider landing [**Workshop HTTP gap**](#workshop-http-vs-realtime--delivery-gap-audit) slices **(1)-(2)** in the **same PR** or a **narrow precursor** so dashboards can swap stubs for real lists.
+Fork from **`ws-05-dashboard-nav`** (or **`main`** after stack lands). Aligns with [Branch/PR chain](#branchpr-chain) item 6 and the frontmatter roadmap id **`prework-prerequisites`**. **HTTP gap slices (1)-(2)** (list + session detail **`GET`s**) landed on **`ws-05-dashboard-nav`** ([gap audit](#workshop-http-vs-realtime--delivery-gap-audit)); PR06 focuses on prerequisites / prework UX and downstream APIs, unless you carve roster management paths first.
 
 | Planned capability | Notes |
 | ------------------ | ----- |
@@ -237,8 +271,10 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 1. **Confirm tip CI:** `gh pr checks 22` — if anything regresses, run **babysitting-pr** / Task fix loop on `ws-05-dashboard-nav`.
 2. **Stack merge:** review + land [#18](https://github.com/justin-p/testing/pull/18) → … → [#22](https://github.com/justin-p/testing/pull/22) (or retarget heads after each base merges to `main`); update [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) after each merge.
 3. **PR06 kickoff:** create `ws-06-learning-workflows` from merged tip (or from `ws-05` if stacking without waiting for `main`); follow [PR06 planned slice](#pr06-ws-06-learning-workflows--planned-next-slice-pr-not-opened); open PR + stack table row.
-4. **Dashboard data plane:** implement [**Workshop HTTP gap**](#workshop-http-vs-realtime--delivery-gap-audit) slices **(1)-(2)** (scoped **`GET`** list + detail) before wiring **PR05 live widgets**; prerequisites track remains PR06 scope ([PR06 table](#pr06-ws-06-learning-workflows--planned-next-slice-pr-not-opened)).
+4. **Next backend verticals (gap audit):** slices **(1)-(2)** are ✅ on **`ws-05-dashboard-nav`**. Prefer next: roster **`POST/PATCH`** / participant management aligned with this doc’s [**REST sketch**](#rest-sketch-under-apiv1) section, **or** jump to **PR06** prerequisite models + routes (`LessonPrerequisite`, `UserPrerequisiteCompletion`). *(If that anchor breaks in your renderer, scroll to heading **REST sketch (under /api/v1/…)***.)
 5. **E2E discipline:** `scripts/e2e-backend-reset.sh` before full local Playwright when diagnosing drift; Sonner-aware toasts ([playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md)).
+
+**When resuming from pause:** step through [Pause / resume checkpoint](#pause--resume-checkpoint-handoff) first.
 
 ### YAML todos above
 
