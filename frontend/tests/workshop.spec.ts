@@ -141,6 +141,9 @@ test.describe("Workshop live session", () => {
     await expect(
       participantPage.getByTestId("workshop-ws-last-ack"),
     ).toContainText("live_status.ack")
+    await expect(
+      participantPage.getByTestId("workshop-ws-last-raw"),
+    ).not.toContainText("participant.live_status")
     await expect(page.getByTestId("workshop-ws-last-raw")).toContainText(
       "participant.live_status",
     )

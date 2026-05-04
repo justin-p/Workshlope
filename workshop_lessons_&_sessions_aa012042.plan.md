@@ -154,7 +154,7 @@ Aligned with plan bullets: ws-ticket, role-scoped fan-out, trainee privacy.
 | OpenAPI + regenerated TS client when HTTP contract changed | ✅ | Run pre-commit hook on API edits |
 | **`part_generation` mirror + stale teardown** (hub sync after advance; **`part_generation_stale`** payload then close **`1008`**; receive loop stops — mint new ws-ticket and reconnect) | ✅ | `_dispatch_workshop_ws_text` returns `False`; `sync_bump_room_part_generation` after advance commit |
 | **Multi-process realtime** (Redis or equivalent hub) | 🔲 | MVP is in-memory `WorkshopRealtimeHub` |
-| **Playwright** for instructor + trainee flows on these APIs | 🟨 | Trainee + instructor: bootstrap (+ `omit_participant_seat`), `/workshop/:id` WS **start / pause / resume / advance / end** smoke, two-user assertion that participant `live_status` fan-outs to instructor while trainee stream remains peer-private; fuller cockpit assertions still 🔲 |
+| **Playwright** for instructor + trainee flows on these APIs | ✅ | Bounded PR04 cockpit: `/workshop/:id` only — **start / pause / resume / advance / end** smoke + two-user **participant.live_status** fan-out to instructor + explicit trainee denial of same roster-style payload |
 
 ### Stacked PRs — coarse roll-up
 
@@ -165,19 +165,13 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 | 01 | `ws-01-foundation-rbac` | 🟨 | `User.is_instructor` + migrations; confirm against `main` |
 | 02 | `ws-02-github-sync-manifest` | 🔲 | GitHub App + manifest sync not tracked here yet |
 | 03 | `ws-03-session-core` | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
-| 04 | `ws-04-realtime-privacy` | 🟨 | Backend ✅ incl. drift gate; trainee + instructor UI controls ✅; targeted Playwright incl. two-user privacy/fan-out ✅; full cross-suite E2E still 🔲 |
+| 04 | `ws-04-realtime-privacy` | 🟨 | Bounded realtime/privacy + `/workshop` E2E ✅; merge readiness = CI green + review; optional full-repo Playwright pass is infra/coverage hygiene, not scope creep |
 | 05–10 | downstream | 🔲 | See Branch/PR chain later in this doc |
 
 ### Next actions (suggested order on PR04)
 
-1. **Bounded PR04 closure slice (no new routes/UI areas):**
-   - **In scope:** keep tests on `/workshop/:id` only; add exactly one multi-participant instructor assertion that roster-style events are visible to instructor but never to trainee.
-   - **Out of scope (defer to PR05+):** dashboard pages, session cards, roster management screens, nav/IA work, or any new cockpit route.
-   - **Done when:** `frontend/tests/workshop.spec.ts` contains and passes:
-     - two-user privacy/fan-out assertion (already present),
-     - instructor control lifecycle smoke (`start/pause/resume/advance/end`),
-     - trainee cannot see peer roster payload assertion.
-2. Resume checklist: re-run `backend/tests/api/routes/test_private.py` and `frontend/tests/workshop.spec.ts`, then spot-check full Playwright when infra is stable.
+1. **Merge / babysit PR #21:** `gh pr checks 21` until green; fix only regressions tied to this slice.
+2. **PR05 handoff:** open `ws-05-dashboard-nav` work (nav + role homes) — do not expand `/workshop` test matrix further unless CI or a regression demands it.
 
 ### YAML todos above
 
