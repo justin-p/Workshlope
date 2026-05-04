@@ -42,6 +42,30 @@ test.describe("Admin user management", () => {
     await expect(userRow).toBeVisible()
   })
 
+  test("Create a workshop instructor user", async ({ page }) => {
+    await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
+
+    const email = randomEmail()
+    const password = randomPassword()
+
+    await page.getByRole("button", { name: "Add User" }).click()
+
+    await page.getByPlaceholder("Email").fill(email)
+    await page.getByPlaceholder("Password").first().fill(password)
+    await page.getByPlaceholder("Password").last().fill(password)
+    await page.getByLabel("Workshop instructor?").check()
+    await page.getByLabel("Is active?").check()
+
+    await page.getByRole("button", { name: "Save" }).click()
+
+    await expectSuccessToastDescription(page, "User created successfully")
+    await expect(page.getByRole("dialog")).not.toBeVisible()
+
+    const userRow = page.getByRole("row").filter({ hasText: email })
+    await expect(userRow.getByText("Instructor")).toBeVisible()
+  })
+
   test("Create a superuser", async ({ page }) => {
     await page.goto("/admin")
     await maximizeAdminUsersTablePageSize(page)
