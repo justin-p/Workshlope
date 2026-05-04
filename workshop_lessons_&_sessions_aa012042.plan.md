@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-04** — PR05 backend roster slices landed on **`ws-05-dashboard-nav`** (`POST /members`, `DELETE /participants/{user_id}`, `PATCH /participants/{user_id}`) with tests + regenerated client. **PR #22 checks are currently running/pending**; re-check with `gh pr checks 22` before merge. |
+| **Last synced** | **2026-05-04** — Added session-level **`PATCH /workshop/sessions/{id}`** (instructor seat `role` update via `instructor_seat` body) + tests + OpenAPI client regen on **`ws-05-dashboard-nav`**. PR #22 Playwright CI previously green; re-check `gh pr checks 22` after this push. |
 | **Active integration branch** | `ws-05-dashboard-nav` → [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`). **Successor branch:** `ws-06-learning-workflows` (*not created until PR06 slice starts*) |
 | **Stack PR label** | **PR05 — DashboardNav** ✅ on branch; **`main`** after stacked merge (**#18** → … → **#22**) or retarget per [stack table](#github-pr-stack-open--update-when-retargetedmerged) |
 
@@ -193,7 +193,7 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 
 | Surface | Implemented today | Still 🔲 vs **REST sketch** (below, *REST sketch under /api/v1/*) |
 | ------- | ----------------- | ---------------------------------------------------------------- |
-| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove; **`PATCH …/sessions/{id}/participants/{user_id}`** instructor overrides (`live_status`/`joined_at`/`finished_at`) | Session-level **`PATCH`**; prerequisites; exports — see sketch table |
+| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove; **`PATCH …/sessions/{id}/participants/{user_id}`** instructor overrides (`live_status`/`joined_at`/`finished_at`); **`PATCH …/sessions/{id}`** — `instructor_seat` updates active **`SessionInstructor.role`** (instructor/superuser; empty body **422**; unknown seat **404**) | Broader session **`PATCH`** (status transitions, last-instructor **409**, primary handoff); prerequisites; exports — see sketch table |
 | **WebSocket** | `/{id}/ws` — `part.advance`, `session.pause` / `session.resume`, `participant.live_status`, … | Redis / multi-process hub (explicitly deferred) |
 
 **Remaining vs dashboard/product polish:** roster management + prerequisites/export paths in the sketch are still 🔲 (list + read/detail for session context are ✅ on **`ws-05-dashboard-nav`**).
@@ -274,7 +274,7 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 1. **Confirm tip CI:** `gh pr checks 22` — if anything regresses, run **babysitting-pr** / Task fix loop on `ws-05-dashboard-nav`.
 2. **Stack merge:** review + land [#18](https://github.com/justin-p/testing/pull/18) → … → [#22](https://github.com/justin-p/testing/pull/22) (or retarget heads after each base merges to `main`); update [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) after each merge.
 3. **PR06 kickoff:** create `ws-06-learning-workflows` from merged tip (or from `ws-05` if stacking without waiting for `main`); follow [PR06 planned slice](#pr06-ws-06-learning-workflows--planned-next-slice-pr-not-opened); open PR + stack table row.
-4. **Next backend verticals (gap audit):** PR05 roster slices are now ✅ (`POST /members`, `DELETE /participants/{user_id}`, `PATCH /participants/{user_id}`). Next: session-level **`PATCH /workshop/sessions/{id}`** constraints and/or PR06 prerequisite models + routes (`LessonPrerequisite`, `UserPrerequisiteCompletion`).
+4. **Next backend verticals (gap audit):** PR05 roster slices ✅; first **`PATCH /workshop/sessions/{id}`** slice ✅ (`instructor_seat` role). Next: richer session **`PATCH`** (controlled `status` transitions, **409** last-instructor guard per sketch) and/or PR06 prerequisite models + routes (`LessonPrerequisite`, `UserPrerequisiteCompletion`).
 5. **E2E discipline:** `scripts/e2e-backend-reset.sh` before full local Playwright when diagnosing drift; Sonner-aware toasts ([playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md)).
 
 **When resuming from pause:** step through [Pause / resume checkpoint](#pause--resume-checkpoint-handoff) first.

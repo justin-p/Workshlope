@@ -242,6 +242,14 @@ export type WorkshopSessionCorePublic = {
 };
 
 /**
+ * Update an active instructor seat's role (e.g. co_instructor → lead).
+ */
+export type WorkshopSessionInstructorSeatRoleUpdate = {
+    user_id: string;
+    role: string;
+};
+
+/**
  * Minimal session row for dashboard lists — no roster, no peer data.
  */
 export type WorkshopSessionListItem = {
@@ -255,6 +263,13 @@ export type WorkshopSessionListItem = {
      * Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.
      */
     my_role?: ('participant' | 'instructor' | null);
+};
+
+/**
+ * Session-level PATCH body; fields are applied when present.
+ */
+export type WorkshopSessionPatch = {
+    instructor_seat?: (WorkshopSessionInstructorSeatRoleUpdate | null);
 };
 
 /**
@@ -485,6 +500,13 @@ export type WorkshopSessionsReadWorkshopSessionDetailData = {
 };
 
 export type WorkshopSessionsReadWorkshopSessionDetailResponse = ((WorkshopSessionPublicParticipant | WorkshopSessionPublicInstructor));
+
+export type WorkshopSessionsPatchWorkshopSessionData = {
+    requestBody: WorkshopSessionPatch;
+    sessionId: string;
+};
+
+export type WorkshopSessionsPatchWorkshopSessionResponse = (Message);
 
 export type WorkshopSessionsUpsertWorkshopSessionMemberData = {
     requestBody: WorkshopSessionUpsertMember;

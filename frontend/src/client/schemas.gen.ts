@@ -1160,6 +1160,25 @@ export const WorkshopSessionCorePublicSchema = {
     title: 'WorkshopSessionCorePublic'
 } as const;
 
+export const WorkshopSessionInstructorSeatRoleUpdateSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        role: {
+            type: 'string',
+            maxLength: 32,
+            title: 'Role'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'role'],
+    title: 'WorkshopSessionInstructorSeatRoleUpdate',
+    description: "Update an active instructor seat's role (e.g. co_instructor → lead)."
+} as const;
+
 export const WorkshopSessionListItemSchema = {
     properties: {
         id: {
@@ -1206,6 +1225,24 @@ export const WorkshopSessionListItemSchema = {
     required: ['id', 'status', 'part_generation', 'lesson_id', 'lesson_title', 'lesson_slug'],
     title: 'WorkshopSessionListItem',
     description: 'Minimal session row for dashboard lists — no roster, no peer data.'
+} as const;
+
+export const WorkshopSessionPatchSchema = {
+    properties: {
+        instructor_seat: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/WorkshopSessionInstructorSeatRoleUpdate'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    title: 'WorkshopSessionPatch',
+    description: 'Session-level PATCH body; fields are applied when present.'
 } as const;
 
 export const WorkshopSessionPublicInstructorSchema = {

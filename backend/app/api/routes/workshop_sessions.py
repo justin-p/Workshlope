@@ -31,6 +31,7 @@ from app.models import (
     WorkshopSession,
     WorkshopSessionCorePublic,
     WorkshopSessionListItem,
+    WorkshopSessionPatch,
     WorkshopSessionPublicInstructor,
     WorkshopSessionPublicParticipant,
     WorkshopSessionsPublic,
@@ -697,6 +698,50 @@ def read_workshop_session_detail(
         participants=participants_public,
         instructors=instructors_public,
     )
+
+
+@router.patch("/{session_id}", response_model=Message)
+def patch_workshop_session(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    session_id: uuid.UUID,
+    body: WorkshopSessionPatch,
+) -> Message:
+    """Instructor/superuser updates session metadata (e.g. instructor seat roles)."""
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+
+    if body.instructor_seat is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="patch_requires_instructor_seat",
+        )
+
+    seat = session.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_id,
+            SessionInstructor.user_id == body.instructor_seat.user_id,
+            col(SessionInstructor.removed_at).is_(None),
+        )
+    ).first()
+    if seat is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Instructor seat not found",
+        )
+
+    seat.role = body.instructor_seat.role
+    session.add(seat)
+    session.commit()
+    return Message(message="Session updated")
 
 
 @router.post("/{session_id}/members", response_model=Message)

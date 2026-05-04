@@ -2249,3 +2249,155 @@ def test_patch_participant_override_not_found_for_removed_seat(
     )
     assert response.status_code == 404
     assert response.json()["detail"] == "Participant not found"
+
+
+def test_patch_session_requires_instructor_role(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    actor_email = f"sess-patch-actor-{uuid.uuid4()}@example.com"
+    actor_headers = authentication_token_from_email(
+        client=client, email=actor_email, db=db
+    )
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"sess-patch-t-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id, user_id=target.id, role="co_instructor"
+        )
+    )
+    db.commit()
+
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=actor_headers,
+        json={
+            "instructor_seat": {"user_id": str(target.id), "role": "lead"},
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "User is not an instructor for this session"
+
+
+def test_patch_session_updates_instructor_seat_role(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-lead-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    co_email = f"sess-patch-co-{uuid.uuid4()}@example.com"
+    co = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=co_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id, user_id=co.id, role="co_instructor"
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={
+            "instructor_seat": {"user_id": str(co.id), "role": "lead"},
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Session updated"
+
+    seat = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_row.id,
+            SessionInstructor.user_id == co.id,
+            SessionInstructor.removed_at.is_(None),
+        )
+    ).first()
+    assert seat is not None
+    assert seat.role == "lead"
+
+
+def test_patch_session_instructor_seat_not_found(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-nf-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    stranger = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"sess-stranger-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={
+            "instructor_seat": {"user_id": str(stranger.id), "role": "co_instructor"},
+        },
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Instructor seat not found"
+
+
+def test_patch_session_empty_body_returns_422(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-empty-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "patch_requires_instructor_seat"

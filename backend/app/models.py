@@ -263,6 +263,19 @@ class WorkshopParticipantPatch(SQLModel):
     finished_at: datetime | None = None
 
 
+class WorkshopSessionInstructorSeatRoleUpdate(SQLModel):
+    """Update an active instructor seat's role (e.g. co_instructor → lead)."""
+
+    user_id: uuid.UUID
+    role: str = Field(max_length=32)
+
+
+class WorkshopSessionPatch(SQLModel):
+    """Session-level PATCH body; fields are applied when present."""
+
+    instructor_seat: WorkshopSessionInstructorSeatRoleUpdate | None = None
+
+
 class WorkshopLessonPartBrief(SQLModel):
     """Lesson part metadata for workshop session screens (body omitted)."""
 
