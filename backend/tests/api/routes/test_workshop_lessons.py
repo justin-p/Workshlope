@@ -480,3 +480,96 @@ def test_patch_lesson_prerequisite_returns_404_for_missing_prerequisite(
     )
     assert response.status_code == 404
     assert response.json()["detail"] == "Prerequisite not found"
+
+
+def test_delete_lesson_prerequisite_requires_instructor(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    actor_headers = authentication_token_from_email(
+        client=client,
+        email=f"ws06-prereq-delete-actor-{uuid.uuid4()}@example.com",
+        db=db,
+    )
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Cleanup workspace",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+
+    response = client.delete(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{prerequisite.id}",
+        headers=actor_headers,
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Instructor privileges required"
+
+
+def test_delete_lesson_prerequisite_instructor_success(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    instructor_email = f"ws06-prereq-delete-inst-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    prerequisite = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Install tooling",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+    prerequisite_id = prerequisite.id
+
+    response = client.delete(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{prerequisite_id}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Prerequisite deleted"
+
+    db.expire_all()
+    deleted = db.get(LessonPrerequisite, prerequisite_id)
+    assert deleted is None
+
+
+def test_delete_lesson_prerequisite_returns_404_for_missing_prerequisite(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    instructor_email = f"ws06-prereq-delete-missing-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+
+    response = client.delete(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{uuid.uuid4()}",
+        headers=headers,
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Prerequisite not found"

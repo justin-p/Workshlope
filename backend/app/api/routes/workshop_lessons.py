@@ -110,6 +110,38 @@ def patch_lesson_prerequisite(
     return WorkshopLessonPrerequisitePublic.model_validate(row)
 
 
+@router.delete(
+    "/{lesson_id}/prerequisites/{prerequisite_id}",
+    response_model=Message,
+)
+def delete_lesson_prerequisite(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    lesson_id: uuid.UUID,
+    prerequisite_id: uuid.UUID,
+) -> Message:
+    _require_workshop_lesson_editor(current_user=current_user)
+    lesson = session.get(Lesson, lesson_id)
+    if lesson is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found"
+        )
+    row = session.exec(
+        select(LessonPrerequisite).where(
+            LessonPrerequisite.id == prerequisite_id,
+            LessonPrerequisite.lesson_id == lesson_id,
+        )
+    ).first()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Prerequisite not found"
+        )
+    session.delete(row)
+    session.commit()
+    return Message(message="Prerequisite deleted")
+
+
 @router.get(
     "/{lesson_id}/prerequisites", response_model=WorkshopLessonPrerequisitesPublic
 )

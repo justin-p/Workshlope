@@ -569,6 +569,13 @@ export type WorkshopLessonsPatchLessonPrerequisiteData = {
 
 export type WorkshopLessonsPatchLessonPrerequisiteResponse = (WorkshopLessonPrerequisitePublic);
 
+export type WorkshopLessonsDeleteLessonPrerequisiteData = {
+    lessonId: string;
+    prerequisiteId: string;
+};
+
+export type WorkshopLessonsDeleteLessonPrerequisiteResponse = (Message);
+
 export type WorkshopLessonsReadMyLessonPrerequisitesData = {
     lessonId: string;
 };
