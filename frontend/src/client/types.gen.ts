@@ -177,6 +177,27 @@ export type ValidationError = {
     };
 };
 
+/**
+ * Minimal session row for dashboard lists — no roster, no peer data.
+ */
+export type WorkshopSessionListItem = {
+    id: string;
+    status: string;
+    part_generation: number;
+    lesson_id: string;
+    lesson_title: string;
+    lesson_slug: string;
+    /**
+     * Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.
+     */
+    my_role?: ('participant' | 'instructor' | null);
+};
+
+export type WorkshopSessionsPublic = {
+    data: Array<WorkshopSessionListItem>;
+    count: number;
+};
+
 export type WorkshopWsTicket = {
     ticket: string;
     expires_at: string;
@@ -353,6 +374,13 @@ export type UtilsTestEmailData = {
 export type UtilsTestEmailResponse = (Message);
 
 export type UtilsHealthCheckResponse = (boolean);
+
+export type WorkshopSessionsReadWorkshopSessionsForUserData = {
+    limit?: number;
+    skip?: number;
+};
+
+export type WorkshopSessionsReadWorkshopSessionsForUserResponse = (WorkshopSessionsPublic);
 
 export type WorkshopSessionsEnterWorkshopSessionData = {
     sessionId: string;

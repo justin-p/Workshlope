@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, OauthBridgeLoginData, OauthBridgeLoginResponse, OauthListPendingLoginsData, OauthListPendingLoginsResponse, OauthApprovePendingLoginData, OauthApprovePendingLoginResponse, OauthDenyPendingLoginData, OauthDenyPendingLoginResponse, OauthGetLinkStatusData, OauthGetLinkStatusResponse, OauthAdminUnlinkGithubData, OauthAdminUnlinkGithubResponse, PrivateCreateUserData, PrivateCreateUserResponse, PrivateBootstrapE2eWorkshopLiveSessionData, PrivateBootstrapE2eWorkshopLiveSessionResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WorkshopSessionsEnterWorkshopSessionData, WorkshopSessionsEnterWorkshopSessionResponse, WorkshopSessionsStartWorkshopSessionData, WorkshopSessionsStartWorkshopSessionResponse, WorkshopSessionsEndWorkshopSessionData, WorkshopSessionsEndWorkshopSessionResponse, WorkshopSessionsCreateWorkshopWsTicketData, WorkshopSessionsCreateWorkshopWsTicketResponse } from './types.gen';
+import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, OauthBridgeLoginData, OauthBridgeLoginResponse, OauthListPendingLoginsData, OauthListPendingLoginsResponse, OauthApprovePendingLoginData, OauthApprovePendingLoginResponse, OauthDenyPendingLoginData, OauthDenyPendingLoginResponse, OauthGetLinkStatusData, OauthGetLinkStatusResponse, OauthAdminUnlinkGithubData, OauthAdminUnlinkGithubResponse, PrivateCreateUserData, PrivateCreateUserResponse, PrivateBootstrapE2eWorkshopLiveSessionData, PrivateBootstrapE2eWorkshopLiveSessionResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WorkshopSessionsReadWorkshopSessionsForUserData, WorkshopSessionsReadWorkshopSessionsForUserResponse, WorkshopSessionsEnterWorkshopSessionData, WorkshopSessionsEnterWorkshopSessionResponse, WorkshopSessionsStartWorkshopSessionData, WorkshopSessionsStartWorkshopSessionResponse, WorkshopSessionsEndWorkshopSessionData, WorkshopSessionsEndWorkshopSessionResponse, WorkshopSessionsCreateWorkshopWsTicketData, WorkshopSessionsCreateWorkshopWsTicketResponse } from './types.gen';
 
 export class ItemsService {
     /**
@@ -641,6 +641,33 @@ export class UtilsService {
 }
 
 export class WorkshopSessionsService {
+    /**
+     * Read Workshop Sessions For User
+     * List workshop sessions visible to the caller.
+     *
+     * Non-superusers see sessions where they have an active participant or
+     * instructor seat. Superusers see all sessions; ``my_role`` is ``null`` when
+     * they are not seated (admin-style visibility).
+     * @param data The data for the request.
+     * @param data.skip
+     * @param data.limit
+     * @returns WorkshopSessionsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readWorkshopSessionsForUser(data: WorkshopSessionsReadWorkshopSessionsForUserData = {}): CancelablePromise<WorkshopSessionsReadWorkshopSessionsForUserResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/sessions/',
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
     /**
      * Enter Workshop Session
      * @param data The data for the request.

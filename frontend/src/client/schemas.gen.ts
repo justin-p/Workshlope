@@ -838,6 +838,73 @@ export const ValidationErrorSchema = {
     title: 'ValidationError'
 } as const;
 
+export const WorkshopSessionListItemSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        part_generation: {
+            type: 'integer',
+            title: 'Part Generation'
+        },
+        lesson_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Id'
+        },
+        lesson_title: {
+            type: 'string',
+            title: 'Lesson Title'
+        },
+        lesson_slug: {
+            type: 'string',
+            title: 'Lesson Slug'
+        },
+        my_role: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['participant', 'instructor']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'My Role',
+            description: 'Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.'
+        }
+    },
+    type: 'object',
+    required: ['id', 'status', 'part_generation', 'lesson_id', 'lesson_title', 'lesson_slug'],
+    title: 'WorkshopSessionListItem',
+    description: 'Minimal session row for dashboard lists — no roster, no peer data.'
+} as const;
+
+export const WorkshopSessionsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopSessionListItem'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopSessionsPublic'
+} as const;
+
 export const WorkshopWsTicketSchema = {
     properties: {
         ticket: {

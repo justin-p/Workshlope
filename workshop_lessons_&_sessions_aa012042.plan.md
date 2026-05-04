@@ -156,14 +156,14 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 
 | Surface | Implemented today | Still 🔲 vs **REST sketch** (below, *REST sketch under /api/v1/*) |
 | ------- | ----------------- | ---------------------------------------------------------------- |
-| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket` | **`GET`** list (“my sessions” / teaching); **`GET`** session detail with **scoped** trainee vs instructor DTOs; roster **`POST/PATCH`**; prerequisites; exports — see sketch table |
+| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** scoped list (`WorkshopSessionsPublic`) | **`GET`** session detail with **scoped** trainee vs instructor DTOs; roster **`POST/PATCH`**; prerequisites; exports — see sketch table |
 | **WebSocket** | `/{id}/ws` — `part.advance`, `session.pause` / `session.resume`, `participant.live_status`, … | Redis / multi-process hub (explicitly deferred) |
 
 **Blocks PR05 live dashboard widgets:** without **read/list** endpoints, cards cannot hydrate from API (stub rails only — expected until this slice lands).
 
 **Suggested vertical slices (backend `/python-tdd-with-uv` first):**
 
-1. **`GET /workshop/sessions` (scoped list)** — caller sees only sessions where they are a **participant** or **assigned instructor** (plus superuser policy). Payload: dashboard-safe fields (**no trainee peer roster**); include **`lesson`** title resolve or embed minimal lesson summary.
+1. **`GET /workshop/sessions/` (scoped list)** — ✅ **`WorkshopSessionsPublic`** on **`ws-05-dashboard-nav`** — participant/instructor seats + optional **`my_role`**; superuser sees all with **`my_role`** null when unseated.
 2. **`GET /workshop/sessions/{id}`** — membership check; **`SessionPublicParticipant`** vs **`SessionPublicInstructor`** response models per sketch (“Separate response models” note).
 3. **PR06 prerequisites** — `LessonPrerequisite` / `UserPrerequisiteCompletion` and lesson prerequisite routes from the same REST sketch section.
 

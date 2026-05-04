@@ -227,6 +227,26 @@ class SessionInstructor(SQLModel, table=True):
     removed_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
 
 
+class WorkshopSessionListItem(SQLModel):
+    """Minimal session row for dashboard lists — no roster, no peer data."""
+
+    id: uuid.UUID
+    status: str
+    part_generation: int
+    lesson_id: uuid.UUID
+    lesson_title: str
+    lesson_slug: str
+    my_role: Literal["participant", "instructor"] | None = Field(
+        default=None,
+        description="Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.",
+    )
+
+
+class WorkshopSessionsPublic(SQLModel):
+    data: list[WorkshopSessionListItem]
+    count: int
+
+
 # Generic message
 class Message(SQLModel):
     message: str

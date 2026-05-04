@@ -7,6 +7,7 @@ from fastapi import WebSocketDisconnect
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from app import crud
 from app.core.config import settings
 from app.core.security import ALGORITHM
 from app.models import (
@@ -15,11 +16,15 @@ from app.models import (
     LessonRepo,
     SessionInstructor,
     User,
+    UserCreate,
     WorkshopParticipant,
     WorkshopSession,
 )
 from app.services import workshop_realtime as workshop_realtime_mod
-from tests.utils.user import authentication_token_from_email
+from tests.utils.user import (
+    authentication_token_from_email,
+    user_authentication_headers,
+)
 from tests.utils.utils import get_superuser_token_headers
 
 
@@ -1568,3 +1573,146 @@ def test_ws_resume_requires_paused_session(client: TestClient, db: Session) -> N
         "type": "error",
         "detail": "resume_requires_paused_session",
     }
+
+
+def test_list_workshop_sessions_empty_without_membership(
+    client: TestClient, db: Session
+) -> None:
+    iso_email = f"list-none-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    _create_live_session(db)
+
+    response = client.get(f"{settings.API_V1_STR}/workshop/sessions/", headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 0
+    assert body["data"] == []
+
+
+def test_list_workshop_sessions_includes_participant_membership(
+    client: TestClient, db: Session
+) -> None:
+    iso_email = f"list-seat-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+
+    session_row = _create_live_session(db)
+
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+        )
+    )
+    db.commit()
+
+    response = client.get(f"{settings.API_V1_STR}/workshop/sessions/", headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert len(body["data"]) == 1
+    row = body["data"][0]
+    assert row["id"] == str(session_row.id)
+    assert row["status"] == "live"
+    assert row["my_role"] == "participant"
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    assert row["lesson_title"] == lesson.title
+    assert row["lesson_slug"] == lesson.slug
+
+
+def test_list_workshop_sessions_includes_instructor_membership(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+
+    instructor_email = f"instr-list-{uuid.uuid4()}@example.com"
+    password = "testpass123"
+    instructor = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password=password,
+            is_instructor=True,
+        ),
+    )
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=instructor_email, password=password
+    )
+    response = client.get(f"{settings.API_V1_STR}/workshop/sessions/", headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["data"][0]["my_role"] == "instructor"
+
+
+def test_list_workshop_sessions_excludes_removed_participant(
+    client: TestClient, db: Session
+) -> None:
+    iso_email = f"list-removed-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+
+    session_row = _create_live_session(db)
+
+    participant = WorkshopParticipant(
+        session_id=session_row.id,
+        user_id=user.id,
+        removed_at=datetime.now(timezone.utc),
+    )
+    db.add(participant)
+    db.commit()
+
+    response = client.get(f"{settings.API_V1_STR}/workshop/sessions/", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["count"] == 0
+
+
+def test_list_workshop_sessions_superuser_sees_all(
+    client: TestClient,
+    db: Session,
+    superuser_token_headers: dict[str, str],
+) -> None:
+    iso_email = f"list-su-{uuid.uuid4()}@example.com"
+    user_headers = authentication_token_from_email(
+        client=client, email=iso_email, db=db
+    )
+    iso_user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert iso_user is not None
+
+    a = _create_live_session(db)
+    b = _create_live_session(db)
+
+    db.add(WorkshopParticipant(session_id=a.id, user_id=iso_user.id))
+    db.commit()
+
+    response_a = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/",
+        headers=user_headers,
+    )
+    assert response_a.json()["count"] == 1
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/",
+        headers=superuser_token_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    ids = {item["id"] for item in body["data"]}
+    assert str(a.id) in ids
+    assert str(b.id) in ids
+
+    rows_by_id = {item["id"]: item for item in body["data"]}
+    assert rows_by_id[str(a.id)]["my_role"] is None
+    assert rows_by_id[str(b.id)]["my_role"] is None

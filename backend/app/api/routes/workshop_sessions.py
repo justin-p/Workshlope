@@ -8,19 +8,23 @@ import jwt
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
 from jwt.exceptions import PyJWTError
 from pydantic import BaseModel
-from sqlmodel import Session, col, select
+from sqlalchemy import or_
+from sqlmodel import Session, col, func, select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
 from app.core.db import engine
 from app.core.security import ALGORITHM
 from app.models import (
+    Lesson,
     LessonPart,
     Message,
     SessionInstructor,
     User,
     WorkshopParticipant,
     WorkshopSession,
+    WorkshopSessionListItem,
+    WorkshopSessionsPublic,
 )
 from app.services.workshop_realtime import (
     WorkshopWsConnection,
@@ -128,6 +132,35 @@ def _authorize_workshop_ws_handshake(
         role=narrowed_role,
         part_generation=int(workshop_session.part_generation),
     )
+
+
+def _workshop_list_item_role(
+    session_db: Session,
+    *,
+    workshop_session_id: uuid.UUID,
+    current_user: User,
+) -> Literal["participant", "instructor"] | None:
+    """How the caller is seated on this session, if at all."""
+
+    instructor = session_db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == workshop_session_id,
+            SessionInstructor.user_id == current_user.id,
+            col(SessionInstructor.removed_at).is_(None),
+        )
+    ).first()
+    if instructor is not None:
+        return "instructor"
+    participant = session_db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == workshop_session_id,
+            WorkshopParticipant.user_id == current_user.id,
+            col(WorkshopParticipant.removed_at).is_(None),
+        )
+    ).first()
+    if participant is not None:
+        return "participant"
+    return None
 
 
 def _require_workshop_instructor(
@@ -387,6 +420,87 @@ async def _dispatch_workshop_ws_text(
 
     await websocket.send_json({"type": "error", "detail": "unknown_message_type"})
     return True
+
+
+@router.get("/", response_model=WorkshopSessionsPublic)
+def read_workshop_sessions_for_user(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    skip: int = 0,
+    limit: int = 100,
+) -> WorkshopSessionsPublic:
+    """List workshop sessions visible to the caller.
+
+    Non-superusers see sessions where they have an active participant or
+    instructor seat. Superusers see all sessions; ``my_role`` is ``null`` when
+    they are not seated (admin-style visibility).
+    """
+
+    base_join = select(WorkshopSession, Lesson.title, Lesson.slug).join(
+        Lesson, col(WorkshopSession.lesson_id) == Lesson.id
+    )
+
+    if not current_user.is_superuser:
+        participant_sessions = select(WorkshopParticipant.session_id).where(
+            WorkshopParticipant.user_id == current_user.id,
+            col(WorkshopParticipant.removed_at).is_(None),
+        )
+        instructor_sessions = select(SessionInstructor.session_id).where(
+            SessionInstructor.user_id == current_user.id,
+            col(SessionInstructor.removed_at).is_(None),
+        )
+        visible_filter = or_(
+            col(WorkshopSession.id).in_(participant_sessions),
+            col(WorkshopSession.id).in_(instructor_sessions),
+        )
+        count_statement = (
+            select(func.count())
+            .select_from(WorkshopSession)
+            .join(Lesson, col(WorkshopSession.lesson_id) == Lesson.id)
+            .where(visible_filter)
+        )
+        data_statement = (
+            base_join.where(visible_filter)
+            .order_by(col(WorkshopSession.created_at).desc())
+            .offset(skip)
+            .limit(limit)
+        )
+    else:
+        count_statement = (
+            select(func.count())
+            .select_from(WorkshopSession)
+            .join(Lesson, col(WorkshopSession.lesson_id) == Lesson.id)
+        )
+        data_statement = (
+            base_join.order_by(col(WorkshopSession.created_at).desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+    count = session.exec(count_statement).one()
+    rows = session.exec(data_statement).all()
+
+    data: list[WorkshopSessionListItem] = []
+    for ws, lesson_title, lesson_slug in rows:
+        role = _workshop_list_item_role(
+            session,
+            workshop_session_id=ws.id,
+            current_user=current_user,
+        )
+        data.append(
+            WorkshopSessionListItem(
+                id=ws.id,
+                status=ws.status,
+                part_generation=ws.part_generation,
+                lesson_id=ws.lesson_id,
+                lesson_title=lesson_title,
+                lesson_slug=lesson_slug,
+                my_role=role,
+            )
+        )
+
+    return WorkshopSessionsPublic(data=data, count=count)
 
 
 @router.post("/{session_id}/enter", response_model=Message)
