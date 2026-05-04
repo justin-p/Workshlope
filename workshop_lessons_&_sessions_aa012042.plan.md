@@ -119,9 +119,9 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-04** — Session **`PATCH …/sessions/{id}`** polish landed: added **`primary_instructor_user_id`** handoff semantics (promote target active instructor to `lead`, demote previous `lead` to `co_instructor`; **`422 handoff_target_not_instructor`** when target is not an active instructor), plus combined-ops UX (allow multi-field patch; only block contradictory same-user ops with **`422 cannot_update_and_remove_same_instructor`** / **`422 cannot_handoff_to_removed_instructor`**). Existing status transitions + **`409 last_instructor_removal_blocked`** remain. Tests + OpenAPI client regen on **`ws-05-dashboard-nav`**. |
-| **Active integration branch** | `ws-05-dashboard-nav` → [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`). **Successor branch:** `ws-06-learning-workflows` (*not created until PR06 slice starts*) |
-| **Stack PR label** | **PR05 — DashboardNav** ✅ on branch; **`main`** after stacked merge (**#18** → … → **#22**) or retarget per [stack table](#github-pr-stack-open--update-when-retargetedmerged) |
+| **Last synced** | **2026-05-04** — **PR06 kickoff on `ws-06-learning-workflows`**: added prerequisite data model tables (**`LessonPrerequisite`**, **`UserPrerequisiteCompletion`**), migration **`4f6e7d8c9a01`**, and first lesson prerequisite APIs: **`POST /workshop/lessons/{id}/prerequisites`** + **`GET /workshop/lessons/{id}/prerequisites`** (instructor/superuser guard, ordered reads). Added focused API tests in `test_workshop_lessons.py`; regenerated OpenAPI TS client. |
+| **Active integration branch** | `ws-06-learning-workflows` (*PR not opened yet; branch forked from `ws-05-dashboard-nav` tip*) |
+| **Stack PR label** | **PR06 — LearningWorkflows** 🚧 in progress on branch; open PR against `ws-05-dashboard-nav` (or retarget to `main` after stack merges) |
 
 ### Pause / resume checkpoint (handoff)
 
@@ -172,7 +172,8 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 | PR03 | `ws-03-session-core` | [#20](https://github.com/justin-p/testing/pull/20) | `ws-02-github-sync-manifest` |
 | PR04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) | `ws-03-session-core` |
 | PR05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | `ws-04-realtime-privacy` |
-| PR06–PR10 | `ws-06-*` … `ws-10-*` | *not opened yet* | *(next PR targets prior branch when created)* |
+| PR06 | `ws-06-learning-workflows` | *not opened yet* | `ws-05-dashboard-nav` |
+| PR07–PR10 | `ws-07-*` … `ws-10-*` | *not opened yet* | *(next PR targets prior branch when created)* |
 
 ### Backend code anchors (workshop realtime slice)
 

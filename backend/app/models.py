@@ -227,6 +227,53 @@ class SessionInstructor(SQLModel, table=True):
     removed_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
 
 
+class LessonPrerequisite(SQLModel, table=True):
+    __tablename__ = "lesson_prerequisite"
+    __table_args__ = (
+        UniqueConstraint(
+            "lesson_id", "ordering", name="uq_lesson_prerequisite_ordering"
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    lesson_id: uuid.UUID = Field(
+        foreign_key="lesson.id", nullable=False, ondelete="CASCADE"
+    )
+    type: str = Field(max_length=32, default="task")
+    title: str = Field(max_length=255)
+    details: str | None = Field(default=None, max_length=1024)
+    url: str | None = Field(default=None, max_length=1024)
+    ordering: int = Field(default=0, ge=0)
+    required_flag: bool = True
+
+
+class UserPrerequisiteCompletion(SQLModel, table=True):
+    __tablename__ = "user_prerequisite_completion"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "prerequisite_id",
+            name="uq_user_prerequisite_completion",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    lesson_id: uuid.UUID = Field(
+        foreign_key="lesson.id", nullable=False, ondelete="CASCADE"
+    )
+    prerequisite_id: uuid.UUID = Field(
+        foreign_key="lesson_prerequisite.id", nullable=False, ondelete="CASCADE"
+    )
+    completed_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    source: str = Field(default="self", max_length=32)
+
+
 class WorkshopSessionListItem(SQLModel):
     """Minimal session row for dashboard lists — no roster, no peer data."""
 
@@ -277,6 +324,31 @@ class WorkshopSessionPatch(SQLModel):
     instructor_seat: WorkshopSessionInstructorSeatRoleUpdate | None = None
     primary_instructor_user_id: uuid.UUID | None = None
     remove_instructor_user_id: uuid.UUID | None = None
+
+
+class WorkshopLessonPrerequisiteCreate(SQLModel):
+    type: str = Field(default="task", max_length=32)
+    title: str = Field(max_length=255)
+    details: str | None = Field(default=None, max_length=1024)
+    url: str | None = Field(default=None, max_length=1024)
+    ordering: int = Field(default=0, ge=0)
+    required_flag: bool = True
+
+
+class WorkshopLessonPrerequisitePublic(SQLModel):
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    type: str
+    title: str
+    details: str | None = None
+    url: str | None = None
+    ordering: int
+    required_flag: bool
+
+
+class WorkshopLessonPrerequisitesPublic(SQLModel):
+    data: list[WorkshopLessonPrerequisitePublic]
+    count: int
 
 
 class WorkshopLessonPartBrief(SQLModel):

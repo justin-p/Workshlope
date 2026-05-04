@@ -864,6 +864,135 @@ export const WorkshopLessonPartBriefSchema = {
     description: 'Lesson part metadata for workshop session screens (body omitted).'
 } as const;
 
+export const WorkshopLessonPrerequisiteCreateSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            maxLength: 32,
+            title: 'Type',
+            default: 'task'
+        },
+        title: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Title'
+        },
+        details: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        ordering: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Ordering',
+            default: 0
+        },
+        required_flag: {
+            type: 'boolean',
+            title: 'Required Flag',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['title'],
+    title: 'WorkshopLessonPrerequisiteCreate'
+} as const;
+
+export const WorkshopLessonPrerequisitePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        lesson_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Id'
+        },
+        type: {
+            type: 'string',
+            title: 'Type'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        details: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        ordering: {
+            type: 'integer',
+            title: 'Ordering'
+        },
+        required_flag: {
+            type: 'boolean',
+            title: 'Required Flag'
+        }
+    },
+    type: 'object',
+    required: ['id', 'lesson_id', 'type', 'title', 'ordering', 'required_flag'],
+    title: 'WorkshopLessonPrerequisitePublic'
+} as const;
+
+export const WorkshopLessonPrerequisitesPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPrerequisitePublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopLessonPrerequisitesPublic'
+} as const;
+
 export const WorkshopLessonSummaryPublicSchema = {
     properties: {
         id: {

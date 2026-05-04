@@ -187,6 +187,31 @@ export type WorkshopLessonPartBrief = {
     title: string;
 };
 
+export type WorkshopLessonPrerequisiteCreate = {
+    type?: string;
+    title: string;
+    details?: (string | null);
+    url?: (string | null);
+    ordering?: number;
+    required_flag?: boolean;
+};
+
+export type WorkshopLessonPrerequisitePublic = {
+    id: string;
+    lesson_id: string;
+    type: string;
+    title: string;
+    details?: (string | null);
+    url?: (string | null);
+    ordering: number;
+    required_flag: boolean;
+};
+
+export type WorkshopLessonPrerequisitesPublic = {
+    data: Array<WorkshopLessonPrerequisitePublic>;
+    count: number;
+};
+
 export type WorkshopLessonSummaryPublic = {
     id: string;
     title: string;
@@ -490,6 +515,19 @@ export type UtilsTestEmailData = {
 export type UtilsTestEmailResponse = (Message);
 
 export type UtilsHealthCheckResponse = (boolean);
+
+export type WorkshopLessonsCreateLessonPrerequisiteData = {
+    lessonId: string;
+    requestBody: WorkshopLessonPrerequisiteCreate;
+};
+
+export type WorkshopLessonsCreateLessonPrerequisiteResponse = (WorkshopLessonPrerequisitePublic);
+
+export type WorkshopLessonsReadLessonPrerequisitesData = {
+    lessonId: string;
+};
+
+export type WorkshopLessonsReadLessonPrerequisitesResponse = (WorkshopLessonPrerequisitesPublic);
 
 export type WorkshopSessionsReadWorkshopSessionsForUserData = {
     limit?: number;
