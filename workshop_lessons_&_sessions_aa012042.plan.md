@@ -119,8 +119,8 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-04** — **PR06 `ws-06-learning-workflows`**: prerequisites API (**`/me`**, **`/gaps`**, **`/aggregates`**, CRUD + complete); **workshop session pre-work UI** (trainee banner + instructor counts/gaps on [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx)); **admin UI** lets superusers grant **`is_instructor`** on create/edit ([`AddUser.tsx`](frontend/src/components/Admin/AddUser.tsx), [`EditUser.tsx`](frontend/src/components/Admin/EditUser.tsx), table badges in [`columns.tsx`](frontend/src/components/Admin/columns.tsx), Playwright in [`admin.spec.ts`](frontend/tests/admin.spec.ts)). Create-user payload strips `confirm_password` client-side. |
-| **Branch tip (2026-05-04 EOD)** | **`990397d`** — `feat(admin): let admins grant workshop instructor role`. Earlier same branch/day: **`98fc1e2`** pre-work session UI + **`ec03309`** aggregates endpoint + prerequisite stack commits; **`c64d328`** plan pause note. **`ws-06-learning-workflows`** → [PR #23](https://github.com/justin-p/testing/pull/23). Verify **`git status`** before merging stray local **Playwright workflow** / compose-only edits. |
+| **Last synced** | **2026-05-04** — **PR06 `ws-06-learning-workflows`**: same as prior row **plus** — **inline “Mark complete”** for required pre-work on [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx); **trainee pre-work query** when HTTP `view` is instructor but the user is still on the **participant roster** (dual-seat superuser case); **WS `onclose`** before `session.connected` → error (no infinite “connecting”). **Local E2E bootstrap** ([`private.py`](backend/app/api/routes/private.py)): `with_incomplete_required_prerequisite` seeds one incomplete required item; when **`participant_email` ≠ `FIRST_SUPERUSER`**, trainee is **participant-only** and **`FIRST_SUPERUSER`** is **lead instructor** (fixes multi-tab WS E2E). **Playwright** [`workshop.spec.ts`](frontend/tests/workshop.spec.ts): **`describe.configure({ mode: "serial" })`** for the workshop block; fan-out login waits; backend test for distinct-trainee bootstrap. **Docs:** **`2442940`** plan sync; **ship tip:** **`1633910`** `fix(workshop): stabilize E2E bootstrap and Playwright workshop suite`. |
+| **Branch tip (2026-05-04)** | **`1633910`** — `fix(workshop): stabilize E2E bootstrap and Playwright workshop suite` (stacked on **`990397d`** admin `is_instructor`, plan **`2442940`**). **`ws-06-learning-workflows`** → [PR #23](https://github.com/justin-p/testing/pull/23). **Local Playwright:** after backend/private or frontend changes, **`docker compose … build backend`** (and **`frontend`** if UI changed) before `bunx playwright test` — compose images do not mount live source. Verify **`git status`** before merging stray **Playwright workflow** / compose-only edits. |
 | **Active integration branch** | `ws-06-learning-workflows` → [PR #23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
 | **Stack PR label** | **PR06 — LearningWorkflows** 🚧 open on [#23](https://github.com/justin-p/testing/pull/23); continue slicing prerequisites/prework APIs + UI |
 
@@ -134,17 +134,18 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-06-learning-workflows` |
 | PR | [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
-| Latest work | **Admin**: workshop **instructor** flag on add/edit user + badges + admin E2E; **session page**: trainee/instructor pre-work panels (prior slice) |
+| Latest work | **E2E + Playwright:** distinct-trainee bootstrap, serial workshop specs, fan-out stability; **UI:** pre-work “Mark complete”, roster-aware trainee pre-work fetch, WS close handling. **Admin `is_instructor`** (prior commit on branch). |
 
 **Resume in this order:**
 
 1. `git checkout ws-06-learning-workflows && git pull`, then **`gh pr checks 23`** (or CI dashboard) — fix regressions on the **same head branch** if needed.
-2. Continue with **[Next actions](#next-actions-suggested-order)** — PR06 prerequisite backend/API slices are in progress on this branch.
+2. Continue with **[Next actions](#next-actions-suggested-order)** — PR06: prerequisite/pre-work **MVP vertical** is largely landed; next slices are polish (dashboard tiles, stricter gating, exports) unless CI finds regressions.
 3. Keep [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged), **Implementation tracker / Last synced / Stop-handoff**, and this checkpoint synced whenever PR/base/branch state changes — **especially after each intentional stop or resume.**
 
 **Open gaps (not blocking pause):**
 
 - Local Playwright **`auth.setup`** can time out without backend/`scripts/e2e-backend-reset.sh` — CI remains source of truth for E2E until env is reproduced locally.
+- **Dockerized frontend/backend** used by host Playwright (`:5173` / `:8000`): **rebuild images** after code changes (`docker compose build frontend` / `backend`); `compose` does not bind-mount app source for those services by default.
 - **`.github/workflows/playwright.yml`**: intentionally not bundled with recent PR06 UI/API slices; verify `git diff` vs remote before merging any local workflow experiments.
 - **Prerequisite** stack is **mostly implemented** for MVP (HTTP + workshop session UI); exports-related slices and richer dashboard cards may still be 🔲.
 - **Instructor onboarding:** admins can set **`is_instructor`** via **Users** admin (API already supported); no separate instructor-only onboarding flow assumed.
@@ -174,7 +175,7 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 | API tests | [`backend/tests/api/routes/test_workshop_sessions.py`](backend/tests/api/routes/test_workshop_sessions.py) |
 | Prerequisites API tests (PR06) | [`backend/tests/api/routes/test_workshop_lessons.py`](backend/tests/api/routes/test_workshop_lessons.py) |
 | Hub unit tests | [`backend/tests/services/test_workshop_realtime.py`](backend/tests/services/test_workshop_realtime.py) |
-| Local E2E session bootstrap (`ENVIRONMENT=local` only) | [`backend/app/api/routes/private.py`](backend/app/api/routes/private.py) — `bootstrap_e2e_workshop_live_session` |
+| Local E2E session bootstrap (`ENVIRONMENT=local` only) | [`backend/app/api/routes/private.py`](backend/app/api/routes/private.py) — `bootstrap_e2e_workshop_live_session` (+ `with_incomplete_required_prerequisite`, distinct-trainee vs `FIRST_SUPERUSER` instructor split); tests in [`backend/tests/api/routes/test_private.py`](backend/tests/api/routes/test_private.py) |
 | Trainee workshop UI (enter + ws-ticket + WebSocket) | [`frontend/src/routes/_layout/workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) |
 | Workshop Playwright | [`frontend/tests/workshop.spec.ts`](frontend/tests/workshop.spec.ts) |
 | Dashboard landing + routing | [`frontend/src/lib/dashboardLanding.ts`](frontend/src/lib/dashboardLanding.ts), stub rails [`frontend/src/components/dashboard/DashboardStubRails.tsx`](frontend/src/components/dashboard/DashboardStubRails.tsx), routes under [`frontend/src/routes/_layout/dashboard/`](frontend/src/routes/_layout/dashboard/), [`frontend/src/routes/_layout/workshops.tsx`](frontend/src/routes/_layout/workshops.tsx), sidebar [`frontend/src/components/Sidebar/AppSidebar.tsx`](frontend/src/components/Sidebar/AppSidebar.tsx), OAuth landing [`frontend/src/routes/auth.callback.tsx`](frontend/src/routes/auth.callback.tsx) |
@@ -190,13 +191,13 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 | **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove; **`PATCH …/sessions/{id}/participants/{user_id}`** instructor overrides (`live_status`/`joined_at`/`finished_at`); **`PATCH …/sessions/{id}`** — optional **`status`** (controlled transitions + realtime fanout on change), **`instructor_seat`** role updates, **`primary_instructor_user_id`** handoff (lead/co normalization), **`remove_instructor_user_id`** soft-remove with **409** when that would orphan a non-ended session; empty **422 `patch_requires_update`**; unknown seat **404**. **Lesson prerequisites** (`/workshop/lessons/{id}/prerequisites…`) ✅ for MVP slices. | Exports etc. — see sketch table |
 | **WebSocket** | `/{id}/ws` — `part.advance`, `session.pause` / `session.resume`, `participant.live_status`, … | Redis / multi-process hub (explicitly deferred) |
 
-**Remaining vs dashboard/product polish:** session list/detail + roster + session `PATCH` are ✅; prerequisites + first **workshop** prework UI are ✅; dashboard cards + exports + dedicated Playwright for prework **surfaces** may still be 🔲.
+**Remaining vs dashboard/product polish:** session list/detail + roster + session `PATCH` are ✅; prerequisites + workshop pre-work UI (**banner, aggregates, inline complete**) are ✅; **host Playwright** workshop file stabilized (serial + bootstrap). Dashboard cards + exports + broader pre-work/dashboard Playwright may still be 🔲.
 
 **Suggested PR06 vertical slices (backend `/python-tdd-with-uv` first):**
 
 1. **Prerequisite read enhancements** — per-user completion status in lesson prerequisite reads (self vs instructor-scoped views).
 2. **Prerequisite mutation breadth** — ✅ PATCH/update/delete prerequisite definitions with instructor/superuser guards.
-3. **Prework surfaces** — ✅ first pass on workshop session page + aggregates/gaps APIs; optional: inline complete, harder gating, more Playwright.
+3. **Prework surfaces** — ✅ workshop session page + aggregates/gaps APIs + **inline mark-complete** + Playwright coverage (`workshop.spec.ts` serial block); optional: harder gating, dashboard list Playwright.
 
 Gate: regenerate **OpenAPI** + **`frontend/src/client`** on every new HTTP route.
 
@@ -208,9 +209,9 @@ Forked from **`ws-05-dashboard-nav`** and tracked on [#23](https://github.com/ju
 | ------------------ | ----- |
 | **Session list + detail GETs** | List + **`GET …/{id}`** ✅ on **`ws-05-dashboard-nav`** per [delivery gap audit](#workshop-http-vs-realtime--delivery-gap-audit); prerequisites + richer dashboard cards remain PR06. |
 | **Prerequisite / prework** data model | ✅ Landed: `LessonPrerequisite`, `UserPrerequisiteCompletion` (+ migration `4f6e7d8c9a01`); HTTP: create/list/patch/delete/complete, **`/me`**, **`/gaps`**, **`/aggregates`**; admin can grant **`is_instructor`** for roster/instructor UX. |
-| Trainee UX | 🟨 Session page shows **required** incomplete pre-work banner (uses `/prerequisites/me`); optional “mark complete” inline / hard gating still future. |
+| Trainee UX | 🟨 Session page shows **required** incomplete pre-work banner (**`/prerequisites/me`**) + **Mark complete** per item; **hard gating** (block enter/ws until done) still future. |
 | Instructor visibility | 🟨 Session page shows roster **aggregates** + gaps headline (same `session_id`); richer roster drill-down / dashboard tiles still optional. |
-| Tests | **`/python-tdd-with-uv`** backend; Playwright flows for trainee + instructor when UI ships. |
+| Tests | **`/python-tdd-with-uv`** backend + **`test_private`** E2E bootstrap cases; **Playwright** [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) (serial workshop `describe`, pre-work + fan-out + live flows). |
 | Stack hygiene | ✅ PR open: [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`); keep stack table + dependency graph in sync on retarget/merge. |
 
 ### Stacked PRs — coarse roll-up
@@ -224,13 +225,13 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 | 03 | `ws-03-session-core` | [#20](https://github.com/justin-p/testing/pull/20) | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
 | 04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) | 🟨 | Bounded realtime/privacy + `/workshop` E2E ✅ |
 | 05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | 🟨 | PR05 scope complete on branch (dashboard/nav + list/detail widgets + roster member add/remove/patch APIs); stacked merge + CI completion pending. |
-| 06 | `ws-06-learning-workflows` | [#23](https://github.com/justin-p/testing/pull/23) | 🟨 | Prerequisites + **`/me` `/gaps` `/aggregates`**, workshop pre-work UI, **admin `is_instructor`**; merges/exports/dashboard polish still 🔲 |
+| 06 | `ws-06-learning-workflows` | [#23](https://github.com/justin-p/testing/pull/23) | 🟨 | Prerequisites + **`/me` `/gaps` `/aggregates`**, pre-work UI + **mark complete**, **distinct-trainee E2E bootstrap**, **Playwright workshop suite** serial/stability (**`1633910`**); **admin `is_instructor`**; merges/exports/dashboard polish still 🔲 |
 | 07–10 | `ws-07-*` … `ws-10-*` | — | 🔲 | Branches/PRs in [Branch/PR chain](#branchpr-chain); open PRs when slicing |
 
 ### Next actions (suggested order)
 
 1. **Confirm tip CI (PR06):** `gh pr checks 23` — if anything regresses, run **babysitting-pr** / Task fix loop on `ws-06-learning-workflows`.
-2. **Continue PR06 verticals:** deepen pre-work (e.g. mark-complete in UI, dashboard tiles), workflow exports/other sketch gaps — admin can already grant **instructor** from **Users**.
+2. **Continue PR06 verticals:** dashboard **tiles** / list polish, **stricter pre-work gating** if product wants it, workflow **exports** / other REST sketch gaps — admin can already grant **instructor** from **Users**; **mark complete** is already in session UI (**`1633910`**).
 3. **Stack hygiene:** keep [#23](https://github.com/justin-p/testing/pull/23) rebased/retargeted as upstream stack PRs merge; update [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) after each shift.
 4. **Cross-slice gate:** regenerate OpenAPI + `frontend/src/client` on each API contract change; keep `/python-tdd-with-uv` discipline and focused regression runs.
 5. **E2E discipline:** `scripts/e2e-backend-reset.sh` before full local Playwright when diagnosing drift; Sonner-aware toasts ([playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md)).
