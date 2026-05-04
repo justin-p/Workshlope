@@ -119,9 +119,9 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-04 — **PR05 in flight**: same as prior row **plus** static **stub card rails** per role (`DashboardStubRails`), OAuth **bridge → `readUserMe` → role dashboard** (`auth.callback.tsx`), sidebar **prefix-active** nav (`Main.tsx`), dashboard Playwright asserts `dashboard-stub-rail-admin` |
-| **Active integration branch** | `ws-05-dashboard-nav` (stacked on **PR04** `ws-04-realtime-privacy`) |
-| **Stack PR label** | **PR05 — DashboardNav** (PR04 babysit/merge in parallel — see Next actions) |
+| **Last synced** | 2026-05-04 — PR05 **opened** as [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`). PR04 [PR #21](https://github.com/justin-p/testing/pull/21) checks green for latest run — ready to merge ahead of or with stack rebase. Stub rails + OAuth landing + sidebar prefix-active + dashboard Playwright unchanged from prior row. |
+| **Active integration branch** | `ws-05-dashboard-nav` → **PR #22** (stacked on **PR04** `ws-04-realtime-privacy`) |
+| **Stack PR label** | **PR05 — DashboardNav** (#22); merge **#21** first (or rebase #22 onto `main` after #21 lands) |
 
 ### Backend code anchors (workshop realtime slice)
 
@@ -187,8 +187,8 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 
 ### Next actions (suggested order)
 
-1. **PR04 closure:** babysit / merge **PR #21** (`ws-04-realtime-privacy`) — `gh pr checks 21` until green.
-2. **PR05:** continue on `ws-05-dashboard-nav` — open/stack PR targeting `ws-04` once 04 merges (or document base); fill dashboard placeholders only as APIs exist; avoid `/workshop` test matrix creep.
+1. **PR04 merge:** [PR #21](https://github.com/justin-p/testing/pull/21) — checks were green on latest observed run; merge when review approves, then rebase or retarget [PR #22](https://github.com/justin-p/testing/pull/22) to `main` if GitHub does not auto-update the stack.
+2. **PR05:** [PR #22](https://github.com/justin-p/testing/pull/22) — review + CI; **widgets / session list APIs** remain 🔲 per PR05 table (PR06+).
 3. **E2E discipline:** keep `scripts/e2e-backend-reset.sh` before local full Playwright when diagnosing DB drift; use Sonner-aware toast assertions for new flows.
 
 ### YAML todos above
