@@ -115,11 +115,11 @@ Apply `/python-tdd-with-uv` for all Python backend changes in this plan:
 
 This section is the **recoverable checklist** when chat history or IDE session is gone. Prefer editing here over relying on conversational memory.
 
-**Maintenance rule:** After each meaningful backend/frontend/E2E slice, update **Last synced**, the **Active branch / PR**, toggle ✅ / 🔲 in the matrices below, and keep **[GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged)** in sync (new PR, merge, or base-branch change).
+**Maintenance rule:** After each meaningful backend/frontend/E2E slice, update **Last synced**, the **Active branch / PR**, toggle ✅ / 🔲 in the matrices below, and keep **[GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged)** in sync (new PR, merge, or base-branch change). For the open **tip** PR, run a **babysit loop** (see [Next actions](#next-actions-suggested-order)): `gh pr checks` / `gh pr checks --watch`, `gh run view --log-failed` on failures, fix + push on that PR’s head branch (≤3 remediation rounds per **babysitting-pr** Cursor skill — or an equivalent **Task** subagent mirroring `gh pr checks` → fix → push).
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-04 — Full workshop stack PR links: **#18 → #19 → #20 → #21 → #22** (see [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged)). PR05 feature work: stub rails, OAuth landing, sidebar prefix-active, dashboard Playwright. |
+| **Last synced** | 2026-05-04 — Stack [**#18**–**#22**](https://github.com/justin-p/testing/blob/ws-05-dashboard-nav/workshop_lessons_%26_sessions_aa012042.plan.md#github-pr-stack-open--update-when-retargetedmerged). **#18–#21** checks were green on last poll; **#22** tip PR: run **Task/babysit** (`gh pr checks 22 --watch`) until all gates pass, then refresh this row. PR05 on branch: stubs, OAuth landing, sidebar prefix-active, Playwright harness. |
 | **Active integration branch** | `ws-05-dashboard-nav` → [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`) |
 | **Stack PR label** | **PR05 — DashboardNav**; merge from the **bottom of the stack** (#18) upward, or retarget after each merge (see stack table) |
 
@@ -200,9 +200,10 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 
 ### Next actions (suggested order)
 
-1. **Stack merge order:** land [#18](https://github.com/justin-p/testing/pull/18) → … → [#22](https://github.com/justin-p/testing/pull/22) (or retarget each head after its base merges to `main`). Track current links in [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged).
-2. **Tip of stack:** [PR #22](https://github.com/justin-p/testing/pull/22) — review + CI; **widgets / session list APIs** remain 🔲 (PR06+).
-3. **E2E discipline:** keep `scripts/e2e-backend-reset.sh` before local full Playwright when diagnosing DB drift; use Sonner-aware toast assertions for new flows.
+1. **Babysit (parallel):** use a **general-purpose Cursor Task** running `babysitting-pr` workflow on [PR #22](https://github.com/justin-p/testing/pull/22) (`gh pr checks [--watch]`, `gh run view --log-failed` on regressions, fix + push `ws-05-dashboard-nav`); report status for [#18–#22](https://github.com/justin-p/testing/blob/ws-05-dashboard-nav/workshop_lessons_%26_sessions_aa012042.plan.md#github-pr-stack-open--update-when-retargetedmerged).
+2. **Stack merge order:** land [#18](https://github.com/justin-p/testing/pull/18) → … → [#22](https://github.com/justin-p/testing/pull/22) once reviews pass (or retarget each head after its base merges to `main`).
+3. **Tip scope:** widgets / session **list APIs** remain 🔲 (PR06+) per [PR05 table](#pr05-ws-05-dashboard-nav--detailed-status-in-progress).
+4. **E2E discipline:** `scripts/e2e-backend-reset.sh` before full local Playwright when diagnosing drift; Sonner-aware toasts for new flows ([playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md)).
 
 ### YAML todos above
 
