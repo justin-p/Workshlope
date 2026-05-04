@@ -275,6 +275,7 @@ class WorkshopSessionPatch(SQLModel):
 
     status: Literal["live", "paused", "ended"] | None = None
     instructor_seat: WorkshopSessionInstructorSeatRoleUpdate | None = None
+    primary_instructor_user_id: uuid.UUID | None = None
     remove_instructor_user_id: uuid.UUID | None = None
 
 

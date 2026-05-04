@@ -271,6 +271,7 @@ export type WorkshopSessionListItem = {
 export type WorkshopSessionPatch = {
     status?: ('live' | 'paused' | 'ended' | null);
     instructor_seat?: (WorkshopSessionInstructorSeatRoleUpdate | null);
+    primary_instructor_user_id?: (string | null);
     remove_instructor_user_id?: (string | null);
 };
 

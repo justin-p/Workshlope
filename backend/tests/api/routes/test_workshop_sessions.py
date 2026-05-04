@@ -2434,7 +2434,7 @@ def test_patch_session_empty_body_returns_422(client: TestClient, db: Session) -
     assert response.json()["detail"] == "patch_requires_update"
 
 
-def test_patch_session_conflicting_instructor_fields_returns_422(
+def test_patch_session_cannot_update_and_remove_same_instructor_returns_422(
     client: TestClient, db: Session
 ) -> None:
     session_row = _create_live_session(db)
@@ -2475,7 +2475,102 @@ def test_patch_session_conflicting_instructor_fields_returns_422(
         },
     )
     assert response.status_code == 422
-    assert response.json()["detail"] == "conflicting_instructor_patch_fields"
+    assert response.json()["detail"] == "cannot_update_and_remove_same_instructor"
+
+
+def test_patch_session_handoff_target_must_be_active_instructor_returns_422(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-handoff-lead-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    outsider = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"sess-patch-handoff-outsider-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"primary_instructor_user_id": str(outsider.id)},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "handoff_target_not_instructor"
+
+
+def test_patch_session_handoff_promotes_target_and_demotes_previous_lead(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-handoff1-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    co = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"sess-patch-handoff2-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id, user_id=co.id, role="co_instructor"
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"primary_instructor_user_id": str(co.id)},
+    )
+    assert response.status_code == 200
+
+    lead_seat = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_row.id,
+            SessionInstructor.user_id == lead.id,
+            SessionInstructor.removed_at.is_(None),
+        )
+    ).first()
+    co_seat = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_row.id,
+            SessionInstructor.user_id == co.id,
+            SessionInstructor.removed_at.is_(None),
+        )
+    ).first()
+    assert lead_seat is not None
+    assert co_seat is not None
+    assert lead_seat.role == "co_instructor"
+    assert co_seat.role == "lead"
 
 
 def test_patch_session_status_start_publishes_hub(
@@ -2705,6 +2800,111 @@ def test_patch_session_remove_instructor_ok_when_co_remains(
     ).first()
     assert co_seat is not None
     assert co_seat.removed_at is not None
+
+
+def test_patch_session_combined_handoff_and_remove_current_lead_succeeds(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-combo-lead-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    co = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"sess-patch-combo-co-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id, user_id=co.id, role="co_instructor"
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={
+            "primary_instructor_user_id": str(co.id),
+            "remove_instructor_user_id": str(lead.id),
+        },
+    )
+    assert response.status_code == 200
+
+    lead_seat = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_row.id,
+            SessionInstructor.user_id == lead.id,
+        )
+    ).first()
+    co_seat = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_row.id,
+            SessionInstructor.user_id == co.id,
+            SessionInstructor.removed_at.is_(None),
+        )
+    ).first()
+    assert lead_seat is not None
+    assert lead_seat.removed_at is not None
+    assert co_seat is not None
+    assert co_seat.role == "lead"
+
+
+def test_patch_session_cannot_handoff_to_removed_instructor_returns_422(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-patch-combo-bad-lead-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    co = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"sess-patch-combo-bad-co-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id, user_id=co.id, role="co_instructor"
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={
+            "primary_instructor_user_id": str(co.id),
+            "remove_instructor_user_id": str(co.id),
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "cannot_handoff_to_removed_instructor"
 
 
 def test_patch_session_end_and_remove_last_instructor_ok(

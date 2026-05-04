@@ -1251,6 +1251,18 @@ export const WorkshopSessionPatchSchema = {
                 }
             ]
         },
+        primary_instructor_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Instructor User Id'
+        },
         remove_instructor_user_id: {
             anyOf: [
                 {

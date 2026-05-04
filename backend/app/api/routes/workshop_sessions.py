@@ -776,16 +776,39 @@ async def patch_workshop_session(
 
     has_status = body.status is not None
     has_seat_role = body.instructor_seat is not None
+    has_primary_handoff = body.primary_instructor_user_id is not None
     has_remove = body.remove_instructor_user_id is not None
-    if not has_status and not has_seat_role and not has_remove:
+    if (
+        not has_status
+        and not has_seat_role
+        and not has_primary_handoff
+        and not has_remove
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="patch_requires_update",
         )
-    if has_seat_role and has_remove:
+    if (
+        has_seat_role
+        and has_remove
+        and body.instructor_seat is not None
+        and body.remove_instructor_user_id is not None
+        and body.instructor_seat.user_id == body.remove_instructor_user_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="conflicting_instructor_patch_fields",
+            detail="cannot_update_and_remove_same_instructor",
+        )
+    if (
+        has_primary_handoff
+        and has_remove
+        and body.primary_instructor_user_id is not None
+        and body.remove_instructor_user_id is not None
+        and body.primary_instructor_user_id == body.remove_instructor_user_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="cannot_handoff_to_removed_instructor",
         )
 
     if has_status and body.status is not None:
@@ -829,6 +852,32 @@ async def patch_workshop_session(
             )
         seat.role = body.instructor_seat.role
         session.add(seat)
+
+    if has_primary_handoff and body.primary_instructor_user_id is not None:
+        target_primary = session.exec(
+            select(SessionInstructor).where(
+                SessionInstructor.session_id == session_id,
+                SessionInstructor.user_id == body.primary_instructor_user_id,
+                col(SessionInstructor.removed_at).is_(None),
+            )
+        ).first()
+        if target_primary is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="handoff_target_not_instructor",
+            )
+        active_seats = session.exec(
+            select(SessionInstructor).where(
+                SessionInstructor.session_id == session_id,
+                col(SessionInstructor.removed_at).is_(None),
+            )
+        ).all()
+        for instructor_seat in active_seats:
+            if instructor_seat.user_id == body.primary_instructor_user_id:
+                instructor_seat.role = "lead"
+            elif instructor_seat.role == "lead":
+                instructor_seat.role = "co_instructor"
+            session.add(instructor_seat)
 
     if has_remove and body.remove_instructor_user_id is not None:
         remove_seat = session.exec(
