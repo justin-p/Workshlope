@@ -484,6 +484,13 @@ export type WorkshopSessionsUpsertWorkshopSessionMemberData = {
 
 export type WorkshopSessionsUpsertWorkshopSessionMemberResponse = (Message);
 
+export type WorkshopSessionsRemoveWorkshopSessionParticipantData = {
+    sessionId: string;
+    userId: string;
+};
+
+export type WorkshopSessionsRemoveWorkshopSessionParticipantResponse = (Message);
+
 export type WorkshopSessionsEnterWorkshopSessionData = {
     sessionId: string;
 };

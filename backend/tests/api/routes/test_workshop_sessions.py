@@ -2026,3 +2026,109 @@ def test_upsert_member_rejects_instructor_role_for_non_instructor_user(
         response.json()["detail"]
         == "Instructor role requires target user.is_instructor"
     )
+
+
+def test_remove_participant_requires_instructor_role(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    actor_headers = authentication_token_from_email(
+        client=client,
+        email=f"remove-actor-{uuid.uuid4()}@example.com",
+        db=db,
+    )
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"remove-target-{uuid.uuid4()}@example.com",
+            password="pw123456",
+        ),
+    )
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=target.id))
+    db.commit()
+
+    response = client.delete(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/participants/{target.id}",
+        headers=actor_headers,
+    )
+    assert response.status_code == 403
+
+
+def test_remove_participant_soft_removes_active_seat(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"remove-lead-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"remove-target2-{uuid.uuid4()}@example.com",
+            password="pw123456",
+        ),
+    )
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=target.id))
+    db.commit()
+
+    lead_headers = user_authentication_headers(
+        client=client,
+        email=lead.email,
+        password="pw123456",
+    )
+    response = client.delete(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/participants/{target.id}",
+        headers=lead_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Participant removed"
+
+    participant = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_row.id,
+            WorkshopParticipant.user_id == target.id,
+        )
+    ).first()
+    assert participant is not None
+    assert participant.removed_at is not None
+
+
+def test_remove_participant_not_found_when_no_active_seat(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"remove-lead2-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"remove-target3-{uuid.uuid4()}@example.com",
+            password="pw123456",
+        ),
+    )
+    db.commit()
+
+    lead_headers = user_authentication_headers(
+        client=client,
+        email=lead.email,
+        password="pw123456",
+    )
+    response = client.delete(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/participants/{target.id}",
+        headers=lead_headers,
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Participant not found"

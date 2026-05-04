@@ -142,8 +142,9 @@ Use this section when reopening the project **after intentional stop**. Do **not
 - **`GET /api/v1/workshop/sessions/`** — scoped list (`WorkshopSessionsPublic`); dashboards + `/workshops` use [`DashboardWorkshopSessions`](frontend/src/components/dashboard/DashboardWorkshopSessions.tsx) + `WorkshopSessionsService.readWorkshopSessionsForUser`.
 - **`GET /api/v1/workshop/sessions/{id}`** — participant vs instructor DTOs (`WorkshopSessionPublicParticipant` \| `WorkshopSessionPublicInstructor`); superuser ⇒ instructor-shaped view; roster **`avatar_url`** is always **`null`** until **`User.avatar_url`** exists in schema.
 - **`POST /api/v1/workshop/sessions/{id}/members`** — instructor/superuser roster upsert for participant vs instructor with opposite-role deactivation in one transaction (always-replace semantics).
+- **`DELETE /api/v1/workshop/sessions/{id}/participants/{user_id}`** — instructor/superuser soft-remove participant seat (`removed_at`) with membership guardrails.
 - **`/workshop/$sessionId`** — hydrates lesson **title/slug** via `WorkshopSessionsService.readWorkshopSessionDetail` (`useQuery`), then existing ws-ticket/WebSocket flow.
-- **Tests:** `test_workshop_sessions.py` includes detail + member-upsert cases (role guard, participant/instructor replace semantics).
+- **Tests:** `test_workshop_sessions.py` includes detail + member-upsert + participant-remove cases (role guard, replace semantics, soft-remove behavior).
 - **Client:** regenerated under [`frontend/src/client/`](frontend/src/client/) whenever OpenAPI changed (pre-commit `generate-frontend-sdk`).
 
 **Resume in this order:**
@@ -155,7 +156,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 **Open gaps (not blocking pause):**
 
 - Local Playwright **`auth.setup`** can time out without backend/`scripts/e2e-backend-reset.sh` — CI remains source of truth for E2E until env is reproduced locally.
-- **Roster `POST/PATCH`** and **prerequisite** endpoints from REST sketch remain 🔲 ([gap audit](#workshop-http-vs-realtime--delivery-gap-audit)).
+- **Roster `PATCH`** and **prerequisite** endpoints from REST sketch remain 🔲 ([gap audit](#workshop-http-vs-realtime--delivery-gap-audit)).
 - Optional: expand Playwright coverage for trainee/instructor **dashboard list** widgets (beyond current admin assertion in `dashboard-routing.spec.ts`).
 
 ### GitHub PR stack (open — update when retargeted/merged)
@@ -191,7 +192,7 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 
 | Surface | Implemented today | Still 🔲 vs **REST sketch** (below, *REST sketch under /api/v1/*) |
 | ------- | ----------------- | ---------------------------------------------------------------- |
-| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert (participant/instructor with opposite-role replace) | Session/participant **`PATCH`** + participant remove route; prerequisites; exports — see sketch table |
+| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove | Session/participant **`PATCH`**; prerequisites; exports — see sketch table |
 | **WebSocket** | `/{id}/ws` — `part.advance`, `session.pause` / `session.resume`, `participant.live_status`, … | Redis / multi-process hub (explicitly deferred) |
 
 **Remaining vs dashboard/product polish:** roster management + prerequisites/export paths in the sketch are still 🔲 (list + read/detail for session context are ✅ on **`ws-05-dashboard-nav`**).
@@ -272,7 +273,7 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 1. **Confirm tip CI:** `gh pr checks 22` — if anything regresses, run **babysitting-pr** / Task fix loop on `ws-05-dashboard-nav`.
 2. **Stack merge:** review + land [#18](https://github.com/justin-p/testing/pull/18) → … → [#22](https://github.com/justin-p/testing/pull/22) (or retarget heads after each base merges to `main`); update [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) after each merge.
 3. **PR06 kickoff:** create `ws-06-learning-workflows` from merged tip (or from `ws-05` if stacking without waiting for `main`); follow [PR06 planned slice](#pr06-ws-06-learning-workflows--planned-next-slice-pr-not-opened); open PR + stack table row.
-4. **Next backend verticals (gap audit):** slices **(1)-(2)** are ✅ on **`ws-05-dashboard-nav`**. Prefer next: roster **`POST/PATCH`** / participant management aligned with this doc’s [**REST sketch**](#rest-sketch-under-apiv1) section, **or** jump to **PR06** prerequisite models + routes (`LessonPrerequisite`, `UserPrerequisiteCompletion`). *(If that anchor breaks in your renderer, scroll to heading **REST sketch (under /api/v1/…)***.)
+4. **Next backend verticals (gap audit):** slices **(1)-(2)** are ✅ on **`ws-05-dashboard-nav`**. Prefer next: roster/session **`PATCH`** paths aligned with this doc’s [**REST sketch**](#rest-sketch-under-apiv1) section, **or** jump to **PR06** prerequisite models + routes (`LessonPrerequisite`, `UserPrerequisiteCompletion`). *(If that anchor breaks in your renderer, scroll to heading **REST sketch (under /api/v1/…)***.)
 5. **E2E discipline:** `scripts/e2e-backend-reset.sh` before full local Playwright when diagnosing drift; Sonner-aware toasts ([playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md)).
 
 **When resuming from pause:** step through [Pause / resume checkpoint](#pause--resume-checkpoint-handoff) first.

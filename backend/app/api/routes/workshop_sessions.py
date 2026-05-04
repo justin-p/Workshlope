@@ -795,6 +795,43 @@ def upsert_workshop_session_member(
     return Message(message="Member upserted as instructor")
 
 
+@router.delete("/{session_id}/participants/{user_id}", response_model=Message)
+def remove_workshop_session_participant(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    session_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> Message:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+
+    participant = session.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_id,
+            WorkshopParticipant.user_id == user_id,
+            col(WorkshopParticipant.removed_at).is_(None),
+        )
+    ).first()
+    if participant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Participant not found",
+        )
+
+    participant.removed_at = datetime.now(timezone.utc)
+    session.add(participant)
+    session.commit()
+    return Message(message="Participant removed")
+
+
 @router.post("/{session_id}/enter", response_model=Message)
 def enter_workshop_session(
     *, session: SessionDep, current_user: CurrentUser, session_id: uuid.UUID
