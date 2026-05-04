@@ -178,6 +178,61 @@ export type ValidationError = {
 };
 
 /**
+ * Lesson part metadata for workshop session screens (body omitted).
+ */
+export type WorkshopLessonPartBrief = {
+    id: string;
+    ordering: number;
+    slug: string;
+    title: string;
+};
+
+export type WorkshopLessonSummaryPublic = {
+    id: string;
+    title: string;
+    slug: string;
+};
+
+/**
+ * Caller’s own trainee seat snapshot (participant view only).
+ */
+export type WorkshopParticipantSelfPublic = {
+    invited_at: (string | null);
+    joined_at: (string | null);
+    finished_at: (string | null);
+    live_status: string;
+};
+
+export type WorkshopRosterInstructorRowPublic = {
+    user_id: string;
+    email: string;
+    full_name: (string | null);
+    avatar_url?: (string | null);
+    role: string;
+    assigned_at: (string | null);
+};
+
+export type WorkshopRosterParticipantRowPublic = {
+    user_id: string;
+    email: string;
+    full_name: (string | null);
+    avatar_url?: (string | null);
+    invited_at: (string | null);
+    joined_at: (string | null);
+    finished_at: (string | null);
+    live_status: string;
+};
+
+export type WorkshopSessionCorePublic = {
+    id: string;
+    status: string;
+    current_part_index: number;
+    current_part_slug: (string | null);
+    part_generation: number;
+    created_at: (string | null);
+};
+
+/**
  * Minimal session row for dashboard lists — no roster, no peer data.
  */
 export type WorkshopSessionListItem = {
@@ -191,6 +246,29 @@ export type WorkshopSessionListItem = {
      * Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.
      */
     my_role?: ('participant' | 'instructor' | null);
+};
+
+/**
+ * Instructor-visible session detail with roster.
+ */
+export type WorkshopSessionPublicInstructor = {
+    view?: "instructor";
+    session: WorkshopSessionCorePublic;
+    lesson: WorkshopLessonSummaryPublic;
+    parts: Array<WorkshopLessonPartBrief>;
+    participants: Array<WorkshopRosterParticipantRowPublic>;
+    instructors: Array<WorkshopRosterInstructorRowPublic>;
+};
+
+/**
+ * Trainee-visible session detail — lesson + parts + self only (no roster).
+ */
+export type WorkshopSessionPublicParticipant = {
+    view?: "participant";
+    session: WorkshopSessionCorePublic;
+    lesson: WorkshopLessonSummaryPublic;
+    parts: Array<WorkshopLessonPartBrief>;
+    self: WorkshopParticipantSelfPublic;
 };
 
 export type WorkshopSessionsPublic = {
@@ -381,6 +459,12 @@ export type WorkshopSessionsReadWorkshopSessionsForUserData = {
 };
 
 export type WorkshopSessionsReadWorkshopSessionsForUserResponse = (WorkshopSessionsPublic);
+
+export type WorkshopSessionsReadWorkshopSessionDetailData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsReadWorkshopSessionDetailResponse = ((WorkshopSessionPublicParticipant | WorkshopSessionPublicInstructor));
 
 export type WorkshopSessionsEnterWorkshopSessionData = {
     sessionId: string;

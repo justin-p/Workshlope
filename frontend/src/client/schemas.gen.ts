@@ -838,6 +838,284 @@ export const ValidationErrorSchema = {
     title: 'ValidationError'
 } as const;
 
+export const WorkshopLessonPartBriefSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        ordering: {
+            type: 'integer',
+            title: 'Ordering'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        }
+    },
+    type: 'object',
+    required: ['id', 'ordering', 'slug', 'title'],
+    title: 'WorkshopLessonPartBrief',
+    description: 'Lesson part metadata for workshop session screens (body omitted).'
+} as const;
+
+export const WorkshopLessonSummaryPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title', 'slug'],
+    title: 'WorkshopLessonSummaryPublic'
+} as const;
+
+export const WorkshopParticipantSelfPublicSchema = {
+    properties: {
+        invited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invited At'
+        },
+        joined_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Joined At'
+        },
+        finished_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finished At'
+        },
+        live_status: {
+            type: 'string',
+            title: 'Live Status'
+        }
+    },
+    type: 'object',
+    required: ['invited_at', 'joined_at', 'finished_at', 'live_status'],
+    title: 'WorkshopParticipantSelfPublic',
+    description: 'Caller’s own trainee seat snapshot (participant view only).'
+} as const;
+
+export const WorkshopRosterInstructorRowPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
+        },
+        role: {
+            type: 'string',
+            title: 'Role'
+        },
+        assigned_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Assigned At'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'email', 'full_name', 'role', 'assigned_at'],
+    title: 'WorkshopRosterInstructorRowPublic'
+} as const;
+
+export const WorkshopRosterParticipantRowPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
+        },
+        invited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invited At'
+        },
+        joined_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Joined At'
+        },
+        finished_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finished At'
+        },
+        live_status: {
+            type: 'string',
+            title: 'Live Status'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'email', 'full_name', 'invited_at', 'joined_at', 'finished_at', 'live_status'],
+    title: 'WorkshopRosterParticipantRowPublic'
+} as const;
+
+export const WorkshopSessionCorePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        current_part_index: {
+            type: 'integer',
+            title: 'Current Part Index'
+        },
+        current_part_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Current Part Slug'
+        },
+        part_generation: {
+            type: 'integer',
+            title: 'Part Generation'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'status', 'current_part_index', 'current_part_slug', 'part_generation', 'created_at'],
+    title: 'WorkshopSessionCorePublic'
+} as const;
+
 export const WorkshopSessionListItemSchema = {
     properties: {
         id: {
@@ -884,6 +1162,79 @@ export const WorkshopSessionListItemSchema = {
     required: ['id', 'status', 'part_generation', 'lesson_id', 'lesson_title', 'lesson_slug'],
     title: 'WorkshopSessionListItem',
     description: 'Minimal session row for dashboard lists — no roster, no peer data.'
+} as const;
+
+export const WorkshopSessionPublicInstructorSchema = {
+    properties: {
+        view: {
+            type: 'string',
+            const: 'instructor',
+            title: 'View',
+            default: 'instructor'
+        },
+        session: {
+            '$ref': '#/components/schemas/WorkshopSessionCorePublic'
+        },
+        lesson: {
+            '$ref': '#/components/schemas/WorkshopLessonSummaryPublic'
+        },
+        parts: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPartBrief'
+            },
+            type: 'array',
+            title: 'Parts'
+        },
+        participants: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopRosterParticipantRowPublic'
+            },
+            type: 'array',
+            title: 'Participants'
+        },
+        instructors: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopRosterInstructorRowPublic'
+            },
+            type: 'array',
+            title: 'Instructors'
+        }
+    },
+    type: 'object',
+    required: ['session', 'lesson', 'parts', 'participants', 'instructors'],
+    title: 'WorkshopSessionPublicInstructor',
+    description: 'Instructor-visible session detail with roster.'
+} as const;
+
+export const WorkshopSessionPublicParticipantSchema = {
+    properties: {
+        view: {
+            type: 'string',
+            const: 'participant',
+            title: 'View',
+            default: 'participant'
+        },
+        session: {
+            '$ref': '#/components/schemas/WorkshopSessionCorePublic'
+        },
+        lesson: {
+            '$ref': '#/components/schemas/WorkshopLessonSummaryPublic'
+        },
+        parts: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPartBrief'
+            },
+            type: 'array',
+            title: 'Parts'
+        },
+        self: {
+            '$ref': '#/components/schemas/WorkshopParticipantSelfPublic'
+        }
+    },
+    type: 'object',
+    required: ['session', 'lesson', 'parts', 'self'],
+    title: 'WorkshopSessionPublicParticipant',
+    description: 'Trainee-visible session detail — lesson + parts + self only (no roster).'
 } as const;
 
 export const WorkshopSessionsPublicSchema = {

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Literal
 
-from pydantic import EmailStr
+from pydantic import ConfigDict, EmailStr
 from sqlalchemy import DateTime, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -245,6 +245,85 @@ class WorkshopSessionListItem(SQLModel):
 class WorkshopSessionsPublic(SQLModel):
     data: list[WorkshopSessionListItem]
     count: int
+
+
+class WorkshopLessonPartBrief(SQLModel):
+    """Lesson part metadata for workshop session screens (body omitted)."""
+
+    id: uuid.UUID
+    ordering: int
+    slug: str
+    title: str
+
+
+class WorkshopSessionCorePublic(SQLModel):
+    id: uuid.UUID
+    status: str
+    current_part_index: int
+    current_part_slug: str | None
+    part_generation: int
+    created_at: datetime | None
+
+
+class WorkshopLessonSummaryPublic(SQLModel):
+    id: uuid.UUID
+    title: str
+    slug: str
+
+
+class WorkshopParticipantSelfPublic(SQLModel):
+    """Caller’s own trainee seat snapshot (participant view only)."""
+
+    invited_at: datetime | None
+    joined_at: datetime | None
+    finished_at: datetime | None
+    live_status: str
+
+
+class WorkshopSessionPublicParticipant(SQLModel):
+    """Trainee-visible session detail — lesson + parts + self only (no roster)."""
+
+    model_config = ConfigDict(populate_by_name=True)  # type: ignore[assignment]
+
+    view: Literal["participant"] = "participant"
+    session: WorkshopSessionCorePublic
+    lesson: WorkshopLessonSummaryPublic
+    parts: list[WorkshopLessonPartBrief]
+    participant_self: WorkshopParticipantSelfPublic = Field(
+        serialization_alias="self",
+        validation_alias="self",
+    )
+
+
+class WorkshopRosterParticipantRowPublic(SQLModel):
+    user_id: uuid.UUID
+    email: str
+    full_name: str | None
+    avatar_url: str | None = None
+    invited_at: datetime | None
+    joined_at: datetime | None
+    finished_at: datetime | None
+    live_status: str
+
+
+class WorkshopRosterInstructorRowPublic(SQLModel):
+    user_id: uuid.UUID
+    email: str
+    full_name: str | None
+    avatar_url: str | None = None
+    role: str
+    assigned_at: datetime | None
+
+
+class WorkshopSessionPublicInstructor(SQLModel):
+    """Instructor-visible session detail with roster."""
+
+    view: Literal["instructor"] = "instructor"
+    session: WorkshopSessionCorePublic
+    lesson: WorkshopLessonSummaryPublic
+    parts: list[WorkshopLessonPartBrief]
+    participants: list[WorkshopRosterParticipantRowPublic]
+    instructors: list[WorkshopRosterInstructorRowPublic]
 
 
 # Generic message

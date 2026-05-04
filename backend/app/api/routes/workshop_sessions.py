@@ -21,9 +21,17 @@ from app.models import (
     Message,
     SessionInstructor,
     User,
+    WorkshopLessonPartBrief,
+    WorkshopLessonSummaryPublic,
     WorkshopParticipant,
+    WorkshopParticipantSelfPublic,
+    WorkshopRosterInstructorRowPublic,
+    WorkshopRosterParticipantRowPublic,
     WorkshopSession,
+    WorkshopSessionCorePublic,
     WorkshopSessionListItem,
+    WorkshopSessionPublicInstructor,
+    WorkshopSessionPublicParticipant,
     WorkshopSessionsPublic,
 )
 from app.services.workshop_realtime import (
@@ -154,6 +162,37 @@ def _workshop_list_item_role(
     participant = session_db.exec(
         select(WorkshopParticipant).where(
             WorkshopParticipant.session_id == workshop_session_id,
+            WorkshopParticipant.user_id == current_user.id,
+            col(WorkshopParticipant.removed_at).is_(None),
+        )
+    ).first()
+    if participant is not None:
+        return "participant"
+    return None
+
+
+def _workshop_session_detail_view_kind(
+    session_db: Session,
+    *,
+    session_id: uuid.UUID,
+    current_user: User,
+) -> Literal["participant", "instructor"] | None:
+    """Who may read session detail; mirrors ws-ticket elevation for superusers."""
+
+    if current_user.is_superuser:
+        return "instructor"
+    instructor = session_db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_id,
+            SessionInstructor.user_id == current_user.id,
+            col(SessionInstructor.removed_at).is_(None),
+        )
+    ).first()
+    if instructor is not None:
+        return "instructor"
+    participant = session_db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_id,
             WorkshopParticipant.user_id == current_user.id,
             col(WorkshopParticipant.removed_at).is_(None),
         )
@@ -501,6 +540,161 @@ def read_workshop_sessions_for_user(
         )
 
     return WorkshopSessionsPublic(data=data, count=count)
+
+
+def _workshop_session_detail_shared(
+    session: Session,
+    *,
+    workshop_row: WorkshopSession,
+) -> tuple[
+    WorkshopSessionCorePublic,
+    WorkshopLessonSummaryPublic,
+    list[WorkshopLessonPartBrief],
+]:
+    lesson = session.get(Lesson, workshop_row.lesson_id)
+    if lesson is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="session_lesson_missing",
+        )
+
+    core = WorkshopSessionCorePublic(
+        id=workshop_row.id,
+        status=workshop_row.status,
+        current_part_index=workshop_row.current_part_index,
+        current_part_slug=workshop_row.current_part_slug,
+        part_generation=workshop_row.part_generation,
+        created_at=workshop_row.created_at,
+    )
+    lesson_summary = WorkshopLessonSummaryPublic(
+        id=lesson.id,
+        title=lesson.title,
+        slug=lesson.slug,
+    )
+    part_rows = session.exec(
+        select(LessonPart)
+        .where(LessonPart.lesson_id == lesson.id)
+        .order_by(col(LessonPart.ordering))
+    ).all()
+    parts = [
+        WorkshopLessonPartBrief(
+            id=row.id,
+            ordering=int(row.ordering),
+            slug=row.slug,
+            title=row.title,
+        )
+        for row in part_rows
+    ]
+    return core, lesson_summary, parts
+
+
+@router.get(
+    "/{session_id}",
+    response_model=WorkshopSessionPublicParticipant | WorkshopSessionPublicInstructor,
+)
+def read_workshop_session_detail(
+    *, session: SessionDep, current_user: CurrentUser, session_id: uuid.UUID
+) -> WorkshopSessionPublicParticipant | WorkshopSessionPublicInstructor:
+    workshop_row = session.get(WorkshopSession, session_id)
+    if workshop_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    view_kind = _workshop_session_detail_view_kind(
+        session,
+        session_id=session_id,
+        current_user=current_user,
+    )
+    if view_kind is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not a member of this session",
+        )
+
+    core, lesson_summary, parts = _workshop_session_detail_shared(
+        session, workshop_row=workshop_row
+    )
+
+    if view_kind == "participant":
+        participant = session.exec(
+            select(WorkshopParticipant).where(
+                WorkshopParticipant.session_id == session_id,
+                WorkshopParticipant.user_id == current_user.id,
+                col(WorkshopParticipant.removed_at).is_(None),
+            )
+        ).first()
+        if participant is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="participant_seat_missing",
+            )
+        self_snap = WorkshopParticipantSelfPublic(
+            invited_at=participant.invited_at,
+            joined_at=participant.joined_at,
+            finished_at=participant.finished_at,
+            live_status=participant.live_status,
+        )
+        return WorkshopSessionPublicParticipant(
+            session=core,
+            lesson=lesson_summary,
+            parts=parts,
+            participant_self=self_snap,
+        )
+
+    p_pairs = session.exec(
+        select(WorkshopParticipant, User)
+        .join(User, col(WorkshopParticipant.user_id) == User.id)
+        .where(
+            WorkshopParticipant.session_id == session_id,
+            col(WorkshopParticipant.removed_at).is_(None),
+            col(WorkshopParticipant.user_id).is_not(None),
+        )
+    ).all()
+    participants_out = sorted(p_pairs, key=lambda pair: str(pair[1].email))
+    participants_public = [
+        WorkshopRosterParticipantRowPublic(
+            user_id=user.id,
+            email=str(user.email),
+            full_name=user.full_name,
+            avatar_url=None,
+            invited_at=seat.invited_at,
+            joined_at=seat.joined_at,
+            finished_at=seat.finished_at,
+            live_status=seat.live_status,
+        )
+        for seat, user in participants_out
+    ]
+
+    i_pairs = session.exec(
+        select(SessionInstructor, User)
+        .join(User, col(SessionInstructor.user_id) == User.id)
+        .where(
+            SessionInstructor.session_id == session_id,
+            col(SessionInstructor.removed_at).is_(None),
+        )
+    ).all()
+    instructors_out = sorted(i_pairs, key=lambda pair: str(pair[1].email))
+    instructors_public = [
+        WorkshopRosterInstructorRowPublic(
+            user_id=user.id,
+            email=str(user.email),
+            full_name=user.full_name,
+            avatar_url=None,
+            role=seat.role,
+            assigned_at=seat.assigned_at,
+        )
+        for seat, user in instructors_out
+    ]
+
+    return WorkshopSessionPublicInstructor(
+        session=core,
+        lesson=lesson_summary,
+        parts=parts,
+        participants=participants_public,
+        instructors=instructors_public,
+    )
 
 
 @router.post("/{session_id}/enter", response_model=Message)

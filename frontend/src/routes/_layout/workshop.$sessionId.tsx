@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
@@ -63,6 +64,14 @@ export const Route = createFileRoute("/_layout/workshop/$sessionId")({
 
 function WorkshopSessionPage() {
   const { sessionId } = Route.useParams()
+  const uuidOk = UUID_V4_RE.test(sessionId)
+  const detailQuery = useQuery({
+    queryKey: ["workshopSessionDetail", sessionId],
+    queryFn: () =>
+      WorkshopSessionsService.readWorkshopSessionDetail({ sessionId }),
+    enabled: uuidOk,
+    retry: false,
+  })
   const [phase, setPhase] = useState<
     "idle" | "entering" | "ws_connecting" | "ready" | "error"
   >("idle")
@@ -217,9 +226,17 @@ function WorkshopSessionPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Workshop session</h1>
+      <h1 className="text-2xl font-semibold">
+        {detailQuery.data?.lesson.title ?? "Workshop session"}
+      </h1>
       <p className="text-muted-foreground text-sm">
         Session <code className="text-xs">{sessionId}</code>
+        {detailQuery.data?.lesson.slug ? (
+          <>
+            {" "}
+            · <code className="text-xs">{detailQuery.data.lesson.slug}</code>
+          </>
+        ) : null}
       </p>
 
       <div className="flex flex-wrap gap-2 items-center">

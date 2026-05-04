@@ -119,7 +119,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-04 — Stack [**#18**–**#22**](https://github.com/justin-p/testing/blob/ws-05-dashboard-nav/workshop_lessons_%26_sessions_aa012042.plan.md#github-pr-stack-open--update-when-retargetedmerged). **PR #22** treated as **CI-succeeded / merge-ready** for planning (re-verify with `gh pr checks 22` before merge). Includes **Biome** CLI `$schema` parity (`@biomejs/biome` ^**2.4.13**). **Next:** stack merge (#18 upward) → open **PR06** `ws-06-learning-workflows`. |
+| **Last synced** | 2026-05-04 — Same stack as below. **`GET /workshop/sessions/{id}`** detail (participant vs instructor DTOs) + regenerated SDK; `/workshop/:id` page hydrates **lesson title** from that GET. **`PR #22`:** confirm CI before merge (`gh pr checks 22`). **Next:** stack merge (#18↑) → **PR06** prerequisites / workflow slice. |
 | **Active integration branch** | `ws-05-dashboard-nav` → [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`). **Successor branch:** `ws-06-learning-workflows` (*not created until PR06 slice starts*) |
 | **Stack PR label** | **PR05 — DashboardNav** ✅ on branch; **`main`** after stacked merge (**#18** → … → **#22**) or retarget per [stack table](#github-pr-stack-open--update-when-retargetedmerged) |
 
@@ -156,15 +156,15 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 
 | Surface | Implemented today | Still 🔲 vs **REST sketch** (below, *REST sketch under /api/v1/*) |
 | ------- | ----------------- | ---------------------------------------------------------------- |
-| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** scoped list (`WorkshopSessionsPublic`) | **`GET`** session detail with **scoped** trainee vs instructor DTOs; roster **`POST/PATCH`**; prerequisites; exports — see sketch table |
+| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**) | Roster **`POST/PATCH`**; prerequisites; exports — see sketch table |
 | **WebSocket** | `/{id}/ws` — `part.advance`, `session.pause` / `session.resume`, `participant.live_status`, … | Redis / multi-process hub (explicitly deferred) |
 
-**Blocks PR05 live dashboard widgets:** without **read/list** endpoints, cards cannot hydrate from API (stub rails only — expected until this slice lands).
+**Remaining vs dashboard/product polish:** roster management + prerequisites/export paths in the sketch are still 🔲 (list + read/detail for session context are ✅ on **`ws-05-dashboard-nav`**).
 
 **Suggested vertical slices (backend `/python-tdd-with-uv` first):**
 
 1. **`GET /workshop/sessions/` (scoped list)** — ✅ **`WorkshopSessionsPublic`** on **`ws-05-dashboard-nav`** — participant/instructor seats + optional **`my_role`**; superuser sees all with **`my_role`** null when unseated.
-2. **`GET /workshop/sessions/{id}`** — membership check; **`SessionPublicParticipant`** vs **`SessionPublicInstructor`** response models per sketch (“Separate response models” note).
+2. **`GET /workshop/sessions/{id}`** — ✅ **`WorkshopSessionPublicParticipant`** (lesson + ordered part metadata + **`self`**) vs **`WorkshopSessionPublicInstructor`** (+ **`participants`** / **`instructors`** roster rows with **`avatar_url`** placeholder `null` until stored on **`User`**); superuser ⇒ instructor-shaped view — matches ws-ticket elevation.
 3. **PR06 prerequisites** — `LessonPrerequisite` / `UserPrerequisiteCompletion` and lesson prerequisite routes from the same REST sketch section.
 
 Gate: regenerate **OpenAPI** + **`frontend/src/client`** on every new HTTP route.
@@ -204,7 +204,7 @@ All rows below reflect **`ws-05-dashboard-nav` / [#22](https://github.com/justin
 | Static **stub rails** on each dashboard (privacy-safe copy + “Soon” cues; trainee has no Workshops link) | ✅ | [`DashboardStubRails.tsx`](frontend/src/components/dashboard/DashboardStubRails.tsx) |
 | Sidebar item **active** when path matches or is under same prefix | ✅ | e.g. future `/dashboard/trainee/*` highlights My Learning |
 | OAuth **GitHub bridge** navigates to role dashboard (parity with password login) | ✅ | Clears token if `/users/me` fails |
-| Live **widgets** wired to workshop/session/list APIs | 🔲 | PR06+ / when list endpoints ship; parity matrix rows still 🔲 |
+| Live **widgets** wired to workshop session **list + read/detail** APIs | 🟨 | Dashboard list ✅; cockpit uses **GET `{id}`** for lesson heading; sketch roster/prereqs still 🔲 |
 
 ### PR06 (`ws-06-learning-workflows`) — planned next slice (*PR not opened*)
 
@@ -229,7 +229,7 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 | 02 | `ws-02-github-sync-manifest` | [#19](https://github.com/justin-p/testing/pull/19) | 🔲 | GitHub App + manifest sync not tracked here yet |
 | 03 | `ws-03-session-core` | [#20](https://github.com/justin-p/testing/pull/20) | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
 | 04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) | 🟨 | Bounded realtime/privacy + `/workshop` E2E ✅ |
-| 05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | 🟨 | **CI ✅** per handoff; routing + nav + E2E/infra ([PR05 table](#pr05-ws-05-dashboard-nav--slice-status-integration-branch--merge-pending)); live widgets 🔲 |
+| 05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | 🟨 | Routing + dashboards + **`GET`** list/detail + cockpit title hydrate; stacked merge pending ([PR05 table](#pr05-ws-05-dashboard-nav--slice-status-integration-branch--merge-pending)). |
 | 06–10 | `ws-06-*` … `ws-10-*` | — | 🔲 | Branches/PRs in [Branch/PR chain](#branchpr-chain); open PRs when slicing |
 
 ### Next actions (suggested order)

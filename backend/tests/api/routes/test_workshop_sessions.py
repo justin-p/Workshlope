@@ -1716,3 +1716,125 @@ def test_list_workshop_sessions_superuser_sees_all(
     rows_by_id = {item["id"]: item for item in body["data"]}
     assert rows_by_id[str(a.id)]["my_role"] is None
     assert rows_by_id[str(b.id)]["my_role"] is None
+
+
+def test_get_workshop_session_detail_participant_view(
+    client: TestClient, db: Session
+) -> None:
+    iso_email = f"detail-pt-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+
+    session_row = _create_live_session(db)
+    _add_two_parts_to_session_lesson(db, session_row)
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+        )
+    )
+    db.commit()
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["view"] == "participant"
+    assert "participants" not in body
+    assert "self" in body
+    assert body["self"]["live_status"] == "busy"
+    assert len(body["parts"]) == 2
+    assert body["session"]["id"] == str(session_row.id)
+
+
+def test_get_workshop_session_detail_instructor_roster(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    train_email = f"detail-tr-{uuid.uuid4()}@example.com"
+    train_user = crud.create_user(
+        session=db,
+        user_create=UserCreate(email=train_email, password="pw123456"),
+    )
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=train_user.id))
+    inst_email = f"detail-inst-{uuid.uuid4()}@example.com"
+    inst_user = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=inst_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=inst_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=inst_email, password="pw123456"
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["view"] == "instructor"
+    emails = {p["email"] for p in body["participants"]}
+    assert train_email in emails
+    ins_emails = {i["email"] for i in body["instructors"]}
+    assert inst_email in ins_emails
+
+
+def test_get_workshop_session_detail_forbidden(client: TestClient, db: Session) -> None:
+    iso_email = f"detail-xx-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    session_row = _create_live_session(db)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert response.status_code == 403
+
+
+def test_get_workshop_session_detail_not_found(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    missing = uuid.uuid4()
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{missing}",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 404
+
+
+def test_get_workshop_session_detail_superuser_instructor_shape(
+    client: TestClient,
+    db: Session,
+    superuser_token_headers: dict[str, str],
+) -> None:
+    session_row = _create_live_session(db)
+    train_email = f"detail-su-tr-{uuid.uuid4()}@example.com"
+    train_user = crud.create_user(
+        session=db,
+        user_create=UserCreate(email=train_email, password="pw123456"),
+    )
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=train_user.id))
+    db.commit()
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=superuser_token_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["view"] == "instructor"
+    assert {p["email"] for p in body["participants"]} == {train_email}
