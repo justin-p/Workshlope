@@ -3,7 +3,7 @@ name: Playwright Tests
 on:
   push:
     branches:
-    - main
+    - master
   pull_request:
     types:
     - opened
@@ -15,19 +15,19 @@ on:
         required: false
         default: 'false'
 
-# compose.ci-gha-cache.yml uses BuildKit type=gha; needs Actions cache API write during warmup.
 permissions:
   contents: read
   pull-requests: read
-  actions: write
 
 jobs:
   changes:
     runs-on: ubuntu-latest
+    # Set job outputs to values from filter step
     outputs:
       changed: ${{ steps.filter.outputs.changed }}
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+    # For pull requests it's not necessary to checkout the code but for the main branch it is
     - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
       id: filter
       with:
@@ -39,25 +39,28 @@ jobs:
             - compose*.yml
             - .github/workflows/playwright.yml
 
-  # Exactly one Compose build here (slow part: Dockerfile builds for frontend, playwright, backend, authjs.)
-  # BuildKit caches those layers via compose.ci-gha-cache.yml → GitHub Actions cache (repeat runs skip most steps).
-  # Shards load the exported images via docker save/load — they never run `docker compose build`.
-  playwright-docker-warmup:
+  test-playwright:
     needs:
       - changes
     if: ${{ needs.changes.outputs.changed == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    env:
-      COMPOSE_FILE: compose.yml:compose.override.yml:compose.ci-gha-cache.yml
-      DOCKER_BUILDKIT: 1
+    strategy:
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
+      fail-fast: false
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-    - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
     - uses: oven-sh/setup-bun@v2
     - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3.23
+      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true' }}
+      with:
+        limit-access-to-actor: true
     - name: Install uv
       uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
     - run: uv sync
@@ -69,49 +72,8 @@ jobs:
       run: |
         cp .env .env.local
         echo "USER_REGISTRATION_ENABLED=true" >> .env.local
-    - run: docker compose pull db adminer mailcatcher proxy
+        echo "VITE_USER_REGISTRATION_ENABLED=true" >> .env.local
     - run: docker compose build
-    - name: Save Compose-built images for matrix (frontend, playwright, backend, authjs — not postgres/traefik pulls)
-      run: |
-        mapfile -t imgs < <(docker compose config --images | grep -vE '^(postgres|adminer|traefik|schickling/)' | sort -u)
-        printf 'Saving built images:\n%s\n' "${imgs[@]}"
-        docker save "${imgs[@]}" -o /tmp/playwright-compose-images.tar
-    - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-      with:
-        name: playwright-compose-images
-        path: /tmp/playwright-compose-images.tar
-        retention-days: 1
-
-  test-playwright:
-    needs:
-      - changes
-      - playwright-docker-warmup
-    if: ${{ needs.changes.outputs.changed == 'true' }}
-    timeout-minutes: 60
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        shardIndex: [1, 2, 3, 4]
-        shardTotal: [4]
-      fail-fast: false
-    steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3.23
-      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true' }}
-      with:
-        limit-access-to-actor: true
-    - name: Prepare local env file
-      run: |
-        cp .env .env.local
-        echo "USER_REGISTRATION_ENABLED=true" >> .env.local
-    - run: docker compose pull db adminer mailcatcher proxy
-    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        name: playwright-compose-images
-        path: /tmp/ci-images
-    - name: Load images built in warmup (shards do not run docker compose build)
-      run: docker load -i /tmp/ci-images/playwright-compose-images.tar
     - run: docker compose down -v --remove-orphans
     - name: Run Playwright tests
       run: docker compose run --rm playwright bunx playwright test --fail-on-flaky-tests --trace=retain-on-failure --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
@@ -129,6 +91,7 @@ jobs:
     needs:
       - test-playwright
       - changes
+    # Merge reports after playwright-tests, even if some shards have failed
     if: ${{ !cancelled() && needs.changes.outputs.changed == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -153,10 +116,10 @@ jobs:
         retention-days: 30
         include-hidden-files: true
 
-  alls-green-playwright:
+  # https://github.com/marketplace/actions/alls-green#why
+  alls-green-playwright:  # This job does nothing and is only used for the branch protection
     if: always()
     needs:
-      - playwright-docker-warmup
       - test-playwright
     runs-on: ubuntu-latest
     steps:
@@ -164,4 +127,4 @@ jobs:
         uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: playwright-docker-warmup,test-playwright
+          allowed-skips: test-playwright
