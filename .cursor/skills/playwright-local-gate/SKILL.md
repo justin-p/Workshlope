@@ -18,11 +18,15 @@ Use this skill when staged or modified files include:
 
 ## Required Local Validation
 
-1. Start backend required by frontend tests:
+1. **Always reset the backend before Playwright** (fresh DB volume + known superuser seed). From repo root:
 
 ```bash
-/usr/bin/docker compose --env-file .env.local up -d --wait backend
+bash scripts/e2e-backend-reset.sh
 ```
+
+This is also run automatically via `globalSetup` in `frontend/playwright.config.ts` when you execute Playwright **on the host** (not inside the Playwright Docker service, where CI already resets the stack). To skip the automated reset: `SKIP_E2E_BACKEND_RESET=1`.
+
+The reset script starts the backend with `USER_REGISTRATION_ENABLED=true` so sign-up specs pass even when `.env.local` disables registration. The Playwright-started Vite dev server forces `VITE_USER_REGISTRATION_ENABLED=true` for the same reason.
 
 2. Run Playwright from `frontend`:
 

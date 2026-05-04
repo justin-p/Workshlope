@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test"
 import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
 import { createUser } from "./utils/privateApi"
 import { randomEmail, randomPassword } from "./utils/random"
+import { expectSuccessToastDescription } from "./utils/sonnerToast.ts"
 import { logInUser } from "./utils/user"
 
 test("Admin page is accessible and shows correct title", async ({ page }) => {
@@ -32,8 +33,7 @@ test.describe("Admin user management", () => {
 
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User created successfully")).toBeVisible()
-
+    await expectSuccessToastDescription(page, "User created successfully")
     await expect(page.getByRole("dialog")).not.toBeVisible()
 
     const userRow = page.getByRole("row").filter({ hasText: email })
@@ -56,8 +56,7 @@ test.describe("Admin user management", () => {
 
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User created successfully")).toBeVisible()
-
+    await expectSuccessToastDescription(page, "User created successfully")
     await expect(page.getByRole("dialog")).not.toBeVisible()
 
     const userRow = page.getByRole("row").filter({ hasText: email })
@@ -79,7 +78,7 @@ test.describe("Admin user management", () => {
     await page.getByPlaceholder("Password").last().fill(password)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User created successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "User created successfully")
     await expect(page.getByRole("dialog")).not.toBeVisible()
 
     const userRow = page.getByRole("row").filter({ hasText: email })
@@ -90,7 +89,7 @@ test.describe("Admin user management", () => {
     await page.getByPlaceholder("Full name").fill(updatedName)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User updated successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "User updated successfully")
     await expect(userRow).toContainText(updatedName)
   })
 
@@ -106,8 +105,7 @@ test.describe("Admin user management", () => {
     await page.getByPlaceholder("Password").last().fill(password)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User created successfully")).toBeVisible()
-
+    await expectSuccessToastDescription(page, "User created successfully")
     await expect(page.getByRole("dialog")).not.toBeVisible()
 
     const userRow = page.getByRole("row").filter({ hasText: email })
@@ -117,9 +115,10 @@ test.describe("Admin user management", () => {
 
     await page.getByRole("button", { name: "Delete" }).click()
 
-    await expect(
-      page.getByText("The user was deleted successfully"),
-    ).toBeVisible()
+    await expectSuccessToastDescription(
+      page,
+      "The user was deleted successfully",
+    )
 
     await expect(
       page.getByRole("row").filter({ hasText: email }),

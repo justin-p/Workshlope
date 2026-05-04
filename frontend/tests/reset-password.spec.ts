@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { findLastEmail } from "./utils/mailcatcher"
 import { randomEmail, randomPassword } from "./utils/random"
+import { expectSuccessToastDescription } from "./utils/sonnerToast.ts"
 import { logInUser, signUpNewUser } from "./utils/user"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -67,7 +68,7 @@ test("User can reset password successfully using the link", async ({
   await page.getByTestId("new-password-input").fill(newPassword)
   await page.getByTestId("confirm-password-input").fill(newPassword)
   await page.getByRole("button", { name: "Reset Password" }).click()
-  await expect(page.getByText("Password updated successfully")).toBeVisible()
+  await expectSuccessToastDescription(page, "Password updated successfully")
 
   // Check if the user is able to login with the new password
   await logInUser(page, email, newPassword)

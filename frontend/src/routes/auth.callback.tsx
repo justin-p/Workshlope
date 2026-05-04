@@ -2,9 +2,10 @@ import { useMutation } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useEffect, useRef } from "react"
 
-import { OauthService } from "@/client"
+import { OauthService, UsersService } from "@/client"
 import { AuthLayout } from "@/components/Common/AuthLayout"
 import { Button } from "@/components/ui/button"
+import { getDashboardLandingPath } from "@/lib/dashboardLanding"
 
 interface CallbackSearch {
   bridge_token?: string
@@ -33,10 +34,16 @@ function AuthCallback() {
       OauthService.bridgeLogin({
         requestBody: { bridge_token: input.bridge_token },
       }),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data.status === "signed_in" && data.access_token) {
         localStorage.setItem("access_token", data.access_token)
-        navigate({ to: "/" })
+        try {
+          const user = await UsersService.readUserMe()
+          navigate({ to: getDashboardLandingPath(user) })
+        } catch {
+          localStorage.removeItem("access_token")
+          navigate({ to: "/login" })
+        }
       }
     },
   })

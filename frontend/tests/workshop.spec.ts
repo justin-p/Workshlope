@@ -121,7 +121,7 @@ test.describe("Workshop live session", () => {
       .getByTestId("password-input")
       .fill(participant.password)
     await participantPage.getByRole("button", { name: "Log In" }).click()
-    await participantPage.waitForURL("/")
+    await participantPage.waitForURL("/dashboard/trainee")
 
     await page.goto(`/workshop/${session_id}`)
     await expect(page.getByTestId("workshop-ws-status")).toHaveText(

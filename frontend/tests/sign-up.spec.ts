@@ -73,24 +73,31 @@ test("Sign up with invalid email", async ({ page }) => {
   )
 })
 
-test("Sign up with existing email", async ({ page }) => {
+test("Sign up with existing email (returns 403)", async ({ page }) => {
   const fullName = "Test User"
   const email = randomEmail()
   const password = randomPassword()
 
+  // First signup attempt (should succeed)
   await page.goto("/signup")
-
   await fillForm(page, fullName, email, password, password)
   await page.getByRole("button", { name: "Sign Up" }).click()
 
+  // Second signup attempt with the same email (should get 403)
   await page.goto("/signup")
-
   await fillForm(page, fullName, email, password, password)
-  await page.getByRole("button", { name: "Sign Up" }).click()
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      (resp) => resp.url().includes("/api/register") && resp.status() === 403,
+    ),
+    page.getByRole("button", { name: "Sign Up" }).click(),
+  ])
 
-  await page
-    .getByText("The user with this email already exists in the system")
-    .click()
+  expect(response.status()).toBe(403)
+  // Optionally check that the appropriate error message is displayed
+  await expect(
+    page.getByText("The user with this email already exists in the system"),
+  ).toBeVisible()
 })
 
 test("Sign up with weak password", async ({ page }) => {

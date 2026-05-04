@@ -1,5 +1,5 @@
-import { Briefcase, Home, Users } from "lucide-react"
-
+import { BookOpen, Home, Users } from "lucide-react"
+import type { UserPublic } from "@/client"
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
 import {
@@ -9,20 +9,35 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar"
 import useAuth from "@/hooks/useAuth"
+import {
+  getDashboardLandingPath,
+  primaryHomeSidebarLabel,
+} from "@/lib/dashboardLanding"
 import { type Item, Main } from "./Main"
 import { User } from "./User"
 
-const baseItems: Item[] = [
-  { icon: Home, title: "Dashboard", path: "/" },
-  { icon: Briefcase, title: "Items", path: "/items" },
-]
+function buildNavItemsForUser(user: UserPublic): Item[] {
+  const homePath = getDashboardLandingPath(user)
+  const items: Item[] = [
+    {
+      icon: Home,
+      title: primaryHomeSidebarLabel(user),
+      path: homePath,
+    },
+  ]
+  if (user.is_instructor || user.is_superuser) {
+    items.push({ icon: BookOpen, title: "Workshops", path: "/workshops" })
+  }
+  if (user.is_superuser) {
+    items.push({ icon: Users, title: "Admin", path: "/admin" })
+  }
+  return items
+}
 
 export function AppSidebar() {
   const { user: currentUser } = useAuth()
 
-  const items = currentUser?.is_superuser
-    ? [...baseItems, { icon: Users, title: "Admin", path: "/admin" }]
-    : baseItems
+  const items = currentUser ? buildNavItemsForUser(currentUser) : []
 
   return (
     <Sidebar collapsible="icon">

@@ -2,6 +2,7 @@ import { expect, type Page, test } from "@playwright/test"
 
 import { createPendingViaBridge, deleteAllPending } from "./utils/bridgeToken"
 import { randomEmail, randomPassword } from "./utils/random"
+import { expectSuccessToastDescription } from "./utils/sonnerToast.ts"
 
 async function createUserViaAdminUi(page: Page) {
   const email = randomEmail()
@@ -12,7 +13,7 @@ async function createUserViaAdminUi(page: Page) {
   await page.getByPlaceholder("Password").first().fill(password)
   await page.getByPlaceholder("Password").last().fill(password)
   await page.getByRole("button", { name: "Save" }).click()
-  await expect(page.getByText("User created successfully")).toBeVisible()
+  await expectSuccessToastDescription(page, "User created successfully")
   return { email, password }
 }
 

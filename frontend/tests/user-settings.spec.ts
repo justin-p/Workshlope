@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test"
 import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
 import { createUser } from "./utils/privateApi.ts"
 import { randomEmail, randomPassword } from "./utils/random"
+import { expectSuccessToastDescription } from "./utils/sonnerToast.ts"
 import { logInUser, logOutUser } from "./utils/user"
 
 const tabs = ["My profile", "Password", "Danger zone"]
@@ -45,7 +46,7 @@ test.describe("Edit user profile", () => {
     await page.getByLabel("Full name").fill(updatedName)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User updated successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "User updated successfully")
     await expect(
       page.locator("form").getByText(updatedName, { exact: true }),
     ).toBeVisible()
@@ -79,7 +80,7 @@ test.describe("Edit user email", () => {
     await page.getByLabel("Email").fill(updatedEmail)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User updated successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "User updated successfully")
     await expect(
       page.locator("form").getByText(updatedEmail, { exact: true }),
     ).toBeVisible()
@@ -142,7 +143,7 @@ test.describe("Change password", () => {
     await page.getByTestId("confirm-password-input").fill(newPassword)
     await page.getByRole("button", { name: "Update Password" }).click()
 
-    await expect(page.getByText("Password updated successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "Password updated successfully")
 
     await logOutUser(page)
     await logInUser(page, email, newPassword)

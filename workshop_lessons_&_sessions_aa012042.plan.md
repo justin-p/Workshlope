@@ -119,9 +119,9 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | 2026-05-01 (`/workshop/:sessionId` trainee + instructor WS controls; bootstrap `omit_participant_seat` for instructor-role tickets; two-user Playwright privacy/fan-out assertion; fast local pre-commit hooks for scoped backend + Playwright tests) |
-| **Active integration branch** | `ws-04-realtime-privacy` |
-| **Stack PR label** | Plan item **PR04 — RealtimePrivacy** (see Branch/PR chain below) |
+| **Last synced** | 2026-05-04 — **PR05 in flight**: same as prior row **plus** static **stub card rails** per role (`DashboardStubRails`), OAuth **bridge → `readUserMe` → role dashboard** (`auth.callback.tsx`), sidebar **prefix-active** nav (`Main.tsx`), dashboard Playwright asserts `dashboard-stub-rail-admin` |
+| **Active integration branch** | `ws-05-dashboard-nav` (stacked on **PR04** `ws-04-realtime-privacy`) |
+| **Stack PR label** | **PR05 — DashboardNav** (PR04 babysit/merge in parallel — see Next actions) |
 
 ### Backend code anchors (workshop realtime slice)
 
@@ -134,6 +134,8 @@ This section is the **recoverable checklist** when chat history or IDE session i
 | Local E2E session bootstrap (`ENVIRONMENT=local` only) | [`backend/app/api/routes/private.py`](backend/app/api/routes/private.py) — `bootstrap_e2e_workshop_live_session` |
 | Trainee workshop UI (enter + ws-ticket + WebSocket) | [`frontend/src/routes/_layout/workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) |
 | Workshop Playwright | [`frontend/tests/workshop.spec.ts`](frontend/tests/workshop.spec.ts) |
+| Dashboard landing + routing | [`frontend/src/lib/dashboardLanding.ts`](frontend/src/lib/dashboardLanding.ts), stub rails [`frontend/src/components/dashboard/DashboardStubRails.tsx`](frontend/src/components/dashboard/DashboardStubRails.tsx), routes under [`frontend/src/routes/_layout/dashboard/`](frontend/src/routes/_layout/dashboard/), [`frontend/src/routes/_layout/workshops.tsx`](frontend/src/routes/_layout/workshops.tsx), sidebar [`frontend/src/components/Sidebar/AppSidebar.tsx`](frontend/src/components/Sidebar/AppSidebar.tsx), OAuth landing [`frontend/src/routes/auth.callback.tsx`](frontend/src/routes/auth.callback.tsx) |
+| Playwright harness (backend reset / env) | [`scripts/e2e-backend-reset.sh`](scripts/e2e-backend-reset.sh), [`frontend/playwright.global-setup.ts`](frontend/playwright.global-setup.ts), [`frontend/playwright.config.ts`](frontend/playwright.config.ts) |
 
 ### PR04 (`ws-04-realtime-privacy`) — detailed status
 
@@ -156,6 +158,20 @@ Aligned with plan bullets: ws-ticket, role-scoped fan-out, trainee privacy.
 | **Multi-process realtime** (Redis or equivalent hub) | 🔲 | MVP is in-memory `WorkshopRealtimeHub` |
 | **Playwright** for instructor + trainee flows on these APIs | ✅ | Bounded PR04 cockpit: `/workshop/:id` only — **start / pause / resume / advance / end** smoke + two-user **participant.live_status** fan-out to instructor + explicit trainee denial of same roster-style payload |
 
+### PR05 (`ws-05-dashboard-nav`) — detailed status (in progress)
+
+| Capability | Status | Notes |
+| ---------- | ------ | ----- |
+| Post-login landing rules (`is_instructor` → Instructor Home; superuser-only → Admin Home; else My Learning) | ✅ | [`getDashboardLandingPath`](frontend/src/lib/dashboardLanding.ts) |
+| Routes `/dashboard/instructor`, `/dashboard/trainee`, `/dashboard/admin` + role guards in `beforeLoad` | ✅ | Placeholder dashboards + `dashboard-home-root` testid |
+| `/` redirects to role dashboard when logged in; login mutation navigates to landing path | ✅ | Avoids fragile blank `/` after `readUserMe` |
+| Sidebar: primary home label/path by role; **Workshops** stub (`/workshops`) for instructor/superuser; **Admin** → `/admin` | ✅ | Items removed from default nav |
+| Playwright: `dashboard-routing.spec.ts`, login/auth paths updated for dashboards | ✅ | Shared `loggedInDashboard` + Sonner toast helper for admin/items/settings resets |
+| Static **stub rails** on each dashboard (privacy-safe copy + “Soon” cues; trainee has no Workshops link) | ✅ | [`DashboardStubRails.tsx`](frontend/src/components/dashboard/DashboardStubRails.tsx) |
+| Sidebar item **active** when path matches or is under same prefix | ✅ | e.g. future `/dashboard/trainee/*` highlights My Learning |
+| OAuth **GitHub bridge** navigates to role dashboard (parity with password login) | ✅ | Clears token if `/users/me` fails |
+| Live **widgets** wired to workshop/session/list APIs | 🔲 | PR06+ / when list endpoints ship; parity matrix rows still 🔲 |
+
 ### Stacked PRs — coarse roll-up
 
 Use ✅ when the slice is merged to **`main`** (or materially complete on its integration branch if pre-merge). Use 🟨 for partial.
@@ -165,13 +181,15 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 | 01 | `ws-01-foundation-rbac` | 🟨 | `User.is_instructor` + migrations; confirm against `main` |
 | 02 | `ws-02-github-sync-manifest` | 🔲 | GitHub App + manifest sync not tracked here yet |
 | 03 | `ws-03-session-core` | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
-| 04 | `ws-04-realtime-privacy` | 🟨 | Bounded realtime/privacy + `/workshop` E2E ✅; merge readiness = CI green + review; optional full-repo Playwright pass is infra/coverage hygiene, not scope creep |
-| 05–10 | downstream | 🔲 | See Branch/PR chain later in this doc |
+| 04 | `ws-04-realtime-privacy` | 🟨 | Bounded realtime/privacy + `/workshop` E2E ✅; **merge PR #21** when checks green |
+| 05 | `ws-05-dashboard-nav` | 🟨 | Landed on integration branch (see PR05 table above): routing + nav + E2E/infra fixes; widgets/cards 🔲 |
+| 06–10 | downstream | 🔲 | See Branch/PR chain later in this doc |
 
-### Next actions (suggested order on PR04)
+### Next actions (suggested order)
 
-1. **Merge / babysit PR #21:** `gh pr checks 21` until green; fix only regressions tied to this slice.
-2. **PR05 handoff:** open `ws-05-dashboard-nav` work (nav + role homes) — do not expand `/workshop` test matrix further unless CI or a regression demands it.
+1. **PR04 closure:** babysit / merge **PR #21** (`ws-04-realtime-privacy`) — `gh pr checks 21` until green.
+2. **PR05:** continue on `ws-05-dashboard-nav` — open/stack PR targeting `ws-04` once 04 merges (or document base); fill dashboard placeholders only as APIs exist; avoid `/workshop` test matrix creep.
+3. **E2E discipline:** keep `scripts/e2e-backend-reset.sh` before local full Playwright when diagnosing DB drift; use Sonner-aware toast assertions for new flows.
 
 ### YAML todos above
 
