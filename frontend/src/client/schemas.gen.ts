@@ -1237,6 +1237,31 @@ export const WorkshopSessionPublicParticipantSchema = {
     description: 'Trainee-visible session detail — lesson + parts + self only (no roster).'
 } as const;
 
+export const WorkshopSessionUpsertMemberSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        role: {
+            type: 'string',
+            enum: ['participant', 'instructor'],
+            title: 'Role'
+        },
+        instructor_role: {
+            type: 'string',
+            maxLength: 32,
+            title: 'Instructor Role',
+            default: 'co_instructor'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'role'],
+    title: 'WorkshopSessionUpsertMember',
+    description: 'Assign a user as participant or instructor for one session.'
+} as const;
+
 export const WorkshopSessionsPublicSchema = {
     properties: {
         data: {

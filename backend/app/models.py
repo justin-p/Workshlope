@@ -247,6 +247,14 @@ class WorkshopSessionsPublic(SQLModel):
     count: int
 
 
+class WorkshopSessionUpsertMember(SQLModel):
+    """Assign a user as participant or instructor for one session."""
+
+    user_id: uuid.UUID
+    role: Literal["participant", "instructor"]
+    instructor_role: str = Field(default="co_instructor", max_length=32)
+
+
 class WorkshopLessonPartBrief(SQLModel):
     """Lesson part metadata for workshop session screens (body omitted)."""
 

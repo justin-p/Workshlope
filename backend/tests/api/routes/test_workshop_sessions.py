@@ -1838,3 +1838,191 @@ def test_get_workshop_session_detail_superuser_instructor_shape(
     body = response.json()
     assert body["view"] == "instructor"
     assert {p["email"] for p in body["participants"]} == {train_email}
+
+
+def test_upsert_member_requires_instructor_role(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    actor_email = f"member-actor-{uuid.uuid4()}@example.com"
+    actor_headers = authentication_token_from_email(
+        client=client, email=actor_email, db=db
+    )
+    target_email = f"member-target-{uuid.uuid4()}@example.com"
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(email=target_email, password="pw123456"),
+    )
+    db.commit()
+
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members",
+        headers=actor_headers,
+        json={"user_id": str(target.id), "role": "participant"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "User is not an instructor for this session"
+
+
+def test_upsert_member_adds_participant_and_replaces_instructor_role(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"member-inst-{uuid.uuid4()}@example.com"
+    instructor = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(
+        SessionInstructor(session_id=session_row.id, user_id=instructor.id, role="lead")
+    )
+
+    target_email = f"member-target2-{uuid.uuid4()}@example.com"
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=target_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=target.id,
+            role="co_instructor",
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=instructor_email, password="pw123456"
+    )
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members",
+        headers=headers,
+        json={"user_id": str(target.id), "role": "participant"},
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Member upserted as participant"
+
+    active_participant = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_row.id,
+            WorkshopParticipant.user_id == target.id,
+            WorkshopParticipant.removed_at.is_(None),
+        )
+    ).first()
+    assert active_participant is not None
+    inactive_instructor = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_row.id,
+            SessionInstructor.user_id == target.id,
+        )
+    ).first()
+    assert inactive_instructor is not None
+    assert inactive_instructor.removed_at is not None
+
+
+def test_upsert_member_adds_instructor_and_replaces_participant_seat(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"member-lead-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+
+    target_email = f"member-target3-{uuid.uuid4()}@example.com"
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=target_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=target.id))
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members",
+        headers=headers,
+        json={
+            "user_id": str(target.id),
+            "role": "instructor",
+            "instructor_role": "co_instructor",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Member upserted as instructor"
+
+    active_instructor = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_row.id,
+            SessionInstructor.user_id == target.id,
+            SessionInstructor.removed_at.is_(None),
+        )
+    ).first()
+    assert active_instructor is not None
+    assert active_instructor.role == "co_instructor"
+    inactive_participant = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_row.id,
+            WorkshopParticipant.user_id == target.id,
+        )
+    ).first()
+    assert inactive_participant is not None
+    assert inactive_participant.removed_at is not None
+
+
+def test_upsert_member_rejects_instructor_role_for_non_instructor_user(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"member-lead2-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"member-target4-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=False,
+        ),
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members",
+        headers=headers,
+        json={"user_id": str(target.id), "role": "instructor"},
+    )
+    assert response.status_code == 403
+    assert (
+        response.json()["detail"]
+        == "Instructor role requires target user.is_instructor"
+    )

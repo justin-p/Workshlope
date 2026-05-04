@@ -276,6 +276,17 @@ export type WorkshopSessionsPublic = {
     count: number;
 };
 
+/**
+ * Assign a user as participant or instructor for one session.
+ */
+export type WorkshopSessionUpsertMember = {
+    user_id: string;
+    role: 'participant' | 'instructor';
+    instructor_role?: string;
+};
+
+export type role = 'participant' | 'instructor';
+
 export type WorkshopWsTicket = {
     ticket: string;
     expires_at: string;
@@ -465,6 +476,13 @@ export type WorkshopSessionsReadWorkshopSessionDetailData = {
 };
 
 export type WorkshopSessionsReadWorkshopSessionDetailResponse = ((WorkshopSessionPublicParticipant | WorkshopSessionPublicInstructor));
+
+export type WorkshopSessionsUpsertWorkshopSessionMemberData = {
+    requestBody: WorkshopSessionUpsertMember;
+    sessionId: string;
+};
+
+export type WorkshopSessionsUpsertWorkshopSessionMemberResponse = (Message);
 
 export type WorkshopSessionsEnterWorkshopSessionData = {
     sessionId: string;

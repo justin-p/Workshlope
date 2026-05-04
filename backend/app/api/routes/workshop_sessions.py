@@ -33,6 +33,7 @@ from app.models import (
     WorkshopSessionPublicInstructor,
     WorkshopSessionPublicParticipant,
     WorkshopSessionsPublic,
+    WorkshopSessionUpsertMember,
 )
 from app.services.workshop_realtime import (
     WorkshopWsConnection,
@@ -695,6 +696,103 @@ def read_workshop_session_detail(
         participants=participants_public,
         instructors=instructors_public,
     )
+
+
+@router.post("/{session_id}/members", response_model=Message)
+def upsert_workshop_session_member(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    session_id: uuid.UUID,
+    body: WorkshopSessionUpsertMember,
+) -> Message:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+
+    target_user = session.get(User, body.user_id)
+    if target_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target user not found",
+        )
+
+    now = datetime.now(timezone.utc)
+    if body.role == "participant":
+        instructor = session.exec(
+            select(SessionInstructor).where(
+                SessionInstructor.session_id == session_id,
+                SessionInstructor.user_id == target_user.id,
+                col(SessionInstructor.removed_at).is_(None),
+            )
+        ).first()
+        if instructor is not None:
+            instructor.removed_at = now
+            session.add(instructor)
+
+        participant = session.exec(
+            select(WorkshopParticipant).where(
+                WorkshopParticipant.session_id == session_id,
+                WorkshopParticipant.user_id == target_user.id,
+            )
+        ).first()
+        if participant is None:
+            participant = WorkshopParticipant(
+                session_id=session_id,
+                user_id=target_user.id,
+                invited_at=now,
+            )
+        else:
+            participant.user_id = target_user.id
+            participant.removed_at = None
+            if participant.invited_at is None:
+                participant.invited_at = now
+        session.add(participant)
+        session.commit()
+        return Message(message="Member upserted as participant")
+
+    if not target_user.is_instructor:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Instructor role requires target user.is_instructor",
+        )
+
+    participant = session.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_id,
+            WorkshopParticipant.user_id == target_user.id,
+            col(WorkshopParticipant.removed_at).is_(None),
+        )
+    ).first()
+    if participant is not None:
+        participant.removed_at = now
+        session.add(participant)
+
+    instructor = session.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_id,
+            SessionInstructor.user_id == target_user.id,
+        )
+    ).first()
+    if instructor is None:
+        instructor = SessionInstructor(
+            session_id=session_id,
+            user_id=target_user.id,
+            role=body.instructor_role,
+            assigned_at=now,
+        )
+    else:
+        instructor.removed_at = None
+        instructor.role = body.instructor_role
+    session.add(instructor)
+    session.commit()
+    return Message(message="Member upserted as instructor")
 
 
 @router.post("/{session_id}/enter", response_model=Message)
