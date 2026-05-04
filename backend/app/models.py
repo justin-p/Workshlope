@@ -255,6 +255,14 @@ class WorkshopSessionUpsertMember(SQLModel):
     instructor_role: str = Field(default="co_instructor", max_length=32)
 
 
+class WorkshopParticipantPatch(SQLModel):
+    """Instructor override fields for a participant seat."""
+
+    live_status: Literal["busy", "done"] | None = None
+    joined_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
 class WorkshopLessonPartBrief(SQLModel):
     """Lesson part metadata for workshop session screens (body omitted)."""
 

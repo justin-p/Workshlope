@@ -194,6 +194,15 @@ export type WorkshopLessonSummaryPublic = {
 };
 
 /**
+ * Instructor override fields for a participant seat.
+ */
+export type WorkshopParticipantPatch = {
+    live_status?: ('busy' | 'done' | null);
+    joined_at?: (string | null);
+    finished_at?: (string | null);
+};
+
+/**
  * Caller’s own trainee seat snapshot (participant view only).
  */
 export type WorkshopParticipantSelfPublic = {
@@ -490,6 +499,14 @@ export type WorkshopSessionsRemoveWorkshopSessionParticipantData = {
 };
 
 export type WorkshopSessionsRemoveWorkshopSessionParticipantResponse = (Message);
+
+export type WorkshopSessionsPatchWorkshopSessionParticipantData = {
+    requestBody: WorkshopParticipantPatch;
+    sessionId: string;
+    userId: string;
+};
+
+export type WorkshopSessionsPatchWorkshopSessionParticipantResponse = (Message);
 
 export type WorkshopSessionsEnterWorkshopSessionData = {
     sessionId: string;

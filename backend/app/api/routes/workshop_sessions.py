@@ -24,6 +24,7 @@ from app.models import (
     WorkshopLessonPartBrief,
     WorkshopLessonSummaryPublic,
     WorkshopParticipant,
+    WorkshopParticipantPatch,
     WorkshopParticipantSelfPublic,
     WorkshopRosterInstructorRowPublic,
     WorkshopRosterParticipantRowPublic,
@@ -830,6 +831,49 @@ def remove_workshop_session_participant(
     session.add(participant)
     session.commit()
     return Message(message="Participant removed")
+
+
+@router.patch("/{session_id}/participants/{user_id}", response_model=Message)
+def patch_workshop_session_participant(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    session_id: uuid.UUID,
+    user_id: uuid.UUID,
+    body: WorkshopParticipantPatch,
+) -> Message:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+
+    participant = session.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_id,
+            WorkshopParticipant.user_id == user_id,
+            col(WorkshopParticipant.removed_at).is_(None),
+        )
+    ).first()
+    if participant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Participant not found",
+        )
+
+    if body.live_status is not None:
+        participant.live_status = body.live_status
+    if body.joined_at is not None:
+        participant.joined_at = body.joined_at
+    if body.finished_at is not None:
+        participant.finished_at = body.finished_at
+    session.add(participant)
+    session.commit()
+    return Message(message="Participant updated")
 
 
 @router.post("/{session_id}/enter", response_model=Message)

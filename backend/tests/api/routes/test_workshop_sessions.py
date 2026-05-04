@@ -2132,3 +2132,120 @@ def test_remove_participant_not_found_when_no_active_seat(
     )
     assert response.status_code == 404
     assert response.json()["detail"] == "Participant not found"
+
+
+def test_patch_participant_override_requires_instructor_role(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    actor_headers = authentication_token_from_email(
+        client=client,
+        email=f"patch-actor-{uuid.uuid4()}@example.com",
+        db=db,
+    )
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"patch-target-{uuid.uuid4()}@example.com",
+            password="pw123456",
+        ),
+    )
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=target.id))
+    db.commit()
+
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/participants/{target.id}",
+        headers=actor_headers,
+        json={"live_status": "done"},
+    )
+    assert response.status_code == 403
+
+
+def test_patch_participant_override_updates_fields(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"patch-lead-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"patch-target2-{uuid.uuid4()}@example.com",
+            password="pw123456",
+        ),
+    )
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=target.id))
+    db.commit()
+
+    finished_at = datetime.now(timezone.utc)
+    lead_headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/participants/{target.id}",
+        headers=lead_headers,
+        json={"live_status": "done", "finished_at": finished_at.isoformat()},
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Participant updated"
+
+    participant = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_row.id,
+            WorkshopParticipant.user_id == target.id,
+            WorkshopParticipant.removed_at.is_(None),
+        )
+    ).first()
+    assert participant is not None
+    assert participant.live_status == "done"
+    assert participant.finished_at is not None
+
+
+def test_patch_participant_override_not_found_for_removed_seat(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"patch-lead2-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    target = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"patch-target3-{uuid.uuid4()}@example.com",
+            password="pw123456",
+        ),
+    )
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=target.id,
+            removed_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    lead_headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/participants/{target.id}",
+        headers=lead_headers,
+        json={"live_status": "busy"},
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Participant not found"

@@ -885,6 +885,50 @@ export const WorkshopLessonSummaryPublicSchema = {
     title: 'WorkshopLessonSummaryPublic'
 } as const;
 
+export const WorkshopParticipantPatchSchema = {
+    properties: {
+        live_status: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['busy', 'done']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Live Status'
+        },
+        joined_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Joined At'
+        },
+        finished_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finished At'
+        }
+    },
+    type: 'object',
+    title: 'WorkshopParticipantPatch',
+    description: 'Instructor override fields for a participant seat.'
+} as const;
+
 export const WorkshopParticipantSelfPublicSchema = {
     properties: {
         invited_at: {
