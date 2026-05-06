@@ -118,7 +118,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-07-pacing-timer` |
 | PR | *(not opened yet; will target `ws-06-learning-workflows`)* |
-| Latest work | **PR07 slice 7 (2026-05-06):** tightened Playwright pacing coverage for instructor timer UX (start CTA + running-status format assertion), and validated via local gate runs (`workshop.spec.ts` + full chromium suite) after frontend image refresh/reset flow. |
+| Latest work | **PR07 slice 8 (2026-05-06):** added server-calculated `elapsed_seconds` to timer payloads and surfaced elapsed `m:ss` in instructor timer status for countup mode (while preserving countdown-left display), with backend timer tests + regenerated frontend client artifacts passing. |
 
 **Resume in this order:**
 

@@ -451,6 +451,7 @@ function WorkshopSessionPage() {
   const requiredAggregateRows =
     aggregatesQuery.data?.data.filter((r) => r.prerequisite.required_flag) ?? []
   const timerStatus = timerQuery.data?.status ?? "inactive"
+  const timerElapsedSeconds = timerQuery.data?.elapsed_seconds
   const timerRemainingSeconds = timerQuery.data?.remaining_seconds
   const timerEvents = timerEventsQuery.data?.data ?? []
   const isPreworkGateError = errorDetail === "Required prerequisites incomplete"
@@ -771,7 +772,9 @@ function WorkshopSessionPage() {
             Timer: {timerStatus}
             {typeof timerRemainingSeconds === "number"
               ? ` (${formatTimerRemainingSeconds(timerRemainingSeconds)} left)`
-              : ""}
+              : typeof timerElapsedSeconds === "number"
+                ? ` (${formatTimerRemainingSeconds(timerElapsedSeconds)} elapsed)`
+                : ""}
           </span>
           <div
             className="w-full rounded-md border p-2 text-xs text-muted-foreground"
