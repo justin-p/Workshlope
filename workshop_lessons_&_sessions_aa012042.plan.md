@@ -103,10 +103,10 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-06** — **PR06 `ws-06-learning-workflows`** now includes pre-work hard gate + timer HTTP + dashboard blocked-work triage polish: participant `enter`/`ws-ticket` enforce required prerequisites; timer API (`GET/POST /timer`, `/start`, `/pause`, `/resume`, `/stop`) + instructor controls + tests; session list now returns `blocked_required_prereq_count` to avoid dashboard N+1 calls; workshops hub adds blocked totals, blocked-only toggle, and blocked-session drilldown links. CI checks on [#23](https://github.com/justin-p/testing/pull/23) are green. |
-| **Branch tip (2026-05-06)** | **`ws-06-learning-workflows`** (local head beyond `e2d14b4`, uncommitted at time of sync) includes timer + dashboard polish slices listed above. [PR #23](https://github.com/justin-p/testing/pull/23) base remains `ws-05-dashboard-nav`. **Local Playwright:** rebuild backend/frontend images after code changes (`docker compose build backend frontend`) and run reset (`bash scripts/e2e-backend-reset.sh`) before workshop specs. |
-| **Active integration branch** | `ws-06-learning-workflows` → [PR #23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
-| **Stack PR label** | **PR06 — LearningWorkflows** 🚧 open on [#23](https://github.com/justin-p/testing/pull/23); continue slicing prerequisites/prework APIs + UI |
+| **Last synced** | **2026-05-06** — **PR07 `ws-07-pacing-timer`** now includes DB-backed timer lifecycle + event-history + countdown-remaining slice: timer state persisted in `workshop_session_timer`, timer actions logged in `workshop_session_timer_event`, instructor endpoint `GET /workshop/sessions/{session_id}/timer/events`, and timer payload now includes `remaining_seconds` for countdown mode with pause/resume drift correction (resume shifts `started_at` by paused duration). Frontend instructor timer status now shows remaining seconds and recent event history. |
+| **Branch tip (2026-05-06)** | **`ws-07-pacing-timer`** (new branch, PR not opened yet) contains persisted timer lifecycle + audit-event groundwork. Base for upcoming PR should be `ws-06-learning-workflows`. |
+| **Active integration branch** | `ws-07-pacing-timer` → *(PR pending; expected base `ws-06-learning-workflows`)* |
+| **Stack PR label** | **PR07 — PacingTimer** 🚧 in progress (DB-backed timer state + audit events first slice landed locally) |
 
 ### Pause / resume checkpoint (handoff)
 
@@ -116,14 +116,14 @@ Use this section when reopening the project **after intentional stop**. Do **not
 
 | Item | Value |
 | ---- | ----- |
-| Branch | `ws-06-learning-workflows` |
-| PR | [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
-| Latest work | **PR06 polish bundle (2026-05-06):** timer HTTP lifecycle (backend + UI + tests), distinct pre-work gated UI state, dashboard blocked counts moved into session list API (`blocked_required_prereq_count`) to remove frontend N+1 requests, and workshops hub triage UX (total blocked summary, blocked-only toggle, blocked-session drilldown). Prior pre-work gate hardening (`e2d14b4`) remains in scope. |
+| Branch | `ws-07-pacing-timer` |
+| PR | *(not opened yet; will target `ws-06-learning-workflows`)* |
+| Latest work | **PR07 slice 9 (2026-05-06):** timer status polish now includes explicit mode label (`countdown`/`countup`) alongside remaining/elapsed display, and Playwright instructor timer coverage asserts timestamp token rendering in the timer-events panel for better UX confidence. |
 
 **Resume in this order:**
 
-1. `git checkout ws-06-learning-workflows && git pull`, then **`gh pr checks 23`** (or CI dashboard) — fix regressions on the **same head branch** if needed.
-2. Continue with **[Next actions](#next-actions-suggested-order)** — PR06: prerequisite/pre-work **MVP vertical** is largely landed; next slices are polish (dashboard tiles, stricter gating, remaining REST sketch gaps) unless CI finds regressions.
+1. `git checkout ws-07-pacing-timer`, then run backend migration/test loop (`uv run alembic upgrade head`, `uv run pytest tests/api/routes/test_workshop_sessions.py -k timer_`) while PR07 is local-only.
+2. Open PR07 against `ws-06-learning-workflows`, then continue **[Next actions](#next-actions-suggested-order)** with pacing-focused API/UI slices (timer drift handling, instructor pacing controls, session-facing countdown polish).
 3. Keep [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged), **Implementation tracker / Last synced / Stop-handoff**, and this checkpoint synced whenever PR/base/branch state changes — **especially after each intentional stop or resume.**
 
 **Open gaps (not blocking pause):**
@@ -147,7 +147,8 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 | PR04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) | `ws-03-session-core` |
 | PR05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | `ws-04-realtime-privacy` |
 | PR06 | `ws-06-learning-workflows` | [#23](https://github.com/justin-p/testing/pull/23) | `ws-05-dashboard-nav` |
-| PR07–PR09 | `ws-07-*` … `ws-09-*` | *not opened yet* | *(next PR targets prior branch when created)* |
+| PR07 | `ws-07-pacing-timer` | *not opened yet* | `ws-06-learning-workflows` |
+| PR08–PR09 | `ws-08-*` … `ws-09-*` | *not opened yet* | *(next PR targets prior branch when created)* |
 
 ### Backend code anchors (workshop delivery slices)
 

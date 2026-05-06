@@ -402,6 +402,23 @@ export type WorkshopSessionsPublic = {
     count: number;
 };
 
+export type WorkshopSessionTimerEventPublic = {
+    id: string;
+    session_id: string;
+    actor_user_id: string;
+    action: 'start' | 'pause' | 'resume' | 'stop';
+    mode?: ('countdown' | 'countup' | null);
+    target_seconds?: (number | null);
+    created_at?: (string | null);
+};
+
+export type action = 'start' | 'pause' | 'resume' | 'stop';
+
+export type WorkshopSessionTimerEventsPublic = {
+    data: Array<WorkshopSessionTimerEventPublic>;
+    count: number;
+};
+
 export type WorkshopSessionTimerPublic = {
     session_id: string;
     status: 'inactive' | 'running' | 'paused';
@@ -409,6 +426,8 @@ export type WorkshopSessionTimerPublic = {
     target_seconds?: (number | null);
     started_at?: (string | null);
     paused_at?: (string | null);
+    elapsed_seconds?: (number | null);
+    remaining_seconds?: (number | null);
 };
 
 export type status2 = 'inactive' | 'running' | 'paused';
@@ -730,6 +749,13 @@ export type WorkshopSessionsReadWorkshopSessionTimerData = {
 };
 
 export type WorkshopSessionsReadWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
+
+export type WorkshopSessionsReadWorkshopSessionTimerEventsData = {
+    limit?: number;
+    sessionId: string;
+};
+
+export type WorkshopSessionsReadWorkshopSessionTimerEventsResponse = (WorkshopSessionTimerEventsPublic);
 
 export type WorkshopSessionsStartWorkshopSessionTimerData = {
     requestBody: WorkshopSessionTimerStart;

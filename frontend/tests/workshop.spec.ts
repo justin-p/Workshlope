@@ -140,9 +140,18 @@ test.describe("Workshop live session", () => {
     ).toContainText("Roster trainees blocked by required pre-work: 0")
     await expect(page.getByRole("button", { name: "Mark done" })).toHaveCount(0)
 
+    await expect(page.getByTestId("workshop-timer-start")).toContainText(
+      "Start 5m countdown",
+    )
     await page.getByTestId("workshop-timer-start").click()
     await expect(page.getByTestId("workshop-timer-status")).toContainText(
       "running",
+    )
+    await expect(page.getByTestId("workshop-timer-status")).toContainText(
+      /Timer: running( \(\d+:\d{2} left\))?/,
+    )
+    await expect(page.getByTestId("workshop-timer-events")).toContainText(
+      /(\d{2}:\d{2}|No timer actions recorded yet\.)/,
     )
     await page.getByTestId("workshop-timer-pause").click()
     await expect(page.getByTestId("workshop-timer-status")).toContainText(

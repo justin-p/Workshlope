@@ -25,6 +25,20 @@ function httpToWsBase(httpBase: string): string {
   return httpBase
 }
 
+function formatTimerRemainingSeconds(totalSeconds: number): string {
+  const clamped = Math.max(0, totalSeconds)
+  const minutes = Math.floor(clamped / 60)
+  const seconds = clamped % 60
+  return `${minutes}:${String(seconds).padStart(2, "0")}`
+}
+
+function formatEventTimestamp(iso: string | null | undefined): string {
+  if (!iso) return "unknown time"
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return "unknown time"
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+}
+
 /** Decode JWT payload segment (no verification — UI routing only). */
 function decodeJwtPayloadJson(
   rawToken: string,
@@ -158,17 +172,35 @@ function WorkshopSessionPage() {
       WorkshopSessionsService.readWorkshopSessionTimer({ sessionId }),
     enabled: uuidOk && detailView === "instructor",
     retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.status === "running" ? 1_000 : false,
+  })
+
+  const timerEventsQuery = useQuery({
+    queryKey: ["workshopSessionTimerEvents", sessionId],
+    queryFn: () =>
+      WorkshopSessionsService.readWorkshopSessionTimerEvents({
+        sessionId,
+        limit: 5,
+      }),
+    enabled: uuidOk && detailView === "instructor",
+    retry: false,
+    refetchInterval: () =>
+      timerQuery.data?.status === "running" ? 5_000 : false,
   })
 
   const startTimerMutation = useMutation({
     mutationFn: () =>
       WorkshopSessionsService.startWorkshopSessionTimer({
         sessionId,
-        requestBody: { mode: "countup" },
+        requestBody: { mode: "countdown", target_seconds: 300 },
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["workshopSessionTimer", sessionId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
       })
     },
     onError: (e: unknown) => {
@@ -188,6 +220,9 @@ function WorkshopSessionPage() {
       void queryClient.invalidateQueries({
         queryKey: ["workshopSessionTimer", sessionId],
       })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
+      })
     },
     onError: (e: unknown) => {
       if (e instanceof ApiError) {
@@ -206,6 +241,9 @@ function WorkshopSessionPage() {
       void queryClient.invalidateQueries({
         queryKey: ["workshopSessionTimer", sessionId],
       })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
+      })
     },
     onError: (e: unknown) => {
       if (e instanceof ApiError) {
@@ -223,6 +261,9 @@ function WorkshopSessionPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["workshopSessionTimer", sessionId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
       })
     },
     onError: (e: unknown) => {
@@ -410,6 +451,10 @@ function WorkshopSessionPage() {
   const requiredAggregateRows =
     aggregatesQuery.data?.data.filter((r) => r.prerequisite.required_flag) ?? []
   const timerStatus = timerQuery.data?.status ?? "inactive"
+  const timerMode = timerQuery.data?.mode
+  const timerElapsedSeconds = timerQuery.data?.elapsed_seconds
+  const timerRemainingSeconds = timerQuery.data?.remaining_seconds
+  const timerEvents = timerEventsQuery.data?.data ?? []
   const isPreworkGateError = errorDetail === "Required prerequisites incomplete"
   const participantRemainingRequiredCount = overdueRequiredPrerequisites.length
   const instructorBlockedTraineesCount = gapsQuery.data?.count ?? 0
@@ -667,7 +712,7 @@ function WorkshopSessionPage() {
             }
             onClick={() => startTimerMutation.mutate()}
           >
-            Start 5m timer
+            Start 5m countdown
           </Button>
           <Button
             type="button"
@@ -726,7 +771,45 @@ function WorkshopSessionPage() {
             data-testid="workshop-timer-status"
           >
             Timer: {timerStatus}
+            {timerMode ? ` (${timerMode})` : ""}
+            {typeof timerRemainingSeconds === "number"
+              ? ` (${formatTimerRemainingSeconds(timerRemainingSeconds)} left)`
+              : typeof timerElapsedSeconds === "number"
+                ? ` (${formatTimerRemainingSeconds(timerElapsedSeconds)} elapsed)`
+                : ""}
           </span>
+          <div
+            className="w-full rounded-md border p-2 text-xs text-muted-foreground"
+            data-testid="workshop-timer-events"
+          >
+            <div className="font-medium text-foreground mb-1">
+              Recent timer events
+            </div>
+            {timerEventsQuery.isLoading ? (
+              <p>Loading timer events...</p>
+            ) : timerEvents.length === 0 ? (
+              <p>No timer actions recorded yet.</p>
+            ) : (
+              <ul className="space-y-1">
+                {timerEvents.map((event) => (
+                  <li key={event.id} className="flex gap-2 items-center">
+                    <span className="uppercase text-[10px] tracking-wide">
+                      {event.action}
+                    </span>
+                    <span>{event.mode ?? "n/a"}</span>
+                    <span>
+                      {event.target_seconds
+                        ? `${event.target_seconds}s`
+                        : "countup"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/80">
+                      {formatEventTimestamp(event.created_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       ) : null}
 
