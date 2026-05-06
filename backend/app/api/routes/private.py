@@ -12,6 +12,7 @@ from app.core.security import get_password_hash
 from app.models import (
     Lesson,
     LessonPart,
+    LessonPrerequisite,
     LessonRepo,
     SessionInstructor,
     User,
@@ -62,6 +63,7 @@ def bootstrap_e2e_workshop_live_session(
     participant_email: Annotated[EmailStr | None, Query()] = None,
     omit_participant_seat: Annotated[bool, Query()] = False,
     initial_status: Annotated[Literal["live", "scheduled"], Query()] = "live",
+    with_incomplete_required_prerequisite: Annotated[bool, Query()] = False,
 ) -> PrivateWorkshopE2ELiveSessionResponse:
     """Create a live workshop session with lesson parts for local E2E only.
 
@@ -71,6 +73,14 @@ def bootstrap_e2e_workshop_live_session(
     instructor (no ``WorkshopParticipant`` row), so ``ws-ticket`` yields the
     **instructor** role while the frontend skips ``POST …/enter`` for that flow.
     Pass ``initial_status=scheduled`` to exercise instructor start flows.
+    Pass ``with_incomplete_required_prerequisite=true`` to add one **required**
+    lesson prerequisite with **no** completion row for the rostered trainee
+    (participant flows / Playwright pre-work UI).
+
+    When ``participant_email`` is set and differs from ``FIRST_SUPERUSER``, the
+    trainee is rostered **only** as a participant and **``FIRST_SUPERUSER``** is
+    the sole lead instructor (avoids dual instructor+participant seats on the
+    trainee, which breaks HTTP ``view: participant`` and complicates WS E2E).
     """
     email = participant_email or settings.FIRST_SUPERUSER
     user = session.exec(select(User).where(User.email == email)).first()
@@ -79,6 +89,14 @@ def bootstrap_e2e_workshop_live_session(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Participant user not found",
         )
+
+    su = session.exec(
+        select(User).where(User.email == settings.FIRST_SUPERUSER)
+    ).first()
+    distinct_trainee = (
+        participant_email is not None
+        and str(participant_email).lower() != str(settings.FIRST_SUPERUSER).lower()
+    )
 
     sid = uuid.uuid4()
     repo = LessonRepo(
@@ -121,6 +139,18 @@ def bootstrap_e2e_workshop_live_session(
         )
     )
 
+    if with_incomplete_required_prerequisite:
+        session.add(
+            LessonPrerequisite(
+                lesson_id=lesson.id,
+                type="reading",
+                title="E2E required pre-read",
+                details="Complete this item in E2E to clear the banner.",
+                ordering=0,
+                required_flag=True,
+            )
+        )
+
     workshop_session = WorkshopSession(
         id=sid,
         lesson_id=lesson.id,
@@ -137,13 +167,35 @@ def bootstrap_e2e_workshop_live_session(
                 joined_at=datetime.now(timezone.utc),
             )
         )
-    session.add(
-        SessionInstructor(
-            session_id=sid,
-            user_id=user.id,
-            role="lead",
+    if omit_participant_seat:
+        session.add(
+            SessionInstructor(
+                session_id=sid,
+                user_id=user.id,
+                role="lead",
+            )
         )
-    )
+    elif distinct_trainee:
+        if su is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="FIRST_SUPERUSER missing for distinct-trainee E2E bootstrap",
+            )
+        session.add(
+            SessionInstructor(
+                session_id=sid,
+                user_id=su.id,
+                role="lead",
+            )
+        )
+    else:
+        session.add(
+            SessionInstructor(
+                session_id=sid,
+                user_id=user.id,
+                role="lead",
+            )
+        )
     session.commit()
 
     return PrivateWorkshopE2ELiveSessionResponse(session_id=sid)

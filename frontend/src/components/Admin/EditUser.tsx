@@ -5,7 +5,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 
-import { type UserPublic, UsersService } from "@/client"
+import { type UserPublic, UsersService, type UserUpdate } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -42,6 +42,7 @@ const formSchema = z
       .or(z.literal("")),
     confirm_password: z.string().optional(),
     is_superuser: z.boolean().optional(),
+    is_instructor: z.boolean().optional(),
     is_active: z.boolean().optional(),
   })
   .refine((data) => !data.password || data.password === data.confirm_password, {
@@ -68,13 +69,14 @@ const EditUser = ({ user, onSuccess }: EditUserProps) => {
     defaultValues: {
       email: user.email,
       full_name: user.full_name ?? undefined,
-      is_superuser: user.is_superuser,
-      is_active: user.is_active,
+      is_superuser: user.is_superuser ?? false,
+      is_instructor: user.is_instructor ?? false,
+      is_active: user.is_active ?? true,
     },
   })
 
   const mutation = useMutation({
-    mutationFn: (data: FormData) =>
+    mutationFn: (data: UserUpdate) =>
       UsersService.updateUser({ userId: user.id, requestBody: data }),
     onSuccess: () => {
       showSuccessToast("User updated successfully")
@@ -88,12 +90,12 @@ const EditUser = ({ user, onSuccess }: EditUserProps) => {
   })
 
   const onSubmit = (data: FormData) => {
-    // exclude confirm_password from submission data and remove password if empty
     const { confirm_password: _, ...submitData } = data
-    if (!submitData.password) {
-      delete submitData.password
+    const body: UserUpdate = { ...submitData }
+    if (body.password === undefined || body.password === "") {
+      delete body.password
     }
-    mutation.mutate(submitData)
+    mutation.mutate(body)
   }
 
   return (
@@ -198,6 +200,24 @@ const EditUser = ({ user, onSuccess }: EditUserProps) => {
                       />
                     </FormControl>
                     <FormLabel className="font-normal">Is superuser?</FormLabel>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="is_instructor"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormLabel className="font-normal">
+                      Workshop instructor?
+                    </FormLabel>
                   </FormItem>
                 )}
               />

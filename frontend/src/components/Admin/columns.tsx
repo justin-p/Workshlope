@@ -43,9 +43,17 @@ export const columns: ColumnDef<UserTableData>[] = [
     accessorKey: "is_superuser",
     header: "Role",
     cell: ({ row }) => (
-      <Badge variant={row.original.is_superuser ? "default" : "secondary"}>
-        {row.original.is_superuser ? "Superuser" : "User"}
-      </Badge>
+      <div className="flex flex-wrap gap-1">
+        {row.original.is_superuser ? (
+          <Badge variant="default">Superuser</Badge>
+        ) : null}
+        {row.original.is_instructor ? (
+          <Badge variant="secondary">Instructor</Badge>
+        ) : null}
+        {!row.original.is_superuser && !row.original.is_instructor ? (
+          <Badge variant="outline">User</Badge>
+        ) : null}
+      </div>
     ),
   },
   {

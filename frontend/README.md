@@ -92,13 +92,16 @@ The frontend code is structured as follows:
 
 ## End-to-End Testing with Playwright
 
-The frontend includes initial end-to-end tests using Playwright. To run the tests, you need to have the Docker Compose stack running. Start the stack with the following command:
+The frontend includes initial end-to-end tests using Playwright. **Before E2E, reset the backend** so Postgres and the seeded superuser match what the specs expect:
 
 ```bash
-docker compose up -d --wait backend
+# from repository root — recommended before `bunx playwright test`
+bash scripts/e2e-backend-reset.sh
 ```
 
-Then, you can run the tests with the following command:
+Running `bunx playwright test` **on your machine** triggers the same reset automatically via Playwright `globalSetup` unless you set `SKIP_E2E_BACKEND_RESET=1`. (Playwright invoked inside the `playwright` compose service skips that step; CI resets the compose stack on the workflow runner.)
+
+Then run tests from `frontend`:
 
 ```bash
 bunx playwright test

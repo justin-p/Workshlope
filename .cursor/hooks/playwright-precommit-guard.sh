@@ -70,9 +70,9 @@ EOF
   exit 0
 fi
 
-if ! /usr/bin/docker compose --env-file .env.local up -d --wait backend >/tmp/playwright-guard-compose.log 2>&1; then
+if ! bash scripts/e2e-backend-reset.sh >/tmp/playwright-guard-compose.log 2>&1; then
   cat <<'EOF'
-{"permission":"ask","user_message":"Playwright guard: could not start backend with docker compose. Check .env.local and docker logs, then retry.","agent_message":"Commit blocked by Playwright guard because docker compose backend startup failed."}
+{"permission":"ask","user_message":"Playwright guard: could not reset/start backend (scripts/e2e-backend-reset.sh). Check .env.local and docker logs, then retry.","agent_message":"Commit blocked by Playwright guard because e2e backend reset/startup failed."}
 EOF
   exit 0
 fi

@@ -838,6 +838,1383 @@ export const ValidationErrorSchema = {
     title: 'ValidationError'
 } as const;
 
+export const WorkshopBadgeDefinitionCreateSchema = {
+    properties: {
+        slug: {
+            type: 'string',
+            maxLength: 64,
+            title: 'Slug'
+        },
+        title: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        points: {
+            type: 'integer',
+            maximum: 1000,
+            minimum: 0,
+            title: 'Points',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['slug', 'title'],
+    title: 'WorkshopBadgeDefinitionCreate'
+} as const;
+
+export const WorkshopBadgeDefinitionPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        points: {
+            type: 'integer',
+            title: 'Points'
+        }
+    },
+    type: 'object',
+    required: ['id', 'slug', 'title', 'points'],
+    title: 'WorkshopBadgeDefinitionPublic'
+} as const;
+
+export const WorkshopBadgeDefinitionsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopBadgeDefinitionPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopBadgeDefinitionsPublic'
+} as const;
+
+export const WorkshopBadgeGrantRequestSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'badge_id'],
+    title: 'WorkshopBadgeGrantRequest'
+} as const;
+
+export const WorkshopBadgeRevokeRequestSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'badge_id'],
+    title: 'WorkshopBadgeRevokeRequest'
+} as const;
+
+export const WorkshopLessonPartBriefSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        ordering: {
+            type: 'integer',
+            title: 'Ordering'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        }
+    },
+    type: 'object',
+    required: ['id', 'ordering', 'slug', 'title'],
+    title: 'WorkshopLessonPartBrief',
+    description: 'Lesson part metadata for workshop session screens (body omitted).'
+} as const;
+
+export const WorkshopLessonPrerequisiteAggregatePublicSchema = {
+    properties: {
+        prerequisite: {
+            '$ref': '#/components/schemas/WorkshopLessonPrerequisitePublic'
+        },
+        roster_count: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Roster Count',
+            description: 'Active roster trainee seats.'
+        },
+        completed_count: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Completed Count',
+            description: 'Roster trainees with a completion row for this prerequisite.'
+        }
+    },
+    type: 'object',
+    required: ['prerequisite', 'roster_count', 'completed_count'],
+    title: 'WorkshopLessonPrerequisiteAggregatePublic',
+    description: 'Session roster completion counts per prerequisite definition (no per-user identity).'
+} as const;
+
+export const WorkshopLessonPrerequisiteAggregatesPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPrerequisiteAggregatePublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopLessonPrerequisiteAggregatesPublic'
+} as const;
+
+export const WorkshopLessonPrerequisiteCompleteSchema = {
+    properties: {
+        user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'User Id'
+        }
+    },
+    type: 'object',
+    title: 'WorkshopLessonPrerequisiteComplete'
+} as const;
+
+export const WorkshopLessonPrerequisiteCreateSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            maxLength: 32,
+            title: 'Type',
+            default: 'task'
+        },
+        title: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Title'
+        },
+        details: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        ordering: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Ordering',
+            default: 0
+        },
+        required_flag: {
+            type: 'boolean',
+            title: 'Required Flag',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['title'],
+    title: 'WorkshopLessonPrerequisiteCreate'
+} as const;
+
+export const WorkshopLessonPrerequisiteGapPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        incomplete_required_prerequisites: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPrerequisitePublic'
+            },
+            type: 'array',
+            title: 'Incomplete Required Prerequisites'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'email', 'incomplete_required_prerequisites'],
+    title: 'WorkshopLessonPrerequisiteGapPublic',
+    description: 'Trainee prerequisite gap for instructor cohort views (scoped to a workshop session roster).'
+} as const;
+
+export const WorkshopLessonPrerequisiteGapsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPrerequisiteGapPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopLessonPrerequisiteGapsPublic',
+    description: 'Users on the session roster who still owe at least one *required* prerequisite.'
+} as const;
+
+export const WorkshopLessonPrerequisiteMyPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        lesson_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Id'
+        },
+        type: {
+            type: 'string',
+            title: 'Type'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        details: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        ordering: {
+            type: 'integer',
+            title: 'Ordering'
+        },
+        required_flag: {
+            type: 'boolean',
+            title: 'Required Flag'
+        },
+        is_completed: {
+            type: 'boolean',
+            title: 'Is Completed'
+        },
+        completed_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Completed At'
+        },
+        source: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source'
+        }
+    },
+    type: 'object',
+    required: ['id', 'lesson_id', 'type', 'title', 'ordering', 'required_flag', 'is_completed'],
+    title: 'WorkshopLessonPrerequisiteMyPublic'
+} as const;
+
+export const WorkshopLessonPrerequisitePatchSchema = {
+    properties: {
+        type: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 32
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Type'
+        },
+        title: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        details: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        ordering: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ordering'
+        },
+        required_flag: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Required Flag'
+        }
+    },
+    type: 'object',
+    title: 'WorkshopLessonPrerequisitePatch'
+} as const;
+
+export const WorkshopLessonPrerequisitePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        lesson_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Id'
+        },
+        type: {
+            type: 'string',
+            title: 'Type'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        details: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url'
+        },
+        ordering: {
+            type: 'integer',
+            title: 'Ordering'
+        },
+        required_flag: {
+            type: 'boolean',
+            title: 'Required Flag'
+        }
+    },
+    type: 'object',
+    required: ['id', 'lesson_id', 'type', 'title', 'ordering', 'required_flag'],
+    title: 'WorkshopLessonPrerequisitePublic'
+} as const;
+
+export const WorkshopLessonPrerequisitesMyPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPrerequisiteMyPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopLessonPrerequisitesMyPublic'
+} as const;
+
+export const WorkshopLessonPrerequisitesPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPrerequisitePublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopLessonPrerequisitesPublic'
+} as const;
+
+export const WorkshopLessonSummaryPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title', 'slug'],
+    title: 'WorkshopLessonSummaryPublic'
+} as const;
+
+export const WorkshopParticipantPatchSchema = {
+    properties: {
+        live_status: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['busy', 'done']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Live Status'
+        },
+        joined_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Joined At'
+        },
+        finished_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finished At'
+        }
+    },
+    type: 'object',
+    title: 'WorkshopParticipantPatch',
+    description: 'Instructor override fields for a participant seat.'
+} as const;
+
+export const WorkshopParticipantSelfPublicSchema = {
+    properties: {
+        invited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invited At'
+        },
+        joined_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Joined At'
+        },
+        finished_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finished At'
+        },
+        live_status: {
+            type: 'string',
+            title: 'Live Status'
+        }
+    },
+    type: 'object',
+    required: ['invited_at', 'joined_at', 'finished_at', 'live_status'],
+    title: 'WorkshopParticipantSelfPublic',
+    description: 'Caller’s own trainee seat snapshot (participant view only).'
+} as const;
+
+export const WorkshopRosterInstructorRowPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
+        },
+        role: {
+            type: 'string',
+            title: 'Role'
+        },
+        assigned_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Assigned At'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'email', 'full_name', 'role', 'assigned_at'],
+    title: 'WorkshopRosterInstructorRowPublic'
+} as const;
+
+export const WorkshopRosterParticipantRowPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
+        },
+        invited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invited At'
+        },
+        joined_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Joined At'
+        },
+        finished_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finished At'
+        },
+        live_status: {
+            type: 'string',
+            title: 'Live Status'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'email', 'full_name', 'invited_at', 'joined_at', 'finished_at', 'live_status'],
+    title: 'WorkshopRosterParticipantRowPublic'
+} as const;
+
+export const WorkshopSessionCorePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        current_part_index: {
+            type: 'integer',
+            title: 'Current Part Index'
+        },
+        current_part_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Current Part Slug'
+        },
+        part_generation: {
+            type: 'integer',
+            title: 'Part Generation'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'status', 'current_part_index', 'current_part_slug', 'part_generation', 'created_at'],
+    title: 'WorkshopSessionCorePublic'
+} as const;
+
+export const WorkshopSessionInstructorSeatRoleUpdateSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        role: {
+            type: 'string',
+            maxLength: 32,
+            title: 'Role'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'role'],
+    title: 'WorkshopSessionInstructorSeatRoleUpdate',
+    description: "Update an active instructor seat's role (e.g. co_instructor → lead)."
+} as const;
+
+export const WorkshopSessionLeaderboardPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopSessionLeaderboardRowPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopSessionLeaderboardPublic'
+} as const;
+
+export const WorkshopSessionLeaderboardRowPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        total_points: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Total Points'
+        },
+        badge_count: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Badge Count'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'total_points', 'badge_count'],
+    title: 'WorkshopSessionLeaderboardRowPublic'
+} as const;
+
+export const WorkshopSessionListItemSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        part_generation: {
+            type: 'integer',
+            title: 'Part Generation'
+        },
+        lesson_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Id'
+        },
+        lesson_title: {
+            type: 'string',
+            title: 'Lesson Title'
+        },
+        lesson_slug: {
+            type: 'string',
+            title: 'Lesson Slug'
+        },
+        my_role: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['participant', 'instructor']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'My Role',
+            description: 'Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.'
+        },
+        blocked_required_prereq_count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Blocked Required Prereq Count',
+            description: 'Roster trainees still missing at least one required prerequisite; only included for instructor/admin visibility.'
+        }
+    },
+    type: 'object',
+    required: ['id', 'status', 'part_generation', 'lesson_id', 'lesson_title', 'lesson_slug'],
+    title: 'WorkshopSessionListItem',
+    description: 'Minimal session row for dashboard lists — no roster, no peer data.'
+} as const;
+
+export const WorkshopSessionPatchSchema = {
+    properties: {
+        status: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['live', 'paused', 'ended']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status'
+        },
+        instructor_seat: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/WorkshopSessionInstructorSeatRoleUpdate'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        primary_instructor_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Primary Instructor User Id'
+        },
+        remove_instructor_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Remove Instructor User Id'
+        }
+    },
+    type: 'object',
+    title: 'WorkshopSessionPatch',
+    description: 'Session-level PATCH body; at least one field must be present in the request.'
+} as const;
+
+export const WorkshopSessionPublicInstructorSchema = {
+    properties: {
+        view: {
+            type: 'string',
+            const: 'instructor',
+            title: 'View',
+            default: 'instructor'
+        },
+        session: {
+            '$ref': '#/components/schemas/WorkshopSessionCorePublic'
+        },
+        lesson: {
+            '$ref': '#/components/schemas/WorkshopLessonSummaryPublic'
+        },
+        parts: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPartBrief'
+            },
+            type: 'array',
+            title: 'Parts'
+        },
+        participants: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopRosterParticipantRowPublic'
+            },
+            type: 'array',
+            title: 'Participants'
+        },
+        instructors: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopRosterInstructorRowPublic'
+            },
+            type: 'array',
+            title: 'Instructors'
+        }
+    },
+    type: 'object',
+    required: ['session', 'lesson', 'parts', 'participants', 'instructors'],
+    title: 'WorkshopSessionPublicInstructor',
+    description: 'Instructor-visible session detail with roster.'
+} as const;
+
+export const WorkshopSessionPublicParticipantSchema = {
+    properties: {
+        view: {
+            type: 'string',
+            const: 'participant',
+            title: 'View',
+            default: 'participant'
+        },
+        session: {
+            '$ref': '#/components/schemas/WorkshopSessionCorePublic'
+        },
+        lesson: {
+            '$ref': '#/components/schemas/WorkshopLessonSummaryPublic'
+        },
+        parts: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopLessonPartBrief'
+            },
+            type: 'array',
+            title: 'Parts'
+        },
+        self: {
+            '$ref': '#/components/schemas/WorkshopParticipantSelfPublic'
+        }
+    },
+    type: 'object',
+    required: ['session', 'lesson', 'parts', 'self'],
+    title: 'WorkshopSessionPublicParticipant',
+    description: 'Trainee-visible session detail — lesson + parts + self only (no roster).'
+} as const;
+
+export const WorkshopSessionTimerEventPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        session_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Session Id'
+        },
+        actor_user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Actor User Id'
+        },
+        action: {
+            type: 'string',
+            enum: ['start', 'pause', 'resume', 'stop'],
+            title: 'Action'
+        },
+        mode: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['countdown', 'countup']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Mode'
+        },
+        target_seconds: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Seconds'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'session_id', 'actor_user_id', 'action'],
+    title: 'WorkshopSessionTimerEventPublic'
+} as const;
+
+export const WorkshopSessionTimerEventsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopSessionTimerEventPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopSessionTimerEventsPublic'
+} as const;
+
+export const WorkshopSessionTimerPublicSchema = {
+    properties: {
+        session_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Session Id'
+        },
+        status: {
+            type: 'string',
+            enum: ['inactive', 'running', 'paused'],
+            title: 'Status'
+        },
+        mode: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['countdown', 'countup']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Mode'
+        },
+        target_seconds: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Seconds'
+        },
+        started_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Started At'
+        },
+        paused_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Paused At'
+        },
+        elapsed_seconds: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Elapsed Seconds'
+        },
+        remaining_seconds: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Remaining Seconds'
+        }
+    },
+    type: 'object',
+    required: ['session_id', 'status'],
+    title: 'WorkshopSessionTimerPublic'
+} as const;
+
+export const WorkshopSessionTimerStartSchema = {
+    properties: {
+        mode: {
+            type: 'string',
+            enum: ['countdown', 'countup'],
+            title: 'Mode',
+            default: 'countdown'
+        },
+        target_seconds: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 86400,
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Seconds'
+        }
+    },
+    type: 'object',
+    title: 'WorkshopSessionTimerStart'
+} as const;
+
+export const WorkshopSessionUpsertMemberSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        role: {
+            type: 'string',
+            enum: ['participant', 'instructor'],
+            title: 'Role'
+        },
+        instructor_role: {
+            type: 'string',
+            maxLength: 32,
+            title: 'Instructor Role',
+            default: 'co_instructor'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'role'],
+    title: 'WorkshopSessionUpsertMember',
+    description: 'Assign a user as participant or instructor for one session.'
+} as const;
+
+export const WorkshopSessionsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopSessionListItem'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopSessionsPublic'
+} as const;
+
 export const WorkshopWsTicketSchema = {
     properties: {
         ticket: {

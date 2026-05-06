@@ -8,6 +8,7 @@ import {
   type UserRegister,
   UsersService,
 } from "@/client"
+import { getDashboardLandingPath } from "@/lib/dashboardLanding"
 import { handleError } from "@/utils"
 import useCustomToast from "./useCustomToast"
 
@@ -47,8 +48,10 @@ const useAuth = () => {
 
   const loginMutation = useMutation({
     mutationFn: login,
-    onSuccess: () => {
-      navigate({ to: "/" })
+    onSuccess: async () => {
+      const user = await UsersService.readUserMe()
+      queryClient.setQueryData(["currentUser"], user)
+      navigate({ to: getDashboardLandingPath(user) })
     },
     onError: handleError.bind(showErrorToast),
   })

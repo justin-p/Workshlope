@@ -1,0 +1,42 @@
+---
+description: Playwright test authoring and locator standards for testing project
+alwaysApply: true
+---
+
+# Playwright rules, testing
+
+## Locators
+- Use `getByRole`, `getByTestId`, or `getByLabel`.
+- Never use CSS selectors, XPath, or `page.locator()` with class strings.
+- Check the live accessibility tree via MCP before choosing a locator.
+
+## Structure
+- 1 file per feature or user flow.
+- Wrap related tests in `describe()` blocks.
+- Keep each test under 30 lines.
+- Name files as `feature-name.spec.ts`.
+
+## Timing
+- Never use `page.waitForTimeout()` or fixed delays.
+- Use `waitForLoadState('networkidle')` for page transitions.
+- Use `element.waitFor({ state: 'visible' })` for element state.
+
+## Test data
+- All credentials and test data via fixtures or env vars.
+- Tests must pass in isolation, with no dependency on prior tests.
+- Use `storageState` for auth; never log in through the UI per test.
+
+## Assertions
+- Assert the final outcome, not intermediate DOM states.
+- Use `toBeVisible`, `toHaveText`, `toHaveURL`.
+
+## Output
+- Return diffs, not full files.
+- Add a 1-line comment at the top explaining what the test covers.
+
+## Tooling workflow (required)
+- For browser exploration, selector discovery, and interactive verification, use the Playwright MCP tools first.
+- For terminal-driven playback, screenshots, traces, and reproducible scripted runs, use Playwright CLI flows.
+- Before writing or modifying Playwright tests, load and follow relevant local skills (at minimum: `playwright-local-gate`; add `playwright-cli` / `playwright-skill` modules when applicable).
+- Prefer MCP snapshots/accessibility tree plus role-based locators as the source of truth when stabilizing selectors.
+- After Playwright-related code changes, run local Playwright validation through the established skill workflow before considering work complete.
