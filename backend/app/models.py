@@ -314,6 +314,52 @@ class WorkshopSessionTimerEvent(SQLModel, table=True):
     )
 
 
+class WorkshopBadgeDefinition(SQLModel, table=True):
+    __tablename__ = "workshop_badge_definition"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    slug: str = Field(max_length=64, unique=True, index=True)
+    title: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
+    points: int = Field(default=1, ge=0, le=1000)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class WorkshopBadgeGrant(SQLModel, table=True):
+    __tablename__ = "workshop_badge_grant"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "user_id", "badge_id", name="uq_workshop_badge_grant_once"
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    session_id: uuid.UUID = Field(
+        foreign_key="workshop_session.id", nullable=False, ondelete="CASCADE"
+    )
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    badge_id: uuid.UUID = Field(
+        foreign_key="workshop_badge_definition.id", nullable=False, ondelete="CASCADE"
+    )
+    granted_by_user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    granted_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    revoked_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    revoked_by_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", nullable=True, ondelete="SET NULL"
+    )
+    revoked_reason: str | None = Field(default=None, max_length=255)
+
+
 class WorkshopSessionListItem(SQLModel):
     """Minimal session row for dashboard lists — no roster, no peer data."""
 
@@ -496,6 +542,48 @@ class WorkshopSessionTimerEventPublic(SQLModel):
 
 class WorkshopSessionTimerEventsPublic(SQLModel):
     data: list[WorkshopSessionTimerEventPublic]
+    count: int
+
+
+class WorkshopBadgeDefinitionCreate(SQLModel):
+    slug: str = Field(max_length=64)
+    title: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
+    points: int = Field(default=1, ge=0, le=1000)
+
+
+class WorkshopBadgeDefinitionPublic(SQLModel):
+    id: uuid.UUID
+    slug: str
+    title: str
+    description: str | None = None
+    points: int
+
+
+class WorkshopBadgeDefinitionsPublic(SQLModel):
+    data: list[WorkshopBadgeDefinitionPublic]
+    count: int
+
+
+class WorkshopBadgeGrantRequest(SQLModel):
+    user_id: uuid.UUID
+    badge_id: uuid.UUID
+
+
+class WorkshopBadgeRevokeRequest(SQLModel):
+    user_id: uuid.UUID
+    badge_id: uuid.UUID
+    reason: str | None = Field(default=None, max_length=255)
+
+
+class WorkshopSessionLeaderboardRowPublic(SQLModel):
+    user_id: uuid.UUID
+    total_points: int = Field(ge=0)
+    badge_count: int = Field(ge=0)
+
+
+class WorkshopSessionLeaderboardPublic(SQLModel):
+    data: list[WorkshopSessionLeaderboardRowPublic]
     count: int
 
 
