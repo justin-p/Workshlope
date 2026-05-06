@@ -118,7 +118,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-07-pacing-timer` |
 | PR | *(not opened yet; will target `ws-06-learning-workflows`)* |
-| Latest work | **PR07 slice 3 (2026-05-06):** added countdown `remaining_seconds` to timer responses, corrected pause/resume timing drift by offsetting `started_at` on resume, regenerated OpenAPI/SDK artifacts, updated instructor timer status UI to show remaining seconds, and extended backend timer tests to assert remaining-seconds presence for countdown starts. |
+| Latest work | **PR07 slice 4 (2026-05-06):** instructor timer panel now live-refreshes timer state every second while running (TanStack Query `refetchInterval`), and countdown status is rendered in `m:ss` format for easier pacing reads while keeping `remaining_seconds` server-authoritative. |
 
 **Resume in this order:**
 
