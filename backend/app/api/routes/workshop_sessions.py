@@ -37,6 +37,8 @@ from app.models import (
     WorkshopSessionPublicInstructor,
     WorkshopSessionPublicParticipant,
     WorkshopSessionsPublic,
+    WorkshopSessionTimerPublic,
+    WorkshopSessionTimerStart,
     WorkshopSessionUpsertMember,
 )
 from app.services.workshop_realtime import (
@@ -301,6 +303,66 @@ def _required_prerequisites_complete_for_user(
         ).all()
     )
     return len(completed_ids) == len(required_ids)
+
+
+def _required_prereq_blocked_count_by_session(
+    session_db: Session, *, session_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    if not session_ids:
+        return {}
+    rows = session_db.exec(
+        select(
+            WorkshopParticipant.session_id,
+            func.count(func.distinct(WorkshopParticipant.user_id)),
+        )
+        .join(
+            WorkshopSession,
+            col(WorkshopSession.id) == col(WorkshopParticipant.session_id),
+        )
+        .where(
+            col(WorkshopParticipant.session_id).in_(session_ids),
+            col(WorkshopParticipant.removed_at).is_(None),
+            col(WorkshopParticipant.user_id).is_not(None),
+            select(LessonPrerequisite.id)
+            .where(
+                LessonPrerequisite.lesson_id == WorkshopSession.lesson_id,
+                col(LessonPrerequisite.required_flag).is_(True),
+                ~select(UserPrerequisiteCompletion.id)
+                .where(
+                    UserPrerequisiteCompletion.user_id == WorkshopParticipant.user_id,
+                    UserPrerequisiteCompletion.lesson_id == WorkshopSession.lesson_id,
+                    UserPrerequisiteCompletion.prerequisite_id == LessonPrerequisite.id,
+                )
+                .exists(),
+            )
+            .exists(),
+        )
+        .group_by(col(WorkshopParticipant.session_id))
+    ).all()
+    return {session_id: int(count) for session_id, count in rows}
+
+
+def _require_timer_allowed_session_status(session_row: WorkshopSession) -> None:
+    if session_row.status not in WORKSHOP_ACTIVE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="timer_requires_active_session",
+        )
+
+
+def _timer_public(
+    session_id: uuid.UUID, state: Any | None
+) -> WorkshopSessionTimerPublic:
+    if state is None:
+        return WorkshopSessionTimerPublic(session_id=session_id, status="inactive")
+    return WorkshopSessionTimerPublic(
+        session_id=session_id,
+        status=state.status,
+        mode=state.mode,
+        target_seconds=state.target_seconds,
+        started_at=state.started_at,
+        paused_at=state.paused_at,
+    )
 
 
 async def _dispatch_workshop_ws_text(
@@ -602,6 +664,9 @@ def read_workshop_sessions_for_user(
 
     count = session.exec(count_statement).one()
     rows = session.exec(data_statement).all()
+    blocked_counts = _required_prereq_blocked_count_by_session(
+        session, session_ids=[ws.id for ws, _lesson_title, _lesson_slug in rows]
+    )
 
     data: list[WorkshopSessionListItem] = []
     for ws, lesson_title, lesson_slug in rows:
@@ -619,6 +684,9 @@ def read_workshop_sessions_for_user(
                 lesson_title=lesson_title,
                 lesson_slug=lesson_slug,
                 my_role=role,
+                blocked_required_prereq_count=(
+                    None if role == "participant" else blocked_counts.get(ws.id, 0)
+                ),
             )
         )
 
@@ -1210,6 +1278,127 @@ async def end_workshop_session(
         status="ended",
     )
     return Message(message="Session ended")
+
+
+@router.get("/{session_id}/timer", response_model=WorkshopSessionTimerPublic)
+async def read_workshop_session_timer(
+    *, session: SessionDep, current_user: CurrentUser, session_id: uuid.UUID
+) -> WorkshopSessionTimerPublic:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+    state = await workshop_hub.get_timer(session_id=session_id)
+    return _timer_public(session_id, state)
+
+
+@router.post("/{session_id}/timer/start", response_model=WorkshopSessionTimerPublic)
+async def start_workshop_session_timer(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    session_id: uuid.UUID,
+    body: WorkshopSessionTimerStart,
+) -> WorkshopSessionTimerPublic:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+    _require_timer_allowed_session_status(workshop_session)
+    if body.mode == "countdown" and body.target_seconds is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="countdown_requires_target_seconds",
+        )
+    try:
+        state = await workshop_hub.start_timer(
+            session_id=session_id,
+            mode=body.mode,
+            target_seconds=body.target_seconds,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return _timer_public(session_id, state)
+
+
+@router.post("/{session_id}/timer/pause", response_model=WorkshopSessionTimerPublic)
+async def pause_workshop_session_timer(
+    *, session: SessionDep, current_user: CurrentUser, session_id: uuid.UUID
+) -> WorkshopSessionTimerPublic:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+    _require_timer_allowed_session_status(workshop_session)
+    try:
+        state = await workshop_hub.pause_timer(session_id=session_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return _timer_public(session_id, state)
+
+
+@router.post("/{session_id}/timer/resume", response_model=WorkshopSessionTimerPublic)
+async def resume_workshop_session_timer(
+    *, session: SessionDep, current_user: CurrentUser, session_id: uuid.UUID
+) -> WorkshopSessionTimerPublic:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+    _require_timer_allowed_session_status(workshop_session)
+    try:
+        state = await workshop_hub.resume_timer(session_id=session_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return _timer_public(session_id, state)
+
+
+@router.post("/{session_id}/timer/stop", response_model=WorkshopSessionTimerPublic)
+async def stop_workshop_session_timer(
+    *, session: SessionDep, current_user: CurrentUser, session_id: uuid.UUID
+) -> WorkshopSessionTimerPublic:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+    _require_timer_allowed_session_status(workshop_session)
+    try:
+        await workshop_hub.stop_timer(session_id=session_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return WorkshopSessionTimerPublic(session_id=session_id, status="inactive")
 
 
 @router.post("/{session_id}/ws-ticket", response_model=WorkshopWsTicket)

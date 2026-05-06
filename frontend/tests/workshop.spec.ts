@@ -44,14 +44,21 @@ test.describe("Workshop live session", () => {
 
     await participantPage.goto(`/workshop/${session_id}`)
     await expect(participantPage.getByTestId("workshop-ws-status")).toHaveText(
-      /error/i,
+      /gated/i,
       {
         timeout: 15_000,
       },
     )
-    await expect(participantPage.getByTestId("workshop-error")).toContainText(
-      "Required prerequisites incomplete",
-    )
+    await expect(
+      participantPage.getByTestId("workshop-prework-gate-error"),
+    ).toContainText("Pre-work required before joining live session")
+    await expect(
+      participantPage.getByTestId("workshop-prework-gate-error"),
+    ).toContainText("Complete all required prerequisites")
+    await expect(participantPage.getByTestId("workshop-error")).toHaveCount(0)
+    await expect(
+      participantPage.getByTestId("workshop-prework-header-count"),
+    ).toContainText("Required pre-work remaining: 1")
     const banner = participantPage.getByTestId(
       "workshop-prework-participant-banner",
     )
@@ -128,7 +135,27 @@ test.describe("Workshop live session", () => {
       /connected/i,
       { timeout: 15_000 },
     )
+    await expect(
+      page.getByTestId("workshop-prework-header-count"),
+    ).toContainText("Roster trainees blocked by required pre-work: 0")
     await expect(page.getByRole("button", { name: "Mark done" })).toHaveCount(0)
+
+    await page.getByTestId("workshop-timer-start").click()
+    await expect(page.getByTestId("workshop-timer-status")).toContainText(
+      "running",
+    )
+    await page.getByTestId("workshop-timer-pause").click()
+    await expect(page.getByTestId("workshop-timer-status")).toContainText(
+      "paused",
+    )
+    await page.getByTestId("workshop-timer-resume").click()
+    await expect(page.getByTestId("workshop-timer-status")).toContainText(
+      "running",
+    )
+    await page.getByTestId("workshop-timer-stop").click()
+    await expect(page.getByTestId("workshop-timer-status")).toContainText(
+      "inactive",
+    )
 
     await page.getByTestId("workshop-instructor-pause").click()
     await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
@@ -225,5 +252,37 @@ test.describe("Workshop live session", () => {
       /connected/i,
       { timeout: 15_000 },
     )
+  })
+
+  test("workshops hub shows blocked pre-work count on cards", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?with_incomplete_required_prerequisite=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    await page.goto("/workshops")
+    await expect(
+      page.getByTestId(`workshop-card-blocked-count-${session_id}`),
+    ).toContainText("Blocked: 1")
+    await expect(
+      page.getByTestId("workshop-cards-total-blocked"),
+    ).toContainText("Total blocked trainees: 1")
+    await expect(page.getByTestId("workshop-blocked-drilldown")).toContainText(
+      "Blocked sessions",
+    )
+    await expect(page.getByTestId("workshop-blocked-drilldown")).toContainText(
+      "1 blocked",
+    )
+    await expect(page.getByTestId("workshop-blocked-drilldown")).toContainText(
+      "Open",
+    )
+    await page.getByTestId("workshop-cards-blocked-only-toggle").click()
+    await expect(
+      page.getByTestId("workshop-cards-blocked-only-toggle"),
+    ).toContainText("Show all sessions")
   })
 })

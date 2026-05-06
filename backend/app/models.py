@@ -287,6 +287,11 @@ class WorkshopSessionListItem(SQLModel):
         default=None,
         description="Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.",
     )
+    blocked_required_prereq_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Roster trainees still missing at least one required prerequisite; only included for instructor/admin visibility.",
+    )
 
 
 class WorkshopSessionsPublic(SQLModel):
@@ -421,6 +426,20 @@ class WorkshopLessonPartBrief(SQLModel):
     ordering: int
     slug: str
     title: str
+
+
+class WorkshopSessionTimerStart(SQLModel):
+    mode: Literal["countdown", "countup"] = "countdown"
+    target_seconds: int | None = Field(default=None, ge=1, le=86_400)
+
+
+class WorkshopSessionTimerPublic(SQLModel):
+    session_id: uuid.UUID
+    status: Literal["inactive", "running", "paused"]
+    mode: Literal["countdown", "countup"] | None = None
+    target_seconds: int | None = None
+    started_at: datetime | None = None
+    paused_at: datetime | None = None
 
 
 class WorkshopSessionCorePublic(SQLModel):

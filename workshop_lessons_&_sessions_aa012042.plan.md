@@ -103,8 +103,8 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-06** — **PR06 `ws-06-learning-workflows`**: retained prior slices (pre-work UI mark-complete, roster-aware trainee fetch, WS close handling, distinct-trainee bootstrap) **plus** **`e2d14b4`** backend gate: participant `POST /workshop/sessions/{id}/enter` and `POST /workshop/sessions/{id}/ws-ticket` now return **403 `Required prerequisites incomplete`** when required lesson prerequisites are missing. Added backend tests for reject + allow-after-complete and deterministic Playwright coverage (fresh participant context, blocked-then-connected flow). **Plan/docs baseline:** `349085b`/`fcf47ac`; PR #23 body synced with the new gating slice. |
-| **Branch tip (2026-05-06)** | **`e2d14b4`** — `feat(workshop): gate session access on required pre-work` (backend route enforcement + tests + Playwright gate coverage). **`ws-06-learning-workflows`** → [PR #23](https://github.com/justin-p/testing/pull/23). **Local Playwright:** after backend/private or frontend changes, rebuild backend image when using compose (`docker compose build backend`) and run reset (`bash scripts/e2e-backend-reset.sh`) before workshop specs. |
+| **Last synced** | **2026-05-06** — **PR06 `ws-06-learning-workflows`** now includes pre-work hard gate + timer HTTP + dashboard blocked-work triage polish: participant `enter`/`ws-ticket` enforce required prerequisites; timer API (`GET/POST /timer`, `/start`, `/pause`, `/resume`, `/stop`) + instructor controls + tests; session list now returns `blocked_required_prereq_count` to avoid dashboard N+1 calls; workshops hub adds blocked totals, blocked-only toggle, and blocked-session drilldown links. CI checks on [#23](https://github.com/justin-p/testing/pull/23) are green. |
+| **Branch tip (2026-05-06)** | **`ws-06-learning-workflows`** (local head beyond `e2d14b4`, uncommitted at time of sync) includes timer + dashboard polish slices listed above. [PR #23](https://github.com/justin-p/testing/pull/23) base remains `ws-05-dashboard-nav`. **Local Playwright:** rebuild backend/frontend images after code changes (`docker compose build backend frontend`) and run reset (`bash scripts/e2e-backend-reset.sh`) before workshop specs. |
 | **Active integration branch** | `ws-06-learning-workflows` → [PR #23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
 | **Stack PR label** | **PR06 — LearningWorkflows** 🚧 open on [#23](https://github.com/justin-p/testing/pull/23); continue slicing prerequisites/prework APIs + UI |
 
@@ -118,7 +118,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-06-learning-workflows` |
 | PR | [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`) |
-| Latest work | **Pre-work gate hardening (`e2d14b4`):** participant enter + ws-ticket blocked until required prerequisites are complete (403), with backend reject/allow tests. **Playwright:** deterministic blocked-then-complete coverage using distinct participant login context in `workshop.spec.ts`. Prior branch work remains (distinct-trainee bootstrap, serial workshop specs, roster-aware pre-work fetch, WS close handling, admin `is_instructor`, plan trim/archive updates). |
+| Latest work | **PR06 polish bundle (2026-05-06):** timer HTTP lifecycle (backend + UI + tests), distinct pre-work gated UI state, dashboard blocked counts moved into session list API (`blocked_required_prereq_count`) to remove frontend N+1 requests, and workshops hub triage UX (total blocked summary, blocked-only toggle, blocked-session drilldown). Prior pre-work gate hardening (`e2d14b4`) remains in scope. |
 
 **Resume in this order:**
 
@@ -193,8 +193,8 @@ Forked from **`ws-05-dashboard-nav`** and tracked on [#23](https://github.com/ju
 | ------------------ | ----- |
 | **Session list + detail GETs** | List + **`GET …/{id}`** ✅ on **`ws-05-dashboard-nav`** per [delivery gap audit](#workshop-http-vs-realtime--delivery-gap-audit); prerequisites + richer dashboard cards remain PR06. |
 | **Prerequisite / prework** data model | ✅ Landed: `LessonPrerequisite`, `UserPrerequisiteCompletion` (+ migration `4f6e7d8c9a01`); HTTP: create/list/patch/delete/complete, **`/me`**, **`/gaps`**, **`/aggregates`**; admin can grant **`is_instructor`** for roster/instructor UX. |
-| Trainee UX | 🟨 Session page shows **required** incomplete pre-work banner (**`/prerequisites/me`**) + **Mark complete** per item; **hard gating** (block enter/ws until done) still future. |
-| Instructor visibility | 🟨 Session page shows roster **aggregates** + gaps headline (same `session_id`); richer roster drill-down / dashboard tiles still optional. |
+| Trainee UX | ✅ Session page shows **required** incomplete pre-work banner (**`/prerequisites/me`**) + **Mark complete** per item; participant enter/ws-ticket now hard-gated (403) until required pre-work is complete, with dedicated gated UI state in workshop view. |
+| Instructor visibility | 🟨 Session page shows roster **aggregates** + gaps headline (same `session_id`); workshops dashboard now includes blocked counts, blocked-only filter, and blocked-session drilldown links. Deeper roster analytics remain optional. |
 | Tests | **`/python-tdd-with-uv`** backend + **`test_private`** E2E bootstrap cases; **Playwright** [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) (serial workshop `describe`, pre-work + fan-out + live flows). |
 | Stack hygiene | ✅ PR open: [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`); keep stack table + dependency graph in sync on retarget/merge. |
 

@@ -1646,6 +1646,19 @@ export const WorkshopSessionListItemSchema = {
             ],
             title: 'My Role',
             description: 'Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.'
+        },
+        blocked_required_prereq_count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Blocked Required Prereq Count',
+            description: 'Roster trainees still missing at least one required prerequisite; only included for instructor/admin visibility.'
         }
     },
     type: 'object',
@@ -1779,6 +1792,97 @@ export const WorkshopSessionPublicParticipantSchema = {
     required: ['session', 'lesson', 'parts', 'self'],
     title: 'WorkshopSessionPublicParticipant',
     description: 'Trainee-visible session detail — lesson + parts + self only (no roster).'
+} as const;
+
+export const WorkshopSessionTimerPublicSchema = {
+    properties: {
+        session_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Session Id'
+        },
+        status: {
+            type: 'string',
+            enum: ['inactive', 'running', 'paused'],
+            title: 'Status'
+        },
+        mode: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['countdown', 'countup']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Mode'
+        },
+        target_seconds: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Seconds'
+        },
+        started_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Started At'
+        },
+        paused_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Paused At'
+        }
+    },
+    type: 'object',
+    required: ['session_id', 'status'],
+    title: 'WorkshopSessionTimerPublic'
+} as const;
+
+export const WorkshopSessionTimerStartSchema = {
+    properties: {
+        mode: {
+            type: 'string',
+            enum: ['countdown', 'countup'],
+            title: 'Mode',
+            default: 'countdown'
+        },
+        target_seconds: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 86400,
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Seconds'
+        }
+    },
+    type: 'object',
+    title: 'WorkshopSessionTimerStart'
 } as const;
 
 export const WorkshopSessionUpsertMemberSchema = {

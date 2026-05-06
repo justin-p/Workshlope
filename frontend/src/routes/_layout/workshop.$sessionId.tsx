@@ -152,6 +152,89 @@ function WorkshopSessionPage() {
     },
   })
 
+  const timerQuery = useQuery({
+    queryKey: ["workshopSessionTimer", sessionId],
+    queryFn: () =>
+      WorkshopSessionsService.readWorkshopSessionTimer({ sessionId }),
+    enabled: uuidOk && detailView === "instructor",
+    retry: false,
+  })
+
+  const startTimerMutation = useMutation({
+    mutationFn: () =>
+      WorkshopSessionsService.startWorkshopSessionTimer({
+        sessionId,
+        requestBody: { mode: "countup" },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimer", sessionId],
+      })
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
+  const pauseTimerMutation = useMutation({
+    mutationFn: () =>
+      WorkshopSessionsService.pauseWorkshopSessionTimer({ sessionId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimer", sessionId],
+      })
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
+  const resumeTimerMutation = useMutation({
+    mutationFn: () =>
+      WorkshopSessionsService.resumeWorkshopSessionTimer({ sessionId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimer", sessionId],
+      })
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
+  const stopTimerMutation = useMutation({
+    mutationFn: () =>
+      WorkshopSessionsService.stopWorkshopSessionTimer({ sessionId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimer", sessionId],
+      })
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
   const [phase, setPhase] = useState<
     "idle" | "entering" | "ws_connecting" | "ready" | "error"
   >("idle")
@@ -326,6 +409,10 @@ function WorkshopSessionPage() {
 
   const requiredAggregateRows =
     aggregatesQuery.data?.data.filter((r) => r.prerequisite.required_flag) ?? []
+  const timerStatus = timerQuery.data?.status ?? "inactive"
+  const isPreworkGateError = errorDetail === "Required prerequisites incomplete"
+  const participantRemainingRequiredCount = overdueRequiredPrerequisites.length
+  const instructorBlockedTraineesCount = gapsQuery.data?.count ?? 0
 
   return (
     <div className="space-y-4">
@@ -341,6 +428,23 @@ function WorkshopSessionPage() {
           </>
         ) : null}
       </p>
+      {detailView === "participant" ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="workshop-prework-header-count"
+        >
+          Required pre-work remaining: {participantRemainingRequiredCount}
+        </p>
+      ) : null}
+      {detailView === "instructor" ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="workshop-prework-header-count"
+        >
+          Roster trainees blocked by required pre-work:{" "}
+          {instructorBlockedTraineesCount}
+        </p>
+      ) : null}
 
       {userSeesTraineePrework &&
       overdueRequiredPrerequisites.length > 0 &&
@@ -460,17 +564,28 @@ function WorkshopSessionPage() {
           {phase === "ready"
             ? "connected"
             : phase === "error"
-              ? "error"
+              ? isPreworkGateError
+                ? "gated"
+                : "error"
               : phase === "idle"
                 ? "…"
                 : "connecting"}
         </span>
       </div>
 
-      {errorDetail ? (
+      {errorDetail && !isPreworkGateError ? (
         <p className="text-sm text-destructive" data-testid="workshop-error">
           {errorDetail}
         </p>
+      ) : null}
+      {isPreworkGateError ? (
+        <Alert variant="destructive" data-testid="workshop-prework-gate-error">
+          <AlertTitle>Pre-work required before joining live session</AlertTitle>
+          <AlertDescription>
+            Complete all required prerequisites, then reload or re-open this
+            session to connect.
+          </AlertDescription>
+        </Alert>
       ) : null}
       {errorDetail === "Session not started yet" ? (
         <div className="flex gap-2">
@@ -542,6 +657,62 @@ function WorkshopSessionPage() {
           </Button>
           <Button
             type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-timer-start"
+            disabled={
+              !instructorReady ||
+              timerStatus !== "inactive" ||
+              startTimerMutation.isPending
+            }
+            onClick={() => startTimerMutation.mutate()}
+          >
+            Start 5m timer
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-timer-pause"
+            disabled={
+              !instructorReady ||
+              timerStatus !== "running" ||
+              pauseTimerMutation.isPending
+            }
+            onClick={() => pauseTimerMutation.mutate()}
+          >
+            Pause timer
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-timer-resume"
+            disabled={
+              !instructorReady ||
+              timerStatus !== "paused" ||
+              resumeTimerMutation.isPending
+            }
+            onClick={() => resumeTimerMutation.mutate()}
+          >
+            Resume timer
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-timer-stop"
+            disabled={
+              !instructorReady ||
+              timerStatus === "inactive" ||
+              stopTimerMutation.isPending
+            }
+            onClick={() => stopTimerMutation.mutate()}
+          >
+            Stop timer
+          </Button>
+          <Button
+            type="button"
             variant="destructive"
             size="sm"
             data-testid="workshop-instructor-end"
@@ -550,6 +721,12 @@ function WorkshopSessionPage() {
           >
             End session
           </Button>
+          <span
+            className="text-xs text-muted-foreground self-center"
+            data-testid="workshop-timer-status"
+          >
+            Timer: {timerStatus}
+          </span>
         </div>
       ) : null}
 

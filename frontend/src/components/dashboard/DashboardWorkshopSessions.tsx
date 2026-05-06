@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import type { ComponentProps } from "react"
+import { type ComponentProps, useMemo, useState } from "react"
 
 import type { WorkshopSessionListItem } from "@/client"
 import { WorkshopSessionsService } from "@/client"
@@ -39,7 +39,7 @@ function RoleBadge({ role }: { role: WorkshopSessionListItem["my_role"] }) {
 export function DashboardWorkshopSessions({
   className,
   heading = "Your workshops",
-  description = "Sessions where you have a roster seat — open to jump into /workshop (no peer list here).",
+  description = "Sessions where you have a roster seat - open to jump into /workshop (no peer list here).",
   workshopsHubLink,
 }: {
   className?: string
@@ -48,6 +48,7 @@ export function DashboardWorkshopSessions({
   /** Instructor / admin: link from card header to the workshops hub route */
   workshopsHubLink?: boolean
 }) {
+  const [blockedOnly, setBlockedOnly] = useState(false)
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["workshopSessionsForUser"],
     queryFn: () =>
@@ -56,6 +57,26 @@ export function DashboardWorkshopSessions({
         limit: 50,
       }),
   })
+  const totalBlockedTrainees =
+    data?.data.reduce(
+      (sum, row) => sum + (row.blocked_required_prereq_count ?? 0),
+      0,
+    ) ?? 0
+  const blockedRows =
+    data?.data
+      .filter((row) => (row.blocked_required_prereq_count ?? 0) > 0)
+      .sort(
+        (a, b) =>
+          (b.blocked_required_prereq_count ?? 0) -
+          (a.blocked_required_prereq_count ?? 0),
+      ) ?? []
+  const visibleRows = useMemo(() => {
+    if (!data?.data) return []
+    if (!blockedOnly) return data.data
+    return data.data.filter(
+      (row) => (row.blocked_required_prereq_count ?? 0) > 0,
+    )
+  }, [blockedOnly, data?.data])
 
   return (
     <Card data-testid="dashboard-workshop-sessions" className={cn(className)}>
@@ -84,12 +105,61 @@ export function DashboardWorkshopSessions({
         ) : null}
         {data && data.count === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No workshops yet — you’ll see sessions once you’re on a roster.
+            No workshops yet - you'll see sessions once you're on a roster.
           </p>
+        ) : null}
+        {data && data.count > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p
+              className="text-muted-foreground text-xs"
+              data-testid="workshop-cards-total-blocked"
+            >
+              Total blocked trainees: {totalBlockedTrainees}
+            </p>
+            <button
+              type="button"
+              className="text-primary text-xs underline underline-offset-4"
+              data-testid="workshop-cards-blocked-only-toggle"
+              onClick={() => setBlockedOnly((prev) => !prev)}
+            >
+              {blockedOnly ? "Show all sessions" : "Show blocked only"}
+            </button>
+          </div>
+        ) : null}
+        {blockedRows.length > 0 ? (
+          <div
+            className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 dark:border-amber-700/70 dark:bg-amber-950/20"
+            data-testid="workshop-blocked-drilldown"
+          >
+            <p className="text-xs font-medium">Blocked sessions</p>
+            <ul className="mt-1 space-y-1">
+              {blockedRows.map((row) => (
+                <li
+                  key={`blocked-${row.id}`}
+                  className="flex items-center justify-between gap-2 text-xs"
+                >
+                  <span className="truncate">{row.lesson_title}</span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline">
+                      {(row.blocked_required_prereq_count ?? 0).toString()}{" "}
+                      blocked
+                    </Badge>
+                    <Link
+                      to="/workshop/$sessionId"
+                      params={{ sessionId: row.id }}
+                      className="text-primary underline underline-offset-4"
+                    >
+                      Open
+                    </Link>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         {data && data.data.length > 0 ? (
           <ul className="divide-border divide-y rounded-lg border">
-            {data.data.map((row) => (
+            {visibleRows.map((row) => (
               <li key={row.id}>
                 <Link
                   to="/workshop/$sessionId"
@@ -103,6 +173,14 @@ export function DashboardWorkshopSessions({
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {row.my_role !== "participant" ? (
+                      <Badge
+                        variant="outline"
+                        data-testid={`workshop-card-blocked-count-${row.id}`}
+                      >
+                        Blocked: {row.blocked_required_prereq_count ?? 0}
+                      </Badge>
+                    ) : null}
                     <Badge variant={statusBadgeVariant(row.status)}>
                       {row.status}
                     </Badge>
@@ -112,6 +190,14 @@ export function DashboardWorkshopSessions({
               </li>
             ))}
           </ul>
+        ) : null}
+        {data && data.data.length > 0 && visibleRows.length === 0 ? (
+          <p
+            className="text-muted-foreground text-xs"
+            data-testid="workshop-cards-no-blocked"
+          >
+            No sessions currently blocked by required pre-work.
+          </p>
         ) : null}
       </CardContent>
     </Card>

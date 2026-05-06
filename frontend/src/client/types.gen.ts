@@ -358,6 +358,10 @@ export type WorkshopSessionListItem = {
      * Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.
      */
     my_role?: ('participant' | 'instructor' | null);
+    /**
+     * Roster trainees still missing at least one required prerequisite; only included for instructor/admin visibility.
+     */
+    blocked_required_prereq_count?: (number | null);
 };
 
 /**
@@ -397,6 +401,24 @@ export type WorkshopSessionsPublic = {
     data: Array<WorkshopSessionListItem>;
     count: number;
 };
+
+export type WorkshopSessionTimerPublic = {
+    session_id: string;
+    status: 'inactive' | 'running' | 'paused';
+    mode?: ('countdown' | 'countup' | null);
+    target_seconds?: (number | null);
+    started_at?: (string | null);
+    paused_at?: (string | null);
+};
+
+export type status2 = 'inactive' | 'running' | 'paused';
+
+export type WorkshopSessionTimerStart = {
+    mode?: 'countdown' | 'countup';
+    target_seconds?: (number | null);
+};
+
+export type mode = 'countdown' | 'countup';
 
 /**
  * Assign a user as participant or instructor for one session.
@@ -702,6 +724,37 @@ export type WorkshopSessionsEndWorkshopSessionData = {
 };
 
 export type WorkshopSessionsEndWorkshopSessionResponse = (Message);
+
+export type WorkshopSessionsReadWorkshopSessionTimerData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsReadWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
+
+export type WorkshopSessionsStartWorkshopSessionTimerData = {
+    requestBody: WorkshopSessionTimerStart;
+    sessionId: string;
+};
+
+export type WorkshopSessionsStartWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
+
+export type WorkshopSessionsPauseWorkshopSessionTimerData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsPauseWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
+
+export type WorkshopSessionsResumeWorkshopSessionTimerData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsResumeWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
+
+export type WorkshopSessionsStopWorkshopSessionTimerData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsStopWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
 
 export type WorkshopSessionsCreateWorkshopWsTicketData = {
     sessionId: string;

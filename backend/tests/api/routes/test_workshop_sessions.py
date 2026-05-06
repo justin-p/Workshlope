@@ -1757,6 +1757,7 @@ def test_list_workshop_sessions_includes_participant_membership(
     assert row["id"] == str(session_row.id)
     assert row["status"] == "live"
     assert row["my_role"] == "participant"
+    assert row["blocked_required_prereq_count"] is None
     lesson = db.get(Lesson, session_row.lesson_id)
     assert lesson is not None
     assert row["lesson_title"] == lesson.title
@@ -1795,6 +1796,62 @@ def test_list_workshop_sessions_includes_instructor_membership(
     body = response.json()
     assert body["count"] == 1
     assert body["data"][0]["my_role"] == "instructor"
+    assert body["data"][0]["blocked_required_prereq_count"] == 0
+
+
+def test_list_workshop_sessions_instructor_includes_blocked_prereq_count(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"instr-list-blocked-{uuid.uuid4()}@example.com"
+    password = "testpass123"
+    instructor = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password=password,
+            is_instructor=True,
+        ),
+    )
+    trainee = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"trainee-list-blocked-{uuid.uuid4()}@example.com",
+            password=password,
+        ),
+    )
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=trainee.id,
+        )
+    )
+    db.add(
+        LessonPrerequisite(
+            lesson_id=session_row.lesson_id,
+            title="Read docs",
+            required_flag=True,
+            ordering=0,
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=instructor_email, password=password
+    )
+    response = client.get(f"{settings.API_V1_STR}/workshop/sessions/", headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["data"][0]["my_role"] == "instructor"
+    assert body["data"][0]["blocked_required_prereq_count"] == 1
 
 
 def test_list_workshop_sessions_excludes_removed_participant(
@@ -3055,3 +3112,154 @@ def test_patch_session_end_and_remove_last_instructor_ok(
     ).first()
     assert seat is not None
     assert seat.removed_at is not None
+
+
+def test_timer_lifecycle_for_instructor(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-instr-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    start = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=headers,
+        json={"mode": "countdown", "target_seconds": 300},
+    )
+    assert start.status_code == 200
+    assert start.json()["status"] == "running"
+    assert start.json()["mode"] == "countdown"
+    assert start.json()["target_seconds"] == 300
+
+    pause = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/pause",
+        headers=headers,
+    )
+    assert pause.status_code == 200
+    assert pause.json()["status"] == "paused"
+
+    resume = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/resume",
+        headers=headers,
+    )
+    assert resume.status_code == 200
+    assert resume.json()["status"] == "running"
+
+    read = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer",
+        headers=headers,
+    )
+    assert read.status_code == 200
+    assert read.json()["status"] == "running"
+
+    stop = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/stop",
+        headers=headers,
+    )
+    assert stop.status_code == 200
+    assert stop.json()["status"] == "inactive"
+
+
+def test_timer_requires_instructor_and_active_session(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    normal_headers = authentication_token_from_email(
+        client=client, email=f"timer-user-{uuid.uuid4()}@example.com", db=db
+    )
+    denied = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=normal_headers,
+        json={"mode": "countup"},
+    )
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "User is not an instructor for this session"
+
+    instructor_email = f"timer-inactive-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    session_row.status = "scheduled"
+    db.add(session_row)
+    db.commit()
+
+    blocked = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=headers,
+        json={"mode": "countup"},
+    )
+    assert blocked.status_code == 403
+    assert blocked.json()["detail"] == "timer_requires_active_session"
+
+
+def test_timer_validation_and_conflict_paths(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-conflict-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    bad_countdown = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=headers,
+        json={"mode": "countdown"},
+    )
+    assert bad_countdown.status_code == 422
+    assert bad_countdown.json()["detail"] == "countdown_requires_target_seconds"
+
+    ok_start = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=headers,
+        json={"mode": "countup"},
+    )
+    assert ok_start.status_code == 200
+
+    dup_start = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=headers,
+        json={"mode": "countup"},
+    )
+    assert dup_start.status_code == 409
+    assert dup_start.json()["detail"] == "timer_already_active"
+
+    bad_resume = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/resume",
+        headers=headers,
+    )
+    assert bad_resume.status_code == 409
+    assert bad_resume.json()["detail"] == "timer_not_paused"
