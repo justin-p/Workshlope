@@ -1935,6 +1935,17 @@ export const WorkshopSessionTimerPublicSchema = {
             ],
             title: 'Paused At'
         },
+        elapsed_seconds: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Elapsed Seconds'
+        },
         remaining_seconds: {
             anyOf: [
                 {

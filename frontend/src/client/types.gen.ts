@@ -426,6 +426,7 @@ export type WorkshopSessionTimerPublic = {
     target_seconds?: (number | null);
     started_at?: (string | null);
     paused_at?: (string | null);
+    elapsed_seconds?: (number | null);
     remaining_seconds?: (number | null);
 };
 

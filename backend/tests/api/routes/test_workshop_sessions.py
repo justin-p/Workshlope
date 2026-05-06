@@ -3143,6 +3143,7 @@ def test_timer_lifecycle_for_instructor(client: TestClient, db: Session) -> None
     assert start.json()["status"] == "running"
     assert start.json()["mode"] == "countdown"
     assert start.json()["target_seconds"] == 300
+    assert isinstance(start.json()["elapsed_seconds"], int)
 
     pause = client.post(
         f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/pause",
@@ -3164,6 +3165,7 @@ def test_timer_lifecycle_for_instructor(client: TestClient, db: Session) -> None
     )
     assert read.status_code == 200
     assert read.json()["status"] == "running"
+    assert isinstance(read.json()["elapsed_seconds"], int)
 
     stop = client.post(
         f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/stop",
@@ -3406,5 +3408,7 @@ def test_timer_countdown_includes_remaining_seconds(
     )
     assert start.status_code == 200
     remaining = start.json()["remaining_seconds"]
+    elapsed = start.json()["elapsed_seconds"]
     assert isinstance(remaining, int)
+    assert isinstance(elapsed, int)
     assert 0 <= remaining <= 120

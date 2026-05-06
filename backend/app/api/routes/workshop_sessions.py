@@ -366,18 +366,20 @@ def _timer_public(
 ) -> WorkshopSessionTimerPublic:
     if state is None:
         return WorkshopSessionTimerPublic(session_id=session_id, status="inactive")
+    elapsed_seconds: int | None = None
     remaining_seconds: int | None = None
-    if (
-        state.mode == "countdown"
-        and state.target_seconds is not None
-        and state.started_at is not None
-    ):
+    if state.started_at is not None:
         now = datetime.now(timezone.utc)
         effective_end = state.paused_at if state.status == "paused" else now
         elapsed_seconds = max(
             0,
             int((effective_end - state.started_at).total_seconds()),
         )
+    if (
+        elapsed_seconds is not None
+        and state.mode == "countdown"
+        and state.target_seconds is not None
+    ):
         remaining_seconds = max(0, state.target_seconds - elapsed_seconds)
     return WorkshopSessionTimerPublic(
         session_id=session_id,
@@ -386,6 +388,7 @@ def _timer_public(
         target_seconds=state.target_seconds,
         started_at=state.started_at,
         paused_at=state.paused_at,
+        elapsed_seconds=elapsed_seconds,
         remaining_seconds=remaining_seconds,
     )
 
