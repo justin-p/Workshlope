@@ -182,6 +182,81 @@ def test_grant_revoke_and_leaderboard(client: TestClient, db: Session) -> None:
     assert denied.status_code == 403
 
 
+def test_revoke_requires_non_empty_reason(client: TestClient, db: Session) -> None:
+    headers, instructor = _instructor_headers(client, db)
+    session_row = _create_live_session(db)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    trainee_email = f"badge-trainee-{uuid.uuid4()}@example.com"
+    authentication_token_from_email(client=client, email=trainee_email, db=db)
+    trainee = db.exec(select(User).where(User.email == trainee_email)).first()
+    assert trainee is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=trainee.id,
+        )
+    )
+    db.commit()
+
+    create = client.post(
+        f"{settings.API_V1_STR}/workshop/badges",
+        headers=headers,
+        json={
+            "slug": f"badge-{uuid.uuid4()}",
+            "title": "Reason required",
+            "points": 1,
+        },
+    )
+    assert create.status_code == 200
+    badge_id = create.json()["id"]
+
+    grant = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/grant",
+        headers=headers,
+        json={"user_id": str(trainee.id), "badge_id": badge_id},
+    )
+    assert grant.status_code == 200
+
+    missing_reason = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/revoke",
+        headers=headers,
+        json={"user_id": str(trainee.id), "badge_id": badge_id},
+    )
+    assert missing_reason.status_code == 422
+    assert missing_reason.json()["detail"] == "badge_revoke_reason_required"
+
+    blank_reason = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/revoke",
+        headers=headers,
+        json={
+            "user_id": str(trainee.id),
+            "badge_id": badge_id,
+            "reason": "   ",
+        },
+    )
+    assert blank_reason.status_code == 422
+    assert blank_reason.json()["detail"] == "badge_revoke_reason_required"
+
+    valid_reason = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/revoke",
+        headers=headers,
+        json={
+            "user_id": str(trainee.id),
+            "badge_id": badge_id,
+            "reason": "  policy mismatch  ",
+        },
+    )
+    assert valid_reason.status_code == 200
+
+
 def test_grant_requires_participant_roster_membership(
     client: TestClient, db: Session
 ) -> None:

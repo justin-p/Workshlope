@@ -200,6 +200,12 @@ def revoke_workshop_badge(
     _require_active_session_participant(
         session_db=session, session_id=session_id, user_id=body.user_id
     )
+    normalized_reason = (body.reason or "").strip()
+    if not normalized_reason:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="badge_revoke_reason_required",
+        )
     grant = session.exec(
         select(WorkshopBadgeGrant).where(
             WorkshopBadgeGrant.session_id == session_id,
@@ -216,7 +222,7 @@ def revoke_workshop_badge(
         return Message(message="Badge already revoked")
     grant.revoked_at = datetime.now(timezone.utc)
     grant.revoked_by_user_id = current_user.id
-    grant.revoked_reason = body.reason
+    grant.revoked_reason = normalized_reason
     session.add(grant)
     session.commit()
     return Message(message="Badge revoked")
