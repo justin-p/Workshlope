@@ -103,7 +103,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-06** — stack normalized as open chain: **PR07 v2 [#27](https://github.com/justin-p/testing/pull/27)** → **PR08 v2 [#28](https://github.com/justin-p/testing/pull/28)** → **PR09 [#26](https://github.com/justin-p/testing/pull/26)**. Latest PR09 hardening adds non-empty badge-revocation reason enforcement (`422 badge_revoke_reason_required`) with regression tests. |
+| **Last synced** | **2026-05-06** — stack normalized as open chain: **PR07 v2 [#27](https://github.com/justin-p/testing/pull/27)** → **PR08 v2 [#28](https://github.com/justin-p/testing/pull/28)** → **PR09 [#26](https://github.com/justin-p/testing/pull/26)**. Latest PR09 hardening adds non-empty badge-revocation reason enforcement (`422 badge_revoke_reason_required`) plus structured grant/revoke audit logs. |
 | **Branch tip (2026-05-06)** | **`ws-09-hardening-and-tests`** (base `ws-08-badges-revocation-v2`) now includes roster-membership hardening, idempotent revoke retries, and mandatory non-empty revoke reason validation. |
 | **Active integration branch** | `ws-09-hardening-and-tests` → [#26](https://github.com/justin-p/testing/pull/26) (base `ws-08-badges-revocation-v2`) |
 | **Stack PR label** | **PR09 — HardeningAndTests** 🚧 in progress (slice 3 complete locally on PR branch) |
@@ -118,7 +118,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-09-hardening-and-tests` |
 | PR | [#26](https://github.com/justin-p/testing/pull/26) (base `ws-08-badges-revocation-v2`) |
-| Latest work | **PR09 slice 3 (2026-05-06):** badge revocation now requires a non-empty reason (`422 badge_revoke_reason_required` when missing/blank), with regression coverage for missing/blank/trimmed-valid reason flows. |
+| Latest work | **PR09 slice 4 (2026-05-06):** added structured badge grant/revoke audit logs (`workshop_badge_granted`, `workshop_badge_revoked`, `workshop_badge_revoke_idempotent`) with actor/session/target metadata; prior slice 3 revoke-reason enforcement remains covered. |
 
 **Resume in this order:**
 

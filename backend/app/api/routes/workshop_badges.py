@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -22,6 +23,7 @@ from app.models import (
 )
 
 router = APIRouter(prefix="/workshop/badges", tags=["workshop-badges"])
+logger = logging.getLogger(__name__)
 
 
 def _require_superuser_or_instructor(current_user: CurrentUser) -> None:
@@ -163,6 +165,7 @@ def grant_workshop_badge(
             status_code=status.HTTP_409_CONFLICT,
             detail="badge_already_granted",
         )
+    was_regrant = grant is not None
     if grant is None:
         grant = WorkshopBadgeGrant(
             session_id=session_id,
@@ -178,6 +181,16 @@ def grant_workshop_badge(
         grant.revoked_reason = None
     session.add(grant)
     session.commit()
+    logger.info(
+        "workshop_badge_granted",
+        extra={
+            "session_id": str(session_id),
+            "target_user_id": str(body.user_id),
+            "badge_id": str(body.badge_id),
+            "actor_user_id": str(current_user.id),
+            "regranted": was_regrant,
+        },
+    )
     return Message(message="Badge granted")
 
 
@@ -219,12 +232,31 @@ def revoke_workshop_badge(
         )
     if grant.revoked_at is not None:
         # Idempotent revoke for retry-safe instructor actions.
+        logger.info(
+            "workshop_badge_revoke_idempotent",
+            extra={
+                "session_id": str(session_id),
+                "target_user_id": str(body.user_id),
+                "badge_id": str(body.badge_id),
+                "actor_user_id": str(current_user.id),
+            },
+        )
         return Message(message="Badge already revoked")
     grant.revoked_at = datetime.now(timezone.utc)
     grant.revoked_by_user_id = current_user.id
     grant.revoked_reason = normalized_reason
     session.add(grant)
     session.commit()
+    logger.info(
+        "workshop_badge_revoked",
+        extra={
+            "session_id": str(session_id),
+            "target_user_id": str(body.user_id),
+            "badge_id": str(body.badge_id),
+            "actor_user_id": str(current_user.id),
+            "reason": normalized_reason,
+        },
+    )
     return Message(message="Badge revoked")
 
 
