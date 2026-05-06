@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
+from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
 from app import crud
@@ -334,13 +337,43 @@ def test_authorize_ws_handshake_rejects_unknown_role_claim(db: Session) -> None:
     claims = {
         "sid": str(session.id),
         "uid": str(user.id),
-        "role": "observer",
+        "role": "auditor",
         "pg": session.part_generation,
     }
     assert (
         ws_mod._authorize_workshop_ws_handshake(
             db,
             route_session_id=session.id,
+            claims=claims,
+        )
+        is None
+    )
+
+
+def test_authorize_ws_handshake_unknown_role_claim_hits_else_return(
+    db: Session,
+) -> None:
+    """Explicit else-branch (covers role other than participant | instructor)."""
+    ws_session = _make_live_session_and_lesson(db)
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"ws-role-else-{uuid.uuid4()}@example.com",
+            password="pw123456",
+        ),
+    )
+    db.commit()
+
+    claims = {
+        "sid": str(ws_session.id),
+        "uid": str(user.id),
+        "role": "trainer",
+        "pg": ws_session.part_generation,
+    }
+    assert (
+        ws_mod._authorize_workshop_ws_handshake(
+            db,
+            route_session_id=ws_session.id,
             claims=claims,
         )
         is None
@@ -395,6 +428,45 @@ def test_authorize_ws_handshake_rejects_claims_with_invalid_pg_type(
 def test_authorize_ws_handshake_rejects_claims_missing_fields(db: Session) -> None:
     session = _make_live_session_and_lesson(db)
     claims: dict[str, object] = {"sid": str(session.id)}
+    assert (
+        ws_mod._authorize_workshop_ws_handshake(
+            db,
+            route_session_id=session.id,
+            claims=claims,
+        )
+        is None
+    )
+
+
+def test_authorize_ws_handshake_denies_instructor_claim_when_seat_soft_removed(
+    db: Session,
+) -> None:
+    session = _make_live_session_and_lesson(db)
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"instr-removed-seat-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    now = datetime.now(timezone.utc)
+    db.add(
+        SessionInstructor(
+            session_id=session.id,
+            user_id=user.id,
+            role="lead",
+            removed_at=now,
+        ),
+    )
+    db.commit()
+
+    claims = {
+        "sid": str(session.id),
+        "uid": str(user.id),
+        "role": "instructor",
+        "pg": session.part_generation,
+    }
     assert (
         ws_mod._authorize_workshop_ws_handshake(
             db,
@@ -493,3 +565,141 @@ def test_authorize_ws_handshake_happy_participant(db: Session) -> None:
     )
     assert handshake is not None
     assert handshake.role == "participant"
+
+
+def test_validate_transition_noop_when_status_unchanged() -> None:
+    ws_mod._validate_workshop_session_status_transition(
+        current_status="live",
+        target_status="live",
+    )
+
+
+def test_validate_transition_raises_when_already_ended() -> None:
+    with pytest.raises(HTTPException) as exc:
+        ws_mod._validate_workshop_session_status_transition(
+            current_status="ended",
+            target_status="paused",
+        )
+    assert exc.value.status_code == status.HTTP_403_FORBIDDEN
+    assert exc.value.detail == "session_already_ended"
+
+
+def test_validate_transition_to_live_rejects_unknown_current_status() -> None:
+    with pytest.raises(HTTPException) as exc:
+        ws_mod._validate_workshop_session_status_transition(
+            current_status="broken",
+            target_status="live",
+        )
+    assert exc.value.detail == "invalid_session_status_transition"
+
+
+def test_validate_transition_pause_requires_live_session() -> None:
+    with pytest.raises(HTTPException) as exc:
+        ws_mod._validate_workshop_session_status_transition(
+            current_status="scheduled",
+            target_status="paused",
+        )
+    assert exc.value.detail == "pause_requires_live_session"
+
+
+def test_validate_transition_end_requires_active_session() -> None:
+    with pytest.raises(HTTPException) as exc:
+        ws_mod._validate_workshop_session_status_transition(
+            current_status="scheduled",
+            target_status="ended",
+        )
+    assert exc.value.detail == "end_requires_active_session"
+
+
+def test_validate_transition_accepts_allowed_paths() -> None:
+    ws_mod._validate_workshop_session_status_transition(
+        current_status="scheduled",
+        target_status="live",
+    )
+    ws_mod._validate_workshop_session_status_transition(
+        current_status="paused",
+        target_status="live",
+    )
+    ws_mod._validate_workshop_session_status_transition(
+        current_status="live",
+        target_status="paused",
+    )
+    ws_mod._validate_workshop_session_status_transition(
+        current_status="live",
+        target_status="ended",
+    )
+    ws_mod._validate_workshop_session_status_transition(
+        current_status="paused",
+        target_status="ended",
+    )
+
+
+def test_validate_transition_rejects_unknown_target_status() -> None:
+    with pytest.raises(HTTPException) as exc:
+        ws_mod._validate_workshop_session_status_transition(
+            current_status="live",
+            target_status="scheduled",
+        )
+    assert exc.value.detail == "invalid_session_status_transition"
+
+
+def test_timer_public_returns_inactive_placeholder_when_state_missing() -> None:
+    sid = uuid.uuid4()
+    out = ws_mod._timer_public(sid, None)
+    assert out.status == "inactive"
+    assert out.session_id == sid
+
+
+def test_timer_public_countdown_computes_elapsed_and_remaining() -> None:
+    sid = uuid.uuid4()
+    started = datetime.now(timezone.utc) - timedelta(seconds=5)
+    state = SimpleNamespace(
+        status="running",
+        mode="countdown",
+        target_seconds=30,
+        started_at=started,
+        paused_at=None,
+    )
+    out = ws_mod._timer_public(sid, state)
+    assert out.elapsed_seconds is not None and out.elapsed_seconds >= 5
+    assert out.remaining_seconds is not None
+    assert out.remaining_seconds <= 25
+
+
+def test_workshop_session_detail_shared_raises_when_lesson_row_missing() -> None:
+    lesson_id = uuid.uuid4()
+    session_id = uuid.uuid4()
+    mock_db = MagicMock()
+
+    def _get_side(model: type, pk: uuid.UUID) -> object | None:
+        if model is Lesson and pk == lesson_id:
+            return None
+        raise AssertionError("unexpected Session.get invocation")
+
+    mock_db.get.side_effect = _get_side
+    ws_row = WorkshopSession(
+        id=session_id,
+        lesson_id=lesson_id,
+        status="live",
+        created_at=datetime.now(timezone.utc),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        ws_mod._workshop_session_detail_shared(mock_db, workshop_row=ws_row)
+    assert exc.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert exc.value.detail == "session_lesson_missing"
+
+
+def test_timer_public_paused_uses_paused_at_for_elapsed_cap() -> None:
+    sid = uuid.uuid4()
+    started = datetime.now(timezone.utc) - timedelta(seconds=100)
+    paused_at = started + timedelta(seconds=12)
+    state = SimpleNamespace(
+        status="paused",
+        mode="countup",
+        target_seconds=None,
+        started_at=started,
+        paused_at=paused_at,
+    )
+    out = ws_mod._timer_public(sid, state)
+    assert out.elapsed_seconds == 12

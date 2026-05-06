@@ -3,16 +3,29 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import threading
+import time
+from collections import defaultdict, deque
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
 from app.api.deps import SessionDep
 from app.core.config import settings
-from app.models import GithubAppInstallation, get_datetime_utc
+from app.models import GithubAppInstallation, GithubWebhookDelivery, get_datetime_utc
 
 router = APIRouter(prefix="/github", tags=["github-integration"])
+
+_RATE_LOCK = threading.Lock()
+_RATE_BUCKETS: dict[str, deque[float]] = defaultdict(deque)
+
+
+def reset_github_webhook_rate_limiter_for_tests() -> None:
+    """Clear in-process webhook rate buckets (tests only)."""
+    with _RATE_LOCK:
+        _RATE_BUCKETS.clear()
 
 
 def verify_github_signature_sha256(
@@ -25,6 +38,46 @@ def verify_github_signature_sha256(
     expected_hex = signature_header.removeprefix("sha256=")
     digest = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected_hex, digest)
+
+
+def _enforce_github_webhook_rate_limit(client_host: str | None) -> None:
+    """Sliding-window limit per client IP for signed webhook abuse."""
+    limit = int(settings.GITHUB_WEBHOOK_MAX_REQUESTS_PER_MINUTE_PER_IP)
+    window = float(settings.GITHUB_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS)
+    if limit <= 0:
+        return
+    key = client_host or "unknown"
+    now = time.time()
+    with _RATE_LOCK:
+        bucket = _RATE_BUCKETS[key]
+        while bucket and bucket[0] < now - window:
+            bucket.popleft()
+        if len(bucket) >= limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Webhook rate limit exceeded",
+            )
+        bucket.append(now)
+
+
+def _reserve_delivery_idempotent(
+    *, session: Session, delivery_id: str, github_event: str
+) -> bool:
+    """Return True if this is a replay (delivery already processed)."""
+    trimmed = delivery_id[:128]
+    session.add(
+        GithubWebhookDelivery(
+            delivery_id=trimmed,
+            github_event=github_event[:128],
+            received_at=get_datetime_utc(),
+        ),
+    )
+    try:
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        return True
+    return False
 
 
 def _upsert_installation_from_payload(
@@ -83,6 +136,9 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
         )
 
     raw = await request.body()
+    client_host = request.client.host if request.client else None
+    _enforce_github_webhook_rate_limit(client_host)
+
     sig_header = request.headers.get("x-hub-signature-256")
 
     if not verify_github_signature_sha256(
@@ -95,26 +151,38 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
             detail="Invalid signature",
         )
 
-    event = request.headers.get("x-github-event", "")
-    if event == "ping":
-        return {"ok": True}
-
-    if event != "installation":
-        return {"ignored": event}
+    github_event = request.headers.get("x-github-event", "")
+    delivery_id = (request.headers.get("x-github-delivery") or "").strip()
 
     try:
-        payload = json.loads(raw.decode("utf-8"))
+        payload: dict[str, Any] = json.loads(raw.decode("utf-8")) if raw else {}
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Malformed payload",
         ) from exc
 
+    if delivery_id and _reserve_delivery_idempotent(
+        session=session,
+        delivery_id=delivery_id,
+        github_event=github_event,
+    ):
+        return {"ok": True, "idempotent": True}
+
+    if github_event == "ping":
+        session.commit()
+        return {"ok": True}
+
+    if github_event != "installation":
+        session.commit()
+        return {"ignored": github_event}
+
     action = payload.get("action")
     installation = payload.get("installation") or {}
 
     inst_id_raw = installation.get("id")
     if inst_id_raw is None:
+        session.commit()
         return {"ok": True}
 
     inst_id = int(inst_id_raw)
@@ -149,4 +217,5 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
         session.commit()
         return {"ok": True, "action": action}
 
+    session.commit()
     return {"ok": True, "unknown_action": action}

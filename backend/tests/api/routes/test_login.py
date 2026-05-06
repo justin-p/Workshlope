@@ -25,6 +25,25 @@ def test_get_access_token(client: TestClient) -> None:
     assert tokens["access_token"]
 
 
+def test_login_rejects_inactive_user(client: TestClient, db: Session) -> None:
+    email = random_email()
+    password = random_lower_string()
+    user = create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password=password,
+            is_active=False,
+            is_superuser=False,
+        ),
+    )
+    assert user.id
+    login_data = {"username": email, "password": password}
+    r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Inactive user"
+
+
 def test_get_access_token_incorrect_password(client: TestClient) -> None:
     login_data = {
         "username": settings.FIRST_SUPERUSER,
@@ -62,6 +81,90 @@ def test_recovery_password(
         assert r.json() == {
             "message": "If that email is registered, we sent a password recovery link"
         }
+
+
+def test_recovery_password_html_content_returns_404_for_unknown_user(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    r = client.post(
+        f"{settings.API_V1_STR}/password-recovery-html-content/ghost@nodomain.invalid",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 404
+
+
+def test_recovery_password_html_content_returns_html_when_user_exists(
+    client: TestClient, db: Session, superuser_token_headers: dict[str, str]
+) -> None:
+    email = random_email()
+    password = random_lower_string()
+    create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password=password,
+            is_active=True,
+            is_superuser=False,
+        ),
+    )
+    r = client.post(
+        f"{settings.API_V1_STR}/password-recovery-html-content/{email}",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 200
+    assert "reset-password" in r.text
+
+
+def test_reset_password_returns_invalid_token_when_user_was_deleted_after_token_issue(
+    client: TestClient, db: Session, superuser_token_headers: dict[str, str]
+) -> None:
+    email = random_email()
+    password = random_lower_string()
+    user = create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password=password,
+            is_active=True,
+            is_superuser=False,
+        ),
+    )
+    token = generate_password_reset_token(email=email)
+    db.delete(user)
+    db.commit()
+
+    r = client.post(
+        f"{settings.API_V1_STR}/reset-password/",
+        headers=superuser_token_headers,
+        json={"token": token, "new_password": random_lower_string()},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Invalid token"
+
+
+def test_reset_password_rejects_inactive_account(
+    client: TestClient, db: Session, superuser_token_headers: dict[str, str]
+) -> None:
+    email = random_email()
+    password = random_lower_string()
+    create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password=password,
+            is_active=False,
+            is_superuser=False,
+        ),
+    )
+    token = generate_password_reset_token(email=email)
+
+    r = client.post(
+        f"{settings.API_V1_STR}/reset-password/",
+        headers=superuser_token_headers,
+        json={"token": token, "new_password": random_lower_string()},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Inactive user"
 
 
 def test_recovery_password_user_not_exits(

@@ -1,5 +1,6 @@
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -155,6 +156,43 @@ def test_private_bootstrap_e2e_workshop_with_incomplete_required_prerequisite(
     assert prereq is not None
     assert prereq.required_flag is True
     assert prereq.title == "E2E required pre-read"
+
+
+def test_private_e2e_bootstrap_requires_existing_participant_user(
+    client: TestClient,
+) -> None:
+    phantom = f"no-such-bootstrap-user-{uuid.uuid4().hex}@example.com"
+    r = client.post(
+        f"{settings.API_V1_STR}/private/workshop/e2e-live-session/"
+        f"?participant_email={phantom}",
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Participant user not found"
+
+
+def test_private_e2e_distinct_trainee_requires_superuser_row_when_config_mismatched(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    phantom_su = "no-super-row@example.invalid"
+    monkeypatch.setattr(settings, "FIRST_SUPERUSER", phantom_su, raising=False)
+    email = f"trainee-only-{uuid.uuid4().hex}@example.com"
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/private/users/",
+            json={
+                "email": email,
+                "password": "password123",
+                "full_name": "T",
+            },
+        ).status_code
+        == 200
+    )
+
+    r = client.post(
+        f"{settings.API_V1_STR}/private/workshop/e2e-live-session/"
+        f"?participant_email={email}",
+    )
+    assert r.status_code == 500
 
 
 def test_private_bootstrap_e2e_workshop_can_start_scheduled(

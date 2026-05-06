@@ -65,6 +65,27 @@ def test_read_item_not_enough_permissions(
     assert content["detail"] == "Not enough permissions"
 
 
+def test_read_items_scoped_to_owner_when_not_superuser(
+    client: TestClient, normal_user_token_headers: dict[str, str], db: Session
+) -> None:
+    create_random_item(db)
+    created = client.post(
+        f"{settings.API_V1_STR}/items/",
+        headers=normal_user_token_headers,
+        json={"title": "Mine", "description": "Only"},
+    )
+    assert created.status_code == 200
+    response = client.get(
+        f"{settings.API_V1_STR}/items/",
+        headers=normal_user_token_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert len(body["data"]) == 1
+    assert body["data"][0]["title"] == "Mine"
+
+
 def test_read_items(
     client: TestClient, superuser_token_headers: dict[str, str], db: Session
 ) -> None:

@@ -10,6 +10,7 @@ from app.core.db import engine, init_db
 from app.main import app
 from app.models import (
     GithubAppInstallation,
+    GithubWebhookDelivery,
     Item,
     Lesson,
     LessonPart,
@@ -50,6 +51,9 @@ def db() -> Generator[Session, None, None]:
         session.execute(statement)
         statement = delete(LessonRepo)
         session.execute(statement)
+        if inspect(engine).has_table("github_webhook_delivery"):
+            statement = delete(GithubWebhookDelivery)
+            session.execute(statement)
         if inspect(engine).has_table("github_app_installation"):
             statement = delete(GithubAppInstallation)
             session.execute(statement)

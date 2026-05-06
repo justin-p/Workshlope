@@ -12,15 +12,15 @@ Use this section after a pause or repo switch—do not rely on chat memory alone
 | ------ | ------ |
 | **Last synced** | **2026-05-06** — Workshop stack merged to **`main`** via **[#18](https://github.com/justin-p/testing/pull/18)** (tip **`5761292`** or later); nested [#19](https://github.com/justin-p/testing/pull/19)–[#23](https://github.com/justin-p/testing/pull/23), [#26](https://github.com/justin-p/testing/pull/26), [#27](https://github.com/justin-p/testing/pull/27), [#29](https://github.com/justin-p/testing/pull/29); [#28](https://github.com/justin-p/testing/pull/28) closed. Integration branches **`ws-01…ws-06`** may still exist remotely for archaeology. |
 | **Integration tip** | **`main`** |
-| **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** - **Lesson GitHub sync**: backend lives on stacked branches **`ws-lesson-01`…`ws-lesson-05`** until merged ([map](#lesson-source-follow-up-stack)); still open: **Markdown sanitize/rewrites**, webhook **idempotency/throttle**, **entitlement** checks, **Install** UI. Posture **`security-hardening-new-features`**. |
+| **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** - **Lesson GitHub sync**: backend previously tracked on **`ws-lesson-01`…`ws-lesson-05`** ([map](#lesson-source-follow-up-stack)); merge posture follows stacked PRs to **`main`**. Still open: wire **sanitized part HTML** into SPA/API (helper ready), webhook **entitlement / installation_repositories** tightening (beyond idempotency + throttle), optional **replay clock-skew** checks, **Install** UI. Posture **`security-hardening-new-features`**. |
 
 ### Remaining work (authoritative)
 
 **1. Lesson source pipeline** (backend on **`ws-lesson-01`…`ws-lesson-05`**, not merged to **`main`** until the stacked PR chain lands)
 
 - **Progress (landed locally on stacked branches `ws-lesson-01` … `ws-lesson-05` — merge in order):** [`lesson_manifest.py`](backend/app/services/lesson_manifest.py) + [`lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py) (**L1**). DB **`github_app_installation`** + FK on **`LessonRepo`** (**L2**). [`github_app_tokens.py`](backend/app/services/github_app_tokens.py) (**L3**). [`github_webhooks.py`](backend/app/api/routes/github_webhooks.py) — **`POST /api/v1/github/webhooks`** (**L4**). [`lesson_github_fetch.py`](backend/app/services/lesson_github_fetch.py) + [`workshop_lesson_repos.py`](backend/app/api/routes/workshop_lesson_repos.py) — **`POST /api/v1/workshop/lesson-repos/sync-from-github`** (**L5**). See **[Lesson source follow-up stack](#lesson-source-follow-up-stack)**.
-- **GitHub App (still hardening vs [Locked decisions](#locked-decisions)):** Webhook **replay/idempotency** (`X-GitHub-Delivery`), route **throttle**, instructor-bound **repo entitlement** verification beyond “installation exists”, **installation_repositories** handling.
-- **Sync + models (remaining product work):** **sanitize Markdown + rewrite relative assets** to raw GitHub URLs (see **[Markdown](#markdown)**); **`LessonManifest`** SHA row if you want audit; instructor **Install/configure** UI.
+- **GitHub App (still hardening vs [Locked decisions](#locked-decisions)):** **Shipped:** `POST /api/v1/github/webhooks` verifies `X-GitHub-Delivery` via **`github_webhook_delivery`** (idempotent replay) and applies **per-IP sliding-window throttle** (`GITHUB_WEBHOOK_MAX_REQUESTS_PER_MINUTE_PER_IP`, `GITHUB_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS`). **Still open:** instructor-bound **repo entitlement** beyond “installation exists”, **`installation_repositories`** handling, optional **HTTP Date / skew** replay window.
+- **Sync + models (remaining product work):** **Sync-time rewrite** of relative markdown / simple HTML asset URLs → **`raw.githubusercontent.com`** (+ strip ``<script>`` / ``<iframe>`` outside fenced blocks) via [`lesson_markdown_pipeline.py`](backend/app/services/lesson_markdown_pipeline.py); **`lesson_markdown_to_safe_html`** (CommonMark `html=false` + **nh3**) for read path — **expose in API/UI** when rendering part bodies. **`LessonManifest`** SHA row if you want audit; instructor **Install/configure** UI.
 - **Instructor UX**: Repo list, Install/configure CTA (instructor-only — **[Product constraints](#product-constraints)**), Sync, health, parts preview — aligns with **[UI / UX](#ui--ux-specification)** IA; backend routes must catch up.
 
 **2. Optional / polish (product + engineering)**
@@ -70,7 +70,7 @@ Merged into [`main`](https://github.com/justin-p/testing/tree/main) via **[#18](
 | HTTP + WebSocket routes | [`backend/app/api/routes/workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py) |
 | Badges HTTP routes | [`backend/app/api/routes/workshop_badges.py`](backend/app/api/routes/workshop_badges.py) |
 | Prerequisites HTTP routes | [`backend/app/api/routes/workshop_lessons.py`](backend/app/api/routes/workshop_lessons.py) |
-| Lesson YAML manifest + path-map → DB sync | [`backend/app/services/lesson_manifest.py`](backend/app/services/lesson_manifest.py), [`backend/app/services/lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py); tests [`backend/tests/services/test_lesson_manifest.py`](backend/tests/services/test_lesson_manifest.py), [`backend/tests/services/test_lesson_repo_sync.py`](backend/tests/services/test_lesson_repo_sync.py) |
+| Lesson YAML manifest + path-map → DB sync | [`backend/app/services/lesson_manifest.py`](backend/app/services/lesson_manifest.py), [`backend/app/services/lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py), Markdown URL rewrite / safe HTML [`backend/app/services/lesson_markdown_pipeline.py`](backend/app/services/lesson_markdown_pipeline.py); tests [`backend/tests/services/test_lesson_manifest.py`](backend/tests/services/test_lesson_manifest.py), [`backend/tests/services/test_lesson_repo_sync.py`](backend/tests/services/test_lesson_repo_sync.py), [`backend/tests/services/test_lesson_markdown_pipeline.py`](backend/tests/services/test_lesson_markdown_pipeline.py) |
 | GitHub App → lesson HTTP sync | [`backend/app/services/github_app_tokens.py`](backend/app/services/github_app_tokens.py), [`backend/app/services/lesson_github_fetch.py`](backend/app/services/lesson_github_fetch.py), [`backend/app/api/routes/github_webhooks.py`](backend/app/api/routes/github_webhooks.py), [`backend/app/api/routes/workshop_lesson_repos.py`](backend/app/api/routes/workshop_lesson_repos.py); tests [`backend/tests/services/test_github_app_tokens.py`](backend/tests/services/test_github_app_tokens.py), [`backend/tests/api/routes/test_github_webhooks.py`](backend/tests/api/routes/test_github_webhooks.py), [`backend/tests/api/routes/test_workshop_lesson_repos.py`](backend/tests/api/routes/test_workshop_lesson_repos.py) |
 | In-memory fan-out hub | [`backend/app/services/workshop_realtime.py`](backend/app/services/workshop_realtime.py) |
 | API tests | [`backend/tests/api/routes/test_workshop_sessions.py`](backend/tests/api/routes/test_workshop_sessions.py) |
@@ -498,8 +498,9 @@ Last-instructor guardrail: for sessions with status != ended, instructor remove/
 
 ## Markdown
 
-Render GFM → HTML through a **sanitize** allowlist (**bleach**, **nh3**, or equivalent) before the SPA.
-Rewrite relative markdown asset links/images to `raw.githubusercontent.com` URLs at sync/read-model build time for stable rendering.
+**Implemented on backend:** Lesson sync applies **relative markdown link/image targets** and **`src` / `href` attributes on simple HTML tags** outside fenced blocks → **`https://raw.githubusercontent.com/{full_name}/{default_branch}/{path}`**; strips embedded **`<script>`** / **`<iframe>`** outside fences. **`lesson_markdown_to_safe_html`** renders CommonMark (tables enabled, **raw HTML disabled**) then **nh3** allowlists — use when returning part content to the SPA.
+
+**Remaining product wiring:** Workshop UI (or HTTP detail) still needs to fetch/render stored **`body_md`** through the safe renderer (or equivalent) for trainees/instructors.
 
 ## Notifications (MVP)
 
@@ -826,7 +827,7 @@ flowchart LR
   l4 --> l5["L5 sync HTTP"]
 ```
 
-**Still deferred vs full §1:** Markdown **sanitize**, relative-asset rewrite to **`raw.githubusercontent.com`**, **webhook replay/idempotency** store, instructor **Install app** UX, **`installation_repositories` entitlement checks**, route **throttling** on webhook/sync.
+**Still deferred vs full §1:** Expose **`lesson_markdown_to_safe_html`** (or streamed equivalent) **in API + SPA** for part bodies; instructor **Install app** UX; **`installation_repositories` entitlement checks** (webhook **delivery ledger + IP throttle** + sync-time **relative → `raw.githubusercontent.com` rewrite** are in place).
 
 ### PR scope guardrails
 

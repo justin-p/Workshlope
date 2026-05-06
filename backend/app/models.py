@@ -144,6 +144,19 @@ class GithubAppInstallation(SQLModel, table=True):
     lesson_repos: list["LessonRepo"] = Relationship(back_populates="installation")
 
 
+class GithubWebhookDelivery(SQLModel, table=True):
+    """Records ``X-GitHub-Delivery`` ids so webhook side effects run at most once."""
+
+    __tablename__ = "github_webhook_delivery"
+
+    delivery_id: str = Field(primary_key=True, max_length=128)
+    github_event: str = Field(default="", max_length=128)
+    received_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
 class LessonRepo(SQLModel, table=True):
     __tablename__ = "lesson_repo"
 

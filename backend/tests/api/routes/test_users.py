@@ -341,6 +341,20 @@ def test_register_user(client: TestClient, db: Session) -> None:
     assert verified
 
 
+def test_register_user_disabled_returns_403(client: TestClient) -> None:
+    with patch("app.core.config.settings.USER_REGISTRATION_ENABLED", False):
+        r = client.post(
+            f"{settings.API_V1_STR}/users/signup",
+            json={
+                "email": random_email(),
+                "password": random_lower_string(),
+                "full_name": "x",
+            },
+        )
+    assert r.status_code == 403
+    assert r.json()["detail"] == "User registration is disabled"
+
+
 def test_register_user_already_exists_error(client: TestClient) -> None:
     password = random_lower_string()
     full_name = random_lower_string()
