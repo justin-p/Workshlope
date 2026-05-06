@@ -103,10 +103,10 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-06** — stack normalized as open chain: **PR07 v2 [#27](https://github.com/justin-p/testing/pull/27)** → **PR08 v2 [#28](https://github.com/justin-p/testing/pull/28)** → **PR09 [#26](https://github.com/justin-p/testing/pull/26)**. Latest PR09 hardening adds non-empty badge-revocation reason enforcement (`422 badge_revoke_reason_required`) plus structured grant/revoke audit logs. |
-| **Branch tip (2026-05-06)** | **`ws-09-hardening-and-tests`** (base `ws-08-badges-revocation-v2`) now includes roster-membership hardening, idempotent revoke retries, and mandatory non-empty revoke reason validation. |
-| **Active integration branch** | `ws-09-hardening-and-tests` → [#26](https://github.com/justin-p/testing/pull/26) (base `ws-08-badges-revocation-v2`) |
-| **Stack PR label** | **PR09 — HardeningAndTests** 🚧 in progress (slice 3 complete locally on PR branch) |
+| **Last synced** | **2026-05-06** — PR09 merged: [#26](https://github.com/justin-p/testing/pull/26) into `ws-08-badges-revocation-v2`, including roster-membership enforcement, idempotent revoke retries, required non-empty revoke reasons, and structured badge mutation audit logs. Open chain now continues with **PR07 v2 [#27](https://github.com/justin-p/testing/pull/27)** → **PR08 v2 [#28](https://github.com/justin-p/testing/pull/28)**. |
+| **Branch tip (2026-05-06)** | **`ws-08-badges-revocation-v2`** now contains PR08 foundations plus merged PR09 hardening slices. |
+| **Active integration branch** | `ws-08-badges-revocation-v2` → [#28](https://github.com/justin-p/testing/pull/28) (base `ws-07-pacing-timer-v2`) |
+| **Stack PR label** | **PR08 — BadgesRevocation** 🚧 in progress (now includes merged PR09 hardening payload) |
 
 ### Pause / resume checkpoint (handoff)
 
@@ -116,14 +116,14 @@ Use this section when reopening the project **after intentional stop**. Do **not
 
 | Item | Value |
 | ---- | ----- |
-| Branch | `ws-09-hardening-and-tests` |
-| PR | [#26](https://github.com/justin-p/testing/pull/26) (base `ws-08-badges-revocation-v2`) |
-| Latest work | **PR09 slice 4 (2026-05-06):** added structured badge grant/revoke audit logs (`workshop_badge_granted`, `workshop_badge_revoked`, `workshop_badge_revoke_idempotent`) with actor/session/target metadata; prior slice 3 revoke-reason enforcement remains covered. |
+| Branch | `ws-08-badges-revocation-v2` |
+| PR | [#28](https://github.com/justin-p/testing/pull/28) (base `ws-07-pacing-timer-v2`) |
+| Latest work | **PR09 merged via [#26](https://github.com/justin-p/testing/pull/26):** badge hardening complete (roster-only grant/revoke, idempotent revoke retry, required non-empty revoke reason, structured audit logs). |
 
 **Resume in this order:**
 
-1. `git checkout ws-09-hardening-and-tests`, run `uv run pytest tests/api/routes/test_workshop_badges.py`, and keep hardening changes scoped to policy/test guarantees.
-2. Continue PR09 against `ws-08-badges-revocation-v2` ([#26](https://github.com/justin-p/testing/pull/26)) with additional hardening/test coverage slices.
+1. `git checkout ws-08-badges-revocation-v2`, run `uv run pytest tests/api/routes/test_workshop_badges.py`, and keep badge/hardening changes scoped while PR08 v2 remains open.
+2. Babysit [#28](https://github.com/justin-p/testing/pull/28) and [#27](https://github.com/justin-p/testing/pull/27) checks (`gh pr checks --watch`) and resolve any CI drift before merge.
 3. Keep [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged), **Implementation tracker / Last synced / Stop-handoff**, and this checkpoint synced whenever PR/base/branch state changes — **especially after each intentional stop or resume.**
 
 **Open gaps (not blocking pause):**
@@ -149,7 +149,7 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 | PR06 | `ws-06-learning-workflows` | [#23](https://github.com/justin-p/testing/pull/23) | `ws-05-dashboard-nav` |
 | PR07 | `ws-07-pacing-timer-v2` | [#27](https://github.com/justin-p/testing/pull/27) | `ws-06-learning-workflows` |
 | PR08 | `ws-08-badges-revocation-v2` | [#28](https://github.com/justin-p/testing/pull/28) | `ws-07-pacing-timer-v2` |
-| PR09 | `ws-09-hardening-and-tests` | [#26](https://github.com/justin-p/testing/pull/26) | `ws-08-badges-revocation-v2` |
+| PR09 | `ws-09-hardening-and-tests` | [#26](https://github.com/justin-p/testing/pull/26) *(merged)* | `ws-08-badges-revocation-v2` |
 
 ### Backend code anchors (workshop delivery slices)
 
