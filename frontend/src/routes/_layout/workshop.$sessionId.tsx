@@ -160,6 +160,17 @@ function WorkshopSessionPage() {
     retry: false,
   })
 
+  const timerEventsQuery = useQuery({
+    queryKey: ["workshopSessionTimerEvents", sessionId],
+    queryFn: () =>
+      WorkshopSessionsService.readWorkshopSessionTimerEvents({
+        sessionId,
+        limit: 5,
+      }),
+    enabled: uuidOk && detailView === "instructor",
+    retry: false,
+  })
+
   const startTimerMutation = useMutation({
     mutationFn: () =>
       WorkshopSessionsService.startWorkshopSessionTimer({
@@ -169,6 +180,9 @@ function WorkshopSessionPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["workshopSessionTimer", sessionId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
       })
     },
     onError: (e: unknown) => {
@@ -188,6 +202,9 @@ function WorkshopSessionPage() {
       void queryClient.invalidateQueries({
         queryKey: ["workshopSessionTimer", sessionId],
       })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
+      })
     },
     onError: (e: unknown) => {
       if (e instanceof ApiError) {
@@ -206,6 +223,9 @@ function WorkshopSessionPage() {
       void queryClient.invalidateQueries({
         queryKey: ["workshopSessionTimer", sessionId],
       })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
+      })
     },
     onError: (e: unknown) => {
       if (e instanceof ApiError) {
@@ -223,6 +243,9 @@ function WorkshopSessionPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["workshopSessionTimer", sessionId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
       })
     },
     onError: (e: unknown) => {
@@ -410,6 +433,7 @@ function WorkshopSessionPage() {
   const requiredAggregateRows =
     aggregatesQuery.data?.data.filter((r) => r.prerequisite.required_flag) ?? []
   const timerStatus = timerQuery.data?.status ?? "inactive"
+  const timerEvents = timerEventsQuery.data?.data ?? []
   const isPreworkGateError = errorDetail === "Required prerequisites incomplete"
   const participantRemainingRequiredCount = overdueRequiredPrerequisites.length
   const instructorBlockedTraineesCount = gapsQuery.data?.count ?? 0
@@ -727,6 +751,35 @@ function WorkshopSessionPage() {
           >
             Timer: {timerStatus}
           </span>
+          <div
+            className="w-full rounded-md border p-2 text-xs text-muted-foreground"
+            data-testid="workshop-timer-events"
+          >
+            <div className="font-medium text-foreground mb-1">
+              Recent timer events
+            </div>
+            {timerEventsQuery.isLoading ? (
+              <p>Loading timer events...</p>
+            ) : timerEvents.length === 0 ? (
+              <p>No timer actions recorded yet.</p>
+            ) : (
+              <ul className="space-y-1">
+                {timerEvents.map((event) => (
+                  <li key={event.id} className="flex gap-2 items-center">
+                    <span className="uppercase text-[10px] tracking-wide">
+                      {event.action}
+                    </span>
+                    <span>{event.mode ?? "n/a"}</span>
+                    <span>
+                      {event.target_seconds
+                        ? `${event.target_seconds}s`
+                        : "countup"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       ) : null}
 

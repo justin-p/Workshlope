@@ -21,6 +21,7 @@ from app.models import (
     UserPrerequisiteCompletion,
     WorkshopParticipant,
     WorkshopSession,
+    WorkshopSessionTimerEvent,
 )
 from app.services import workshop_realtime as workshop_realtime_mod
 from tests.utils.user import (
@@ -3263,3 +3264,115 @@ def test_timer_validation_and_conflict_paths(client: TestClient, db: Session) ->
     )
     assert bad_resume.status_code == 409
     assert bad_resume.json()["detail"] == "timer_not_paused"
+
+
+def test_timer_writes_audit_events(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-audit-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+            headers=headers,
+            json={"mode": "countup"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/pause",
+            headers=headers,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/resume",
+            headers=headers,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/stop",
+            headers=headers,
+        ).status_code
+        == 200
+    )
+
+    actions = db.exec(
+        select(WorkshopSessionTimerEvent.action)
+        .where(WorkshopSessionTimerEvent.session_id == session_row.id)
+        .order_by(WorkshopSessionTimerEvent.created_at)
+    ).all()
+    assert actions == ["start", "pause", "resume", "stop"]
+
+
+def test_timer_events_endpoint_returns_recent_actions(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-events-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+            headers=headers,
+            json={"mode": "countdown", "target_seconds": 120},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/pause",
+            headers=headers,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/resume",
+            headers=headers,
+        ).status_code
+        == 200
+    )
+
+    events = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/events?limit=2",
+        headers=headers,
+    )
+    assert events.status_code == 200
+    payload = events.json()
+    assert payload["count"] == 2
+    assert payload["data"][0]["action"] == "resume"
+    assert payload["data"][1]["action"] == "pause"

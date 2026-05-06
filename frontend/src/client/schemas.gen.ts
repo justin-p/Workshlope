@@ -1794,6 +1794,88 @@ export const WorkshopSessionPublicParticipantSchema = {
     description: 'Trainee-visible session detail — lesson + parts + self only (no roster).'
 } as const;
 
+export const WorkshopSessionTimerEventPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        session_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Session Id'
+        },
+        actor_user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Actor User Id'
+        },
+        action: {
+            type: 'string',
+            enum: ['start', 'pause', 'resume', 'stop'],
+            title: 'Action'
+        },
+        mode: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['countdown', 'countup']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Mode'
+        },
+        target_seconds: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Seconds'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'session_id', 'actor_user_id', 'action'],
+    title: 'WorkshopSessionTimerEventPublic'
+} as const;
+
+export const WorkshopSessionTimerEventsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopSessionTimerEventPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopSessionTimerEventsPublic'
+} as const;
+
 export const WorkshopSessionTimerPublicSchema = {
     properties: {
         session_id: {
