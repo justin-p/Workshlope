@@ -184,7 +184,7 @@ function WorkshopSessionPage() {
     mutationFn: () =>
       WorkshopSessionsService.startWorkshopSessionTimer({
         sessionId,
-        requestBody: { mode: "countup" },
+        requestBody: { mode: "countdown", target_seconds: 300 },
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -701,7 +701,7 @@ function WorkshopSessionPage() {
             }
             onClick={() => startTimerMutation.mutate()}
           >
-            Start 5m timer
+            Start 5m countdown
           </Button>
           <Button
             type="button"
