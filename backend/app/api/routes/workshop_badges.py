@@ -207,10 +207,13 @@ def revoke_workshop_badge(
             WorkshopBadgeGrant.badge_id == body.badge_id,
         )
     ).first()
-    if grant is None or grant.revoked_at is not None:
+    if grant is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Active badge grant not found"
         )
+    if grant.revoked_at is not None:
+        # Idempotent revoke for retry-safe instructor actions.
+        return Message(message="Badge already revoked")
     grant.revoked_at = datetime.now(timezone.utc)
     grant.revoked_by_user_id = current_user.id
     grant.revoked_reason = body.reason

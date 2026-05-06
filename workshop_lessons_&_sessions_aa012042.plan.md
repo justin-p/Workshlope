@@ -118,7 +118,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-09-hardening-and-tests` |
 | PR | *(not opened yet; expected base `ws-08-badges-revocation`)* |
-| Latest work | **PR09 slice 1 (2026-05-06):** hardened badge grant/revoke paths to enforce active session-roster membership for target users and added route coverage for non-rostered grant rejection (`404 Participant not in session roster`). |
+| Latest work | **PR09 slice 2 (2026-05-06):** hardened badge mutation retry semantics: duplicate active grants now explicitly assert `409 badge_already_granted`, and revocation is idempotent (`200 Badge already revoked`) for safer instructor retries; route tests expanded accordingly. |
 
 **Resume in this order:**
 

@@ -129,6 +129,14 @@ def test_grant_revoke_and_leaderboard(client: TestClient, db: Session) -> None:
     )
     assert grant.status_code == 200
 
+    duplicate_grant = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/grant",
+        headers=headers,
+        json={"user_id": str(trainee.id), "badge_id": badge_id},
+    )
+    assert duplicate_grant.status_code == 409
+    assert duplicate_grant.json()["detail"] == "badge_already_granted"
+
     leaderboard = client.get(
         f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/leaderboard",
         headers=headers,
@@ -147,6 +155,18 @@ def test_grant_revoke_and_leaderboard(client: TestClient, db: Session) -> None:
         },
     )
     assert revoke.status_code == 200
+
+    revoke_retry = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/revoke",
+        headers=headers,
+        json={
+            "user_id": str(trainee.id),
+            "badge_id": badge_id,
+            "reason": "repeat retry",
+        },
+    )
+    assert revoke_retry.status_code == 200
+    assert revoke_retry.json()["message"] == "Badge already revoked"
 
     leaderboard_after = client.get(
         f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/leaderboard",
