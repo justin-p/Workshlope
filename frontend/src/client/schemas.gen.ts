@@ -287,6 +287,53 @@ export const ItemsPublicSchema = {
     title: 'ItemsPublic'
 } as const;
 
+export const LessonRepoGithubSyncBodySchema = {
+    properties: {
+        full_name: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Full Name'
+        },
+        installation_id: {
+            type: 'integer',
+            exclusiveMinimum: 0,
+            title: 'Installation Id'
+        }
+    },
+    type: 'object',
+    required: ['full_name', 'installation_id'],
+    title: 'LessonRepoGithubSyncBody'
+} as const;
+
+export const LessonRepoGithubSyncPublicSchema = {
+    properties: {
+        lesson_repo_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Repo Id'
+        },
+        lessons_synced: {
+            type: 'integer',
+            title: 'Lessons Synced'
+        },
+        full_name: {
+            type: 'string',
+            title: 'Full Name'
+        },
+        health: {
+            type: 'string',
+            title: 'Health'
+        },
+        default_branch: {
+            type: 'string',
+            title: 'Default Branch'
+        }
+    },
+    type: 'object',
+    required: ['lesson_repo_id', 'lessons_synced', 'full_name', 'health', 'default_branch'],
+    title: 'LessonRepoGithubSyncPublic'
+} as const;
+
 export const MessageSchema = {
     properties: {
         message: {

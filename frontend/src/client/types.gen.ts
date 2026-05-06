@@ -66,6 +66,19 @@ export type ItemUpdate = {
     description?: (string | null);
 };
 
+export type LessonRepoGithubSyncBody = {
+    full_name: string;
+    installation_id: number;
+};
+
+export type LessonRepoGithubSyncPublic = {
+    lesson_repo_id: string;
+    lessons_synced: number;
+    full_name: string;
+    health: string;
+    default_branch: string;
+};
+
 export type Message = {
     message: string;
 };
@@ -701,6 +714,12 @@ export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData = {
 };
 
 export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse = (WorkshopSessionLeaderboardPublic);
+
+export type WorkshopLessonReposSyncLessonRepoFromGithubData = {
+    requestBody: LessonRepoGithubSyncBody;
+};
+
+export type WorkshopLessonReposSyncLessonRepoFromGithubResponse = (LessonRepoGithubSyncPublic);
 
 export type WorkshopLessonsCreateLessonPrerequisiteData = {
     lessonId: string;

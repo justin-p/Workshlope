@@ -18,9 +18,9 @@ Use this section after a pause or repo switch—do not rely on chat memory alone
 
 **1. Lesson source pipeline (not implemented end-to-end on `main`)**
 
-- **Progress (landed in backend):** [`lesson_manifest.py`](backend/app/services/lesson_manifest.py) — strict YAML → Pydantic validation (kebab slugs, unique part slugs, `estimated_minutes` ≥ 0, non-empty objectives). [`lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py) — **`sync_lesson_repo_from_path_map`**: phase-1 validate all manifests + referenced `.md` bodies from an in-memory repo path map; phase-2 transactional upsert **`Lesson` / `LessonPart`**, bump **`lesson_sync_generation`**, set **`LessonRepo.health`** + **`last_synced_at`**; hard-fail → **`unhealthy`** (no partial apply). **Not wired** to GitHub yet — next is installation token + Contents API (or webhooks) feeding that path map.
-- **GitHub App**: PEM, installation tokens, webhook endpoint (signature verify, throttle, **[Locked decisions](#locked-decisions)** replay/idempotency), instructor-bound **`LessonRepo`** entitlement. Env sketch: **[GitHub App](#github-app)**.
-- **Sync + models (remaining product work):** Fetch tree from GitHub; persist via the sync helper above; **sanitize Markdown + rewrite relative assets** to raw GitHub URLs (see **[Markdown](#markdown)**); optional **`LessonManifest`** metadata row from plan if you want manifest SHA auditing.
+- **Progress (landed locally on stacked branches `ws-lesson-01` … `ws-lesson-05` — merge in order):** [`lesson_manifest.py`](backend/app/services/lesson_manifest.py) + [`lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py) (**L1**). DB **`github_app_installation`** + FK on **`LessonRepo`** (**L2**). [`github_app_tokens.py`](backend/app/services/github_app_tokens.py) (**L3**). [`github_webhooks.py`](backend/app/api/routes/github_webhooks.py) — **`POST /api/v1/github/webhooks`** (**L4**). [`lesson_github_fetch.py`](backend/app/services/lesson_github_fetch.py) + [`workshop_lesson_repos.py`](backend/app/api/routes/workshop_lesson_repos.py) — **`POST /api/v1/workshop/lesson-repos/sync-from-github`** (**L5**). See **[Lesson source — follow-up stacked chain](#lesson-source--follow-up-stacked-chain-branch-order)**.
+- **GitHub App (still hardening vs [Locked decisions](#locked-decisions)):** Webhook **replay/idempotency** (`X-GitHub-Delivery`), route **throttle**, instructor-bound **repo entitlement** verification beyond “installation exists”, **installation_repositories** handling.
+- **Sync + models (remaining product work):** **sanitize Markdown + rewrite relative assets** to raw GitHub URLs (see **[Markdown](#markdown)**); **`LessonManifest`** SHA row if you want audit; instructor **Install/configure** UI.
 - **Instructor UX**: Repo list, Install/configure CTA (instructor-only — **[Product constraints](#product-constraints)**), Sync, health, parts preview — aligns with **[UI / UX](#ui--ux-specification)** IA; backend routes must catch up.
 
 **2. Optional / polish (product + engineering)**
@@ -71,6 +71,7 @@ Merged into [`main`](https://github.com/justin-p/testing/tree/main) via **[#18](
 | Badges HTTP routes | [`backend/app/api/routes/workshop_badges.py`](backend/app/api/routes/workshop_badges.py) |
 | Prerequisites HTTP routes | [`backend/app/api/routes/workshop_lessons.py`](backend/app/api/routes/workshop_lessons.py) |
 | Lesson YAML manifest + path-map → DB sync | [`backend/app/services/lesson_manifest.py`](backend/app/services/lesson_manifest.py), [`backend/app/services/lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py); tests [`backend/tests/services/test_lesson_manifest.py`](backend/tests/services/test_lesson_manifest.py), [`backend/tests/services/test_lesson_repo_sync.py`](backend/tests/services/test_lesson_repo_sync.py) |
+| GitHub App → lesson HTTP sync | [`backend/app/services/github_app_tokens.py`](backend/app/services/github_app_tokens.py), [`backend/app/services/lesson_github_fetch.py`](backend/app/services/lesson_github_fetch.py), [`backend/app/api/routes/github_webhooks.py`](backend/app/api/routes/github_webhooks.py), [`backend/app/api/routes/workshop_lesson_repos.py`](backend/app/api/routes/workshop_lesson_repos.py); tests [`backend/tests/services/test_github_app_tokens.py`](backend/tests/services/test_github_app_tokens.py), [`backend/tests/api/routes/test_github_webhooks.py`](backend/tests/api/routes/test_github_webhooks.py), [`backend/tests/api/routes/test_workshop_lesson_repos.py`](backend/tests/api/routes/test_workshop_lesson_repos.py) |
 | In-memory fan-out hub | [`backend/app/services/workshop_realtime.py`](backend/app/services/workshop_realtime.py) |
 | API tests | [`backend/tests/api/routes/test_workshop_sessions.py`](backend/tests/api/routes/test_workshop_sessions.py) |
 | Prerequisites API tests | [`backend/tests/api/routes/test_workshop_lessons.py`](backend/tests/api/routes/test_workshop_lessons.py) |
@@ -804,6 +805,28 @@ Workshop slices **01–06** merged as **[#18](https://github.com/justin-p/testin
 7. `ws-07-pacing-timer-v2` — pacing/timer merged via **[#27](https://github.com/justin-p/testing/pull/27)** *(into stack before `#23` collapsed)*.
 8. `ws-08-badges-revocation-v2` — badges merged via **[#29](https://github.com/justin-p/testing/pull/29)**.
 9. `ws-09-hardening-and-tests` — hardened via **[#26](https://github.com/justin-p/testing/pull/26)**.
+
+### Lesson source — follow-up stacked chain (branch order)
+
+After the historical stack above, **`ws-02` lesson sync** stayed product-incomplete. Land the GitHub App lesson pipeline as a **new** stacked chain from the current integration tip (**`main`** once caught up, or the active workshop branch — each PR targets the previous head):
+
+| # | Branch | Scope |
+| --- | --- | --- |
+| **L1** | `ws-lesson-01-path-sync` | Strict manifest parse + `sync_lesson_repo_from_path_map` (in-memory path maps) + tests + plan refresh. |
+| **L2** | `ws-lesson-02-github-installation` | Alembic **`github_app_installation`**, **`LessonRepo.github_installation_id`**, env **`GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` / `GITHUB_WEBHOOK_SECRET`**. |
+| **L3** | `ws-lesson-03-github-app-token` | App JWT + **`POST …/app/installations/{id}/access_tokens`** client + unit tests. |
+| **L4** | `ws-lesson-04-github-webhooks` | **`POST /api/v1/github/webhooks`** (signature verify, `installation` lifecycle) + OpenAPI/TS client bump. |
+| **L5** | `ws-lesson-05-lesson-repo-sync-http` | GitHub Contents fetch for **`lessons/*`** + **`POST /api/v1/workshop/lesson-repos/sync-from-github`** (instructor/superuser) + tests. |
+
+```mermaid
+flowchart LR
+  l1["L1 ws-lesson-01"] --> l2["L2 installation"]
+  l2 --> l3["L3 app token"]
+  l3 --> l4["L4 webhooks"]
+  l4 --> l5["L5 sync HTTP"]
+```
+
+**Still deferred vs full §1:** Markdown **sanitize**, relative-asset rewrite to **`raw.githubusercontent.com`**, **webhook replay/idempotency** store, instructor **Install app** UX, **`installation_repositories` entitlement checks**, route **throttling** on webhook/sync.
 
 ### PR scope guardrails
 
