@@ -70,7 +70,9 @@ def sync_lesson_repo_from_github(
     if inst is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Unknown GitHub App installation — complete a GitHub install webhook first",
+            detail=(
+                "Unknown GitHub App installation; complete a GitHub install webhook first"
+            ),
         )
     if inst.suspended_at is not None:
         raise HTTPException(
