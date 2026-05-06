@@ -7,6 +7,7 @@ from app.api.routes import (
     private,
     users,
     utils,
+    workshop_badges,
     workshop_lessons,
     workshop_sessions,
 )
@@ -20,6 +21,7 @@ api_router.include_router(items.router)
 api_router.include_router(oauth.router)
 api_router.include_router(workshop_sessions.router)
 api_router.include_router(workshop_lessons.router)
+api_router.include_router(workshop_badges.router)
 
 
 if settings.ENVIRONMENT == "local":

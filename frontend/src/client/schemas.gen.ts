@@ -838,6 +838,146 @@ export const ValidationErrorSchema = {
     title: 'ValidationError'
 } as const;
 
+export const WorkshopBadgeDefinitionCreateSchema = {
+    properties: {
+        slug: {
+            type: 'string',
+            maxLength: 64,
+            title: 'Slug'
+        },
+        title: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        points: {
+            type: 'integer',
+            maximum: 1000,
+            minimum: 0,
+            title: 'Points',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['slug', 'title'],
+    title: 'WorkshopBadgeDefinitionCreate'
+} as const;
+
+export const WorkshopBadgeDefinitionPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        points: {
+            type: 'integer',
+            title: 'Points'
+        }
+    },
+    type: 'object',
+    required: ['id', 'slug', 'title', 'points'],
+    title: 'WorkshopBadgeDefinitionPublic'
+} as const;
+
+export const WorkshopBadgeDefinitionsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopBadgeDefinitionPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopBadgeDefinitionsPublic'
+} as const;
+
+export const WorkshopBadgeGrantRequestSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'badge_id'],
+    title: 'WorkshopBadgeGrantRequest'
+} as const;
+
+export const WorkshopBadgeRevokeRequestSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'badge_id'],
+    title: 'WorkshopBadgeRevokeRequest'
+} as const;
+
 export const WorkshopLessonPartBriefSchema = {
     properties: {
         id: {
@@ -1604,6 +1744,48 @@ export const WorkshopSessionInstructorSeatRoleUpdateSchema = {
     required: ['user_id', 'role'],
     title: 'WorkshopSessionInstructorSeatRoleUpdate',
     description: "Update an active instructor seat's role (e.g. co_instructor → lead)."
+} as const;
+
+export const WorkshopSessionLeaderboardPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopSessionLeaderboardRowPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopSessionLeaderboardPublic'
+} as const;
+
+export const WorkshopSessionLeaderboardRowPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        total_points: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Total Points'
+        },
+        badge_count: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Badge Count'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'total_points', 'badge_count'],
+    title: 'WorkshopSessionLeaderboardRowPublic'
 } as const;
 
 export const WorkshopSessionListItemSchema = {

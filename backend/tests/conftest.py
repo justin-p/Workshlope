@@ -16,6 +16,8 @@ from app.models import (
     PendingGitHubLogin,
     SessionInstructor,
     User,
+    WorkshopBadgeDefinition,
+    WorkshopBadgeGrant,
     WorkshopParticipant,
     WorkshopSession,
 )
@@ -31,6 +33,10 @@ def db() -> Generator[Session, None, None]:
         statement = delete(Item)
         session.execute(statement)
         statement = delete(SessionInstructor)
+        session.execute(statement)
+        statement = delete(WorkshopBadgeGrant)
+        session.execute(statement)
+        statement = delete(WorkshopBadgeDefinition)
         session.execute(statement)
         statement = delete(WorkshopParticipant)
         session.execute(statement)
