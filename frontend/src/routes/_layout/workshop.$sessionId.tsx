@@ -25,6 +25,13 @@ function httpToWsBase(httpBase: string): string {
   return httpBase
 }
 
+function formatTimerRemainingSeconds(totalSeconds: number): string {
+  const clamped = Math.max(0, totalSeconds)
+  const minutes = Math.floor(clamped / 60)
+  const seconds = clamped % 60
+  return `${minutes}:${String(seconds).padStart(2, "0")}`
+}
+
 /** Decode JWT payload segment (no verification — UI routing only). */
 function decodeJwtPayloadJson(
   rawToken: string,
@@ -158,6 +165,8 @@ function WorkshopSessionPage() {
       WorkshopSessionsService.readWorkshopSessionTimer({ sessionId }),
     enabled: uuidOk && detailView === "instructor",
     retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.status === "running" ? 1_000 : false,
   })
 
   const timerEventsQuery = useQuery({
@@ -752,7 +761,7 @@ function WorkshopSessionPage() {
           >
             Timer: {timerStatus}
             {typeof timerRemainingSeconds === "number"
-              ? ` (${timerRemainingSeconds}s left)`
+              ? ` (${formatTimerRemainingSeconds(timerRemainingSeconds)} left)`
               : ""}
           </span>
           <div
