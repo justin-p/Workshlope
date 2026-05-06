@@ -15,6 +15,7 @@ from app.models import (
     WorkshopBadgeGrant,
     WorkshopBadgeGrantRequest,
     WorkshopBadgeRevokeRequest,
+    WorkshopParticipant,
     WorkshopSession,
     WorkshopSessionLeaderboardPublic,
     WorkshopSessionLeaderboardRowPublic,
@@ -52,6 +53,24 @@ def _require_session_instructor_or_superuser(
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="User is not an instructor for this session",
+    )
+
+
+def _require_active_session_participant(
+    *, session_db: Session, session_id: uuid.UUID, user_id: uuid.UUID
+) -> None:
+    seat = session_db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_id,
+            WorkshopParticipant.user_id == user_id,
+            col(WorkshopParticipant.removed_at).is_(None),
+        )
+    ).first()
+    if seat is not None:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Participant not in session roster",
     )
 
 
@@ -124,6 +143,9 @@ def grant_workshop_badge(
     _require_session_instructor_or_superuser(
         session_db=session, session_id=session_id, current_user=current_user
     )
+    _require_active_session_participant(
+        session_db=session, session_id=session_id, user_id=body.user_id
+    )
     badge = session.get(WorkshopBadgeDefinition, body.badge_id)
     if badge is None:
         raise HTTPException(
@@ -174,6 +196,9 @@ def revoke_workshop_badge(
         )
     _require_session_instructor_or_superuser(
         session_db=session, session_id=session_id, current_user=current_user
+    )
+    _require_active_session_participant(
+        session_db=session, session_id=session_id, user_id=body.user_id
     )
     grant = session.exec(
         select(WorkshopBadgeGrant).where(

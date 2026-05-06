@@ -9,6 +9,7 @@ from app.models import (
     LessonRepo,
     SessionInstructor,
     User,
+    WorkshopParticipant,
     WorkshopSession,
 )
 from tests.utils.user import authentication_token_from_email
@@ -101,6 +102,13 @@ def test_grant_revoke_and_leaderboard(client: TestClient, db: Session) -> None:
     )
     trainee = db.exec(select(User).where(User.email == trainee_email)).first()
     assert trainee is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=trainee.id,
+        )
+    )
+    db.commit()
 
     create = client.post(
         f"{settings.API_V1_STR}/workshop/badges",
@@ -152,3 +160,43 @@ def test_grant_revoke_and_leaderboard(client: TestClient, db: Session) -> None:
         headers=trainee_headers,
     )
     assert denied.status_code == 403
+
+
+def test_grant_requires_participant_roster_membership(
+    client: TestClient, db: Session
+) -> None:
+    headers, instructor = _instructor_headers(client, db)
+    session_row = _create_live_session(db)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    outsider_email = f"badge-outsider-{uuid.uuid4()}@example.com"
+    authentication_token_from_email(client=client, email=outsider_email, db=db)
+    outsider = db.exec(select(User).where(User.email == outsider_email)).first()
+    assert outsider is not None
+
+    create = client.post(
+        f"{settings.API_V1_STR}/workshop/badges",
+        headers=headers,
+        json={
+            "slug": f"badge-{uuid.uuid4()}",
+            "title": "Roster only",
+            "points": 2,
+        },
+    )
+    assert create.status_code == 200
+    badge_id = create.json()["id"]
+
+    denied = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/grant",
+        headers=headers,
+        json={"user_id": str(outsider.id), "badge_id": badge_id},
+    )
+    assert denied.status_code == 404
+    assert denied.json()["detail"] == "Participant not in session roster"
