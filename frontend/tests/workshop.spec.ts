@@ -150,6 +150,9 @@ test.describe("Workshop live session", () => {
     await expect(page.getByTestId("workshop-timer-status")).toContainText(
       /Timer: running( \(\d+:\d{2} left\))?/,
     )
+    await expect(page.getByTestId("workshop-timer-events")).toContainText(
+      /(\d{2}:\d{2}|No timer actions recorded yet\.)/,
+    )
     await page.getByTestId("workshop-timer-pause").click()
     await expect(page.getByTestId("workshop-timer-status")).toContainText(
       "paused",
