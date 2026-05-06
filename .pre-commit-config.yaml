@@ -25,6 +25,9 @@ repos:
         language: system
         types: [text]
         files: ^frontend/
+        # Do not append matched paths: workspace filter already runs lint in `frontend/`;
+        # repo-root paths like `frontend/src/...` would become `frontend/frontend/...`.
+        pass_filenames: false
 
       - id: local-ruff-check
         name: ruff check
