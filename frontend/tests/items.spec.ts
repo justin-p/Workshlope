@@ -6,6 +6,7 @@ import {
   randomItemTitle,
   randomPassword,
 } from "./utils/random"
+import { expectSuccessToastDescription } from "./utils/sonnerToast.ts"
 import { logInUser } from "./utils/user"
 
 test("Items page is accessible and shows correct title", async ({ page }) => {
@@ -43,7 +44,7 @@ test.describe("Items management", () => {
     await page.getByLabel("Description").fill(description)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("Item created successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "Item created successfully")
     await expect(page.getByText(title)).toBeVisible()
   })
 
@@ -54,7 +55,7 @@ test.describe("Items management", () => {
     await page.getByLabel("Title").fill(title)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("Item created successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "Item created successfully")
     await expect(page.getByText(title)).toBeVisible()
   })
 
@@ -83,7 +84,7 @@ test.describe("Items management", () => {
       await page.getByRole("button", { name: "Add Item" }).click()
       await page.getByLabel("Title").fill(itemTitle)
       await page.getByRole("button", { name: "Save" }).click()
-      await expect(page.getByText("Item created successfully")).toBeVisible()
+      await expectSuccessToastDescription(page, "Item created successfully")
       await expect(page.getByRole("dialog")).not.toBeVisible()
     })
 
@@ -96,7 +97,7 @@ test.describe("Items management", () => {
       await page.getByLabel("Title").fill(updatedTitle)
       await page.getByRole("button", { name: "Save" }).click()
 
-      await expect(page.getByText("Item updated successfully")).toBeVisible()
+      await expectSuccessToastDescription(page, "Item updated successfully")
       await expect(page.getByText(updatedTitle)).toBeVisible()
     })
 
@@ -107,9 +108,10 @@ test.describe("Items management", () => {
 
       await page.getByRole("button", { name: "Delete" }).click()
 
-      await expect(
-        page.getByText("The item was deleted successfully"),
-      ).toBeVisible()
+      await expectSuccessToastDescription(
+        page,
+        "The item was deleted successfully",
+      )
       await expect(page.getByText(itemTitle)).not.toBeVisible()
     })
   })

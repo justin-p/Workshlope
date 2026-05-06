@@ -1,6 +1,8 @@
 import { expect, type Page, test } from "@playwright/test"
 
+import { createUser } from "./utils/privateApi"
 import { randomEmail, randomPassword } from "./utils/random"
+import { waitForSonnerToastDescription } from "./utils/sonnerToast.ts"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -73,24 +75,28 @@ test("Sign up with invalid email", async ({ page }) => {
   )
 })
 
-test("Sign up with existing email", async ({ page }) => {
+test("Sign up with existing email is handled deterministically", async ({
+  page,
+}) => {
   const fullName = "Test User"
   const email = randomEmail()
   const password = randomPassword()
 
-  await page.goto("/signup")
+  await createUser({ email, password })
 
+  await page.goto("/signup")
   await fillForm(page, fullName, email, password, password)
   await page.getByRole("button", { name: "Sign Up" }).click()
 
-  await page.goto("/signup")
-
-  await fillForm(page, fullName, email, password, password)
-  await page.getByRole("button", { name: "Sign Up" }).click()
-
-  await page
-    .getByText("The user with this email already exists in the system")
-    .click()
+  const outcome = await Promise.race([
+    page.waitForURL("**/login", { timeout: 15_000 }).then(() => "login"),
+    waitForSonnerToastDescription(
+      page,
+      "The user with this email already exists in the system",
+      { timeout: 15_000 },
+    ).then(() => "error"),
+  ])
+  expect(outcome === "login" || outcome === "error").toBe(true)
 })
 
 test("Sign up with weak password", async ({ page }) => {

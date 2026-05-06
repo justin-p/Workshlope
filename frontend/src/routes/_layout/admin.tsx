@@ -46,7 +46,7 @@ function UsersTableContent() {
     isCurrentUser: currentUser?.id === user.id,
   }))
 
-  return <DataTable columns={columns} data={tableData} />
+  return <DataTable columns={columns} data={tableData} defaultPageSize={100} />
 }
 
 function UsersTable() {

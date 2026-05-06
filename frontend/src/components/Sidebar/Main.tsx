@@ -20,6 +20,12 @@ interface MainProps {
   items: Item[]
 }
 
+function navItemIsActive(currentPath: string, itemPath: string): boolean {
+  if (currentPath === itemPath) return true
+  if (itemPath.length <= 1) return false
+  return currentPath.startsWith(`${itemPath}/`)
+}
+
 export function Main({ items }: MainProps) {
   const { isMobile, setOpenMobile } = useSidebar()
   const router = useRouterState()
@@ -36,7 +42,7 @@ export function Main({ items }: MainProps) {
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => {
-            const isActive = currentPath === item.path
+            const isActive = navItemIsActive(currentPath, item.path)
 
             return (
               <SidebarMenuItem key={item.title}>

@@ -3,6 +3,11 @@
   "hooks": {
     "beforeShellExecution": [
       {
+        "command": ".cursor/hooks/backend-pytest-precommit-guard.sh",
+        "matcher": "^git\\s+commit\\b",
+        "failClosed": true
+      },
+      {
         "command": ".cursor/hooks/playwright-precommit-guard.sh",
         "matcher": "^git\\s+commit\\b",
         "failClosed": true

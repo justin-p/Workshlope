@@ -6,6 +6,35 @@ type Email = {
   subject: string
 }
 
+function mailcatcherMessagesUrl(): string {
+  const base = process.env.MAILCATCHER_HOST
+  if (!base?.trim()) {
+    throw new Error(
+      "MAILCATCHER_HOST is unset - set http://localhost:1080 for host Playwright or run scripts/e2e-backend-reset.sh (Mailcatcher in compose)",
+    )
+  }
+  return `${base.replace(/\/+$/, "")}/messages`
+}
+
+/** Match Mailcatcher recipient strings (`user@x`, `<user@x>`, quoted forms). */
+export function mailFiltersToMailbox(email: string): (e: Email) => boolean {
+  const norm = email.trim().toLowerCase()
+  const strip = (r: string) =>
+    r
+      .replace(/^<+|>$/g, "")
+      .replace(/^["']+|["']+$/g, "")
+      .trim()
+      .toLowerCase()
+  return (e) => {
+    if (e.recipients.some((r) => strip(r) === norm)) return true
+    const subj = e.subject.toLowerCase()
+    return (
+      subj.includes(norm) &&
+      /password\s+recovery|recovery\s+for\s+user/i.test(e.subject)
+    )
+  }
+}
+
 async function findEmail({
   request,
   filter,
@@ -13,15 +42,33 @@ async function findEmail({
   request: APIRequestContext
   filter?: (email: Email) => boolean
 }) {
-  const response = await request.get(`${process.env.MAILCATCHER_HOST}/messages`)
+  const messagesUrl = mailcatcherMessagesUrl()
+  const response = await request.get(messagesUrl)
 
-  let emails = await response.json()
-
-  if (filter) {
-    emails = emails.filter(filter)
+  if (!response.ok()) {
+    throw new Error(
+      `Mailcatcher GET ${messagesUrl} returned ${response.status()} ${response.statusText()}`,
+    )
   }
 
-  const email = emails[emails.length - 1]
+  const raw = await response.text()
+  let emails: unknown
+  try {
+    emails = JSON.parse(raw)
+  } catch {
+    throw new Error(
+      `Mailcatcher at ${messagesUrl} did not return JSON (got snippet: ${raw.slice(0, 160).replace(/\s+/g, " ")})`,
+    )
+  }
+
+  if (!Array.isArray(emails)) {
+    throw new Error(`Mailcatcher at ${messagesUrl} returned non-array JSON`)
+  }
+
+  const list = emails as Email[]
+  const filtered = filter ? list.filter(filter) : [...list]
+
+  const email = filtered[filtered.length - 1]
 
   if (email) {
     return email as Email

@@ -6,6 +6,10 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 dotenv.config({ path: path.join(__dirname, "../../.env") })
+dotenv.config({
+  path: path.join(__dirname, "../../.env.local"),
+  override: true,
+})
 
 function getEnvVar(name: string): string {
   const value = process.env[name]
