@@ -118,7 +118,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-07-pacing-timer` |
 | PR | *(not opened yet; will target `ws-06-learning-workflows`)* |
-| Latest work | **PR07 slice 6 (2026-05-06):** improved timer-events instructor UX with periodic refresh while timer is running and readable event timestamps in the panel, so pacing history stays current without manual button interactions. |
+| Latest work | **PR07 slice 7 (2026-05-06):** tightened Playwright pacing coverage for instructor timer UX (start CTA + running-status format assertion), and validated via local gate runs (`workshop.spec.ts` + full chromium suite) after frontend image refresh/reset flow. |
 
 **Resume in this order:**
 
