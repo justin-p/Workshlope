@@ -18,9 +18,11 @@ from app.core.security import ALGORITHM
 from app.models import (
     Lesson,
     LessonPart,
+    LessonPrerequisite,
     Message,
     SessionInstructor,
     User,
+    UserPrerequisiteCompletion,
     WorkshopLessonPartBrief,
     WorkshopLessonSummaryPublic,
     WorkshopParticipant,
@@ -276,6 +278,29 @@ def _require_workshop_instructor(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="User is not an instructor for this session",
     )
+
+
+def _required_prerequisites_complete_for_user(
+    session_db: Session, *, lesson_id: uuid.UUID, user_id: uuid.UUID
+) -> bool:
+    required_ids = session_db.exec(
+        select(LessonPrerequisite.id).where(
+            LessonPrerequisite.lesson_id == lesson_id,
+            col(LessonPrerequisite.required_flag).is_(True),
+        )
+    ).all()
+    if not required_ids:
+        return True
+    completed_ids = set(
+        session_db.exec(
+            select(UserPrerequisiteCompletion.prerequisite_id).where(
+                UserPrerequisiteCompletion.user_id == user_id,
+                UserPrerequisiteCompletion.lesson_id == lesson_id,
+                col(UserPrerequisiteCompletion.prerequisite_id).in_(required_ids),
+            )
+        ).all()
+    )
+    return len(completed_ids) == len(required_ids)
 
 
 async def _dispatch_workshop_ws_text(
@@ -1102,6 +1127,16 @@ def enter_workshop_session(
             detail="Session has ended",
         )
 
+    if not _required_prerequisites_complete_for_user(
+        session,
+        lesson_id=workshop_session.lesson_id,
+        user_id=current_user.id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Required prerequisites incomplete",
+        )
+
     participant = session.exec(
         select(WorkshopParticipant).where(
             WorkshopParticipant.session_id == session_id,
@@ -1210,6 +1245,15 @@ def create_workshop_ws_ticket(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User must enter session first",
+            )
+        if not _required_prerequisites_complete_for_user(
+            session,
+            lesson_id=workshop_session.lesson_id,
+            user_id=current_user.id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Required prerequisites incomplete",
             )
         role = "participant"
 

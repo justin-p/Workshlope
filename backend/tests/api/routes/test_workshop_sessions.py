@@ -13,10 +13,12 @@ from app.core.security import ALGORITHM
 from app.models import (
     Lesson,
     LessonPart,
+    LessonPrerequisite,
     LessonRepo,
     SessionInstructor,
     User,
     UserCreate,
+    UserPrerequisiteCompletion,
     WorkshopParticipant,
     WorkshopSession,
 )
@@ -1402,6 +1404,34 @@ def test_http_enter_creates_participant_when_user_not_rostered_yet(
     assert rostered.joined_at is not None
 
 
+def test_http_enter_403_when_required_prerequisites_incomplete(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    trainee_email = f"gate-enter-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=trainee_email, db=db)
+    user = db.exec(select(User).where(User.email == trainee_email)).first()
+    assert user is not None
+
+    db.add(
+        LessonPrerequisite(
+            lesson_id=session_row.lesson_id,
+            type="task",
+            title="Read setup guide",
+            ordering=1,
+            required_flag=True,
+        )
+    )
+    db.commit()
+
+    resp = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/enter",
+        headers=headers,
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Required prerequisites incomplete"
+
+
 def test_http_ws_ticket_rejects_when_session_scheduled(
     client: TestClient, db: Session
 ) -> None:
@@ -1433,6 +1463,86 @@ def test_http_ws_ticket_rejects_when_session_scheduled(
     )
     assert resp.status_code == 403
     assert resp.json()["detail"] == "Session not started yet"
+
+
+def test_http_ws_ticket_403_when_required_prerequisites_incomplete(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    trainee_email = f"gate-ticket-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=trainee_email, db=db)
+    user = db.exec(select(User).where(User.email == trainee_email)).first()
+    assert user is not None
+
+    prerequisite = LessonPrerequisite(
+        lesson_id=session_row.lesson_id,
+        type="task",
+        title="Install dependencies",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    resp = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=headers,
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Required prerequisites incomplete"
+
+
+def test_http_ws_ticket_allows_when_required_prerequisites_complete(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    trainee_email = f"gate-ticket-ok-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=trainee_email, db=db)
+    user = db.exec(select(User).where(User.email == trainee_email)).first()
+    assert user is not None
+
+    prerequisite = LessonPrerequisite(
+        lesson_id=session_row.lesson_id,
+        type="task",
+        title="Install dependencies",
+        ordering=1,
+        required_flag=True,
+    )
+    db.add(prerequisite)
+    db.commit()
+    db.refresh(prerequisite)
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    db.add(
+        UserPrerequisiteCompletion(
+            user_id=user.id,
+            lesson_id=session_row.lesson_id,
+            prerequisite_id=prerequisite.id,
+            source="self",
+        )
+    )
+    db.commit()
+
+    resp = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert "ticket" in resp.json()
 
 
 def test_ws_snap_reports_session_deleted_for_non_advance_frames(

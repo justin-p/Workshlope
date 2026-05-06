@@ -19,21 +19,53 @@ test.describe("Workshop live session", () => {
   // "connecting" forever (participant never received session.connected). Run in order.
   test.describe.configure({ mode: "serial" })
 
-  test("participant marks required pre-work complete from session page", async ({
-    page,
+  test("participant is gated until required pre-work is complete", async ({
+    browser,
     request,
   }) => {
+    const participant = await createParticipantUserForWorkshop()
     const br = await request.post(
-      `${apiBase}/api/v1/private/workshop/e2e-live-session/?with_incomplete_required_prerequisite=true`,
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?with_incomplete_required_prerequisite=true&participant_email=${encodeURIComponent(participant.email)}`,
     )
     expect(br.ok()).toBeTruthy()
     const { session_id } = await br.json()
 
-    await page.goto(`/workshop/${session_id}`)
-    const banner = page.getByTestId("workshop-prework-participant-banner")
+    const participantContext = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    })
+    const participantPage = await participantContext.newPage()
+    await participantPage.goto("/login")
+    await participantPage.getByTestId("email-input").fill(participant.email)
+    await participantPage
+      .getByTestId("password-input")
+      .fill(participant.password)
+    await participantPage.getByRole("button", { name: "Log In" }).click()
+    await participantPage.waitForURL(/\/dashboard\/(trainee|instructor|admin)/)
+
+    await participantPage.goto(`/workshop/${session_id}`)
+    await expect(participantPage.getByTestId("workshop-ws-status")).toHaveText(
+      /error/i,
+      {
+        timeout: 15_000,
+      },
+    )
+    await expect(participantPage.getByTestId("workshop-error")).toContainText(
+      "Required prerequisites incomplete",
+    )
+    const banner = participantPage.getByTestId(
+      "workshop-prework-participant-banner",
+    )
     await expect(banner).toBeVisible({ timeout: 15_000 })
-    await page.getByTestId("workshop-prework-mark-complete").click()
+    await participantPage.getByTestId("workshop-prework-mark-complete").click()
     await expect(banner).toHaveCount(0, { timeout: 15_000 })
+    await participantPage.reload()
+    await expect(participantPage.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      {
+        timeout: 15_000,
+      },
+    )
+    await participantContext.close()
   })
 
   test("participant view connects WebSocket after enter + ticket", async ({
