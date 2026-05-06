@@ -274,6 +274,46 @@ class UserPrerequisiteCompletion(SQLModel, table=True):
     source: str = Field(default="self", max_length=32)
 
 
+class WorkshopSessionTimer(SQLModel, table=True):
+    __tablename__ = "workshop_session_timer"
+    __table_args__ = (
+        UniqueConstraint("session_id", name="uq_workshop_session_timer_session"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    session_id: uuid.UUID = Field(
+        foreign_key="workshop_session.id", nullable=False, ondelete="CASCADE"
+    )
+    status: str = Field(default="inactive", max_length=16)
+    mode: str | None = Field(default=None, max_length=16)
+    target_seconds: int | None = Field(default=None, ge=1, le=86_400)
+    started_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    paused_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class WorkshopSessionTimerEvent(SQLModel, table=True):
+    __tablename__ = "workshop_session_timer_event"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    session_id: uuid.UUID = Field(
+        foreign_key="workshop_session.id", nullable=False, ondelete="CASCADE"
+    )
+    actor_user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    action: str = Field(max_length=16)
+    mode: str | None = Field(default=None, max_length=16)
+    target_seconds: int | None = Field(default=None, ge=1, le=86_400)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
 class WorkshopSessionListItem(SQLModel):
     """Minimal session row for dashboard lists — no roster, no peer data."""
 
@@ -440,6 +480,23 @@ class WorkshopSessionTimerPublic(SQLModel):
     target_seconds: int | None = None
     started_at: datetime | None = None
     paused_at: datetime | None = None
+    elapsed_seconds: int | None = None
+    remaining_seconds: int | None = None
+
+
+class WorkshopSessionTimerEventPublic(SQLModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    actor_user_id: uuid.UUID
+    action: Literal["start", "pause", "resume", "stop"]
+    mode: Literal["countdown", "countup"] | None = None
+    target_seconds: int | None = None
+    created_at: datetime | None = None
+
+
+class WorkshopSessionTimerEventsPublic(SQLModel):
+    data: list[WorkshopSessionTimerEventPublic]
+    count: int
 
 
 class WorkshopSessionCorePublic(SQLModel):
