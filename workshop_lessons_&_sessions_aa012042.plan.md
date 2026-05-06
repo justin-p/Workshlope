@@ -1,44 +1,122 @@
----
-name: Workshop Lessons & Sessions
-overview: "Living delivery status: scroll to **Implementation tracker** and **[Pause / resume checkpoint](#pause--resume-checkpoint-handoff)** after a stop. Update the tracker whenever a stacked PR slice merges or behavior changes materially."
-todos:
-  - id: role-instructor
-    content: User.is_instructor + RBAC — superuser has full workshop/session management APIs; instructors own sessions or any session where they are assigned as instructor/rostered participant; gate GitHub App install prompts to instructor-only surfaces
-    status: pending
-  - id: github-app-sync
-    content: GitHub App; webhooks (signature, throttle, optional delivery idempotency); installs/repos; PEM + installation tokens; instructor-bound LessonRepo entitlement; post-MVP push webhook optional
-    status: pending
-  - id: lesson-sync-model
-    content: LessonRepo/Lesson/LessonPart with per-lesson YAML manifest ordering; idempotent sync; hard-fail invalid manifest with unhealthy repo; sanitize Markdown on render and rewrite relative assets to GitHub raw URLs
-    status: pending
-  - id: session-progress
-    content: WorkshopSession lifecycle + SessionInstructor join table; WorkshopParticipant; enter REST; add-member role assignment is mutually exclusive with always-replace semantics; pause/handoff; no finished_at on end
-    status: pending
-  - id: ws-live
-    content: ws-ticket via Sec-WebSocket-Protocol; part_generation reconnect; pause gates; trainee WS/API payloads omit peer identities and peer live_status (instructor-only fanout full roster)
-    status: pending
-  - id: replace-items-nav
-    content: "Dashboard nav + **`GET /workshop/sessions/`** list widgets + **`GET /workshop/sessions/{id}`** cockpit heading — shipped on **`ws-05-dashboard-nav` / [#22](https://github.com/justin-p/testing/pull/22)**; stack merge pending. **Paused 2026-05-04** — resume from [Pause / resume checkpoint](#pause--resume-checkpoint-handoff)."
-    status: completed
-  - id: badges-awards
-    content: Instructor-verified badge issuance on completion (single + bulk); badge catalog + user badge grants with per-badge points; profile/session/instructor surfaces + public leaderboard
-    status: pending
-  - id: badge-revocation
-    content: Badge revoke workflow with reason + audit trail + optional learner-visible rationale; leaderboard/profile updates on revoke
-    status: pending
-  - id: prework-prerequisites
-    content: Prework and prerequisite checklist per lesson with completion tracking and session gating warnings
-    status: pending
-  - id: pacing-tools
-    content: Session timer and pacing tools (part timer, overrun indicators, instructor controls)
-    status: pending
-  - id: security-hardening-new-features
-    content: Security hardening for in-scope workshop features only — prerequisites, pacing/timer (server-authoritative state + audit), badges/grants/revocations (RBAC, audit trail, leaderboard/profile DTO rules); strict trainee vs instructor DTO boundaries; no controls deferred for out-of-scope surfaces (see Out of scope table)
-    status: pending
-isProject: false
----
+<!-- Document order: (1) Status & backlog → (2) Code map → (3) MVP scope & constraints → (4) Delivery process → (5) Domain contracts & API → (6) Flows & dashboards & UI → (7) Quality → (8) Historical PR process → (9) Appendix. -->
 
 # Workshop training app — lessons + live sessions
+
+## Implementation tracker (canonical — update whenever context would otherwise be lost)
+
+Use this section after a pause or repo switch—do not rely on chat memory alone.
+
+**Maintenance rule:** When behavior or backlog changes materially, refresh **[Remaining work](#remaining-work-authoritative)**, **`Last synced`**, and—for any **future** stacked delivery—reuse **[PR slicing](#pr-slicing-and-branch-strategy-locked)** + **`gh pr checks --watch`** (see [babysitting policy](#pr-babysitting-policy-locked)).
+
+| Field | Value |
+| ------ | ------ |
+| **Last synced** | **2026-05-06** — Workshop stack merged to **`main`** via **[#18](https://github.com/justin-p/testing/pull/18)** (tip **`5761292`** or later); nested [#19](https://github.com/justin-p/testing/pull/19)–[#23](https://github.com/justin-p/testing/pull/23), [#26](https://github.com/justin-p/testing/pull/26), [#27](https://github.com/justin-p/testing/pull/27), [#29](https://github.com/justin-p/testing/pull/29); [#28](https://github.com/justin-p/testing/pull/28) closed. Integration branches **`ws-01…ws-06`** may still exist remotely for archaeology. |
+| **Integration tip** | **`main`** |
+| **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** — primarily **GitHub App + lesson sync**; backlog refs `github-app-sync`, `lesson-sync-model`; posture **`security-hardening-new-features`**. |
+
+### Remaining work (authoritative)
+
+**1. Lesson source pipeline (not implemented end-to-end on `main`)**
+
+- **Progress (landed in backend):** [`lesson_manifest.py`](backend/app/services/lesson_manifest.py) — strict YAML → Pydantic validation (kebab slugs, unique part slugs, `estimated_minutes` ≥ 0, non-empty objectives). [`lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py) — **`sync_lesson_repo_from_path_map`**: phase-1 validate all manifests + referenced `.md` bodies from an in-memory repo path map; phase-2 transactional upsert **`Lesson` / `LessonPart`**, bump **`lesson_sync_generation`**, set **`LessonRepo.health`** + **`last_synced_at`**; hard-fail → **`unhealthy`** (no partial apply). **Not wired** to GitHub yet — next is installation token + Contents API (or webhooks) feeding that path map.
+- **GitHub App**: PEM, installation tokens, webhook endpoint (signature verify, throttle, **[Locked decisions](#locked-decisions)** replay/idempotency), instructor-bound **`LessonRepo`** entitlement. Env sketch: **[GitHub App](#github-app)**.
+- **Sync + models (remaining product work):** Fetch tree from GitHub; persist via the sync helper above; **sanitize Markdown + rewrite relative assets** to raw GitHub URLs (see **[Markdown](#markdown)**); optional **`LessonManifest`** metadata row from plan if you want manifest SHA auditing.
+- **Instructor UX**: Repo list, Install/configure CTA (instructor-only — **[Product constraints](#product-constraints)**), Sync, health, parts preview — aligns with **[UI / UX](#ui--ux-specification)** IA; backend routes must catch up.
+
+**2. Optional / polish (product + engineering)**
+
+- Expose pacing/timer parity with **[REST sketch](#rest-sketch-under-apiv1)** timer routes if you want symmetry beyond current HTTP surface.
+- **[Realtime](#realtime)** multi-instance (**Redis**/shared broker) remains explicitly deferred ([Locked decisions](#locked-decisions) single-process path).
+- Richer dashboard cards / trainee–instructor **Playwright** breadth ([Testing](#testing)); deeper prerequisite roster analytics ([Workshop HTTP vs realtime](#workshop-http-vs-realtime--delivery-gap-audit)).
+
+### Pause / resume checkpoint (handoff)
+
+Use this section when reopening the project **after intentional stop**. Do **not** rely on chat history beyond what is committed and linked here.
+
+**Current active slice:**
+
+| Item | Value |
+| ---- | ----- |
+| Branch | **`main`** |
+| PR | None open for collapsed stack — work continues with normal PRs to **`main`**. |
+| Latest work | **Shipped:** session core, realtime/privacy, dashboard/workshop nav, prerequisites, pacing timer, badges + hardening. **Not shipped:** lesson GitHub sync pipeline (see [Remaining work](#remaining-work-authoritative)). |
+
+**Resume in this order:**
+
+1. `git fetch origin && git checkout main && git pull`.
+2. Pick work from **[Remaining work](#remaining-work-authoritative)**; branch from **`main`**, babysit **`gh pr checks`** before merge ([policy](#pr-babysitting-policy-locked)).
+3. Update **`Last synced`** here when merges or backlog meaningfully shift.
+
+### GitHub PR stack (archived collapsed chain — historical reference)
+
+Merged into [`main`](https://github.com/justin-p/testing/tree/main) via **[#18](https://github.com/justin-p/testing/pull/18)**. **PR02** branch name anticipated GitHub/sync work; **[Remaining work](#remaining-work-authoritative) §1** tracks what still must be implemented. New features → PRs to **`main`**.
+
+| Slice | Branch (head) | Pull request | Base branch |
+| ----- | --------------- | ------------ | ----------- |
+| PR01 | `ws-01-foundation-rbac` | [#18](https://github.com/justin-p/testing/pull/18) *(merged)* | `main` |
+| PR02 | `ws-02-github-sync-manifest` | [#19](https://github.com/justin-p/testing/pull/19) *(merged)* | `ws-01-foundation-rbac` |
+| PR03 | `ws-03-session-core` | [#20](https://github.com/justin-p/testing/pull/20) *(merged)* | `ws-02-github-sync-manifest` |
+| PR04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) *(merged)* | `ws-03-session-core` |
+| PR05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) *(merged)* | `ws-04-realtime-privacy` |
+| PR06 | `ws-06-learning-workflows` | [#23](https://github.com/justin-p/testing/pull/23) *(merged)* | `ws-05-dashboard-nav` |
+| PR07 | `ws-07-pacing-timer-v2` | [#27](https://github.com/justin-p/testing/pull/27) *(merged)* | `ws-06-learning-workflows` |
+| PR08 | `ws-08-badges-revocation-v2` | [#29](https://github.com/justin-p/testing/pull/29) *(merged)* | `ws-06-learning-workflows` |
+| PR09 | `ws-09-hardening-and-tests` | [#26](https://github.com/justin-p/testing/pull/26) *(merged)* | *(stacked onto `ws-08` branch before PR06→05 collapse; history preserved on integration branches)* |
+
+### Backend code anchors (workshop delivery slices)
+
+| Area | Primary paths |
+| ---- | ------------- |
+| HTTP + WebSocket routes | [`backend/app/api/routes/workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py) |
+| Badges HTTP routes | [`backend/app/api/routes/workshop_badges.py`](backend/app/api/routes/workshop_badges.py) |
+| Prerequisites HTTP routes | [`backend/app/api/routes/workshop_lessons.py`](backend/app/api/routes/workshop_lessons.py) |
+| Lesson YAML manifest + path-map → DB sync | [`backend/app/services/lesson_manifest.py`](backend/app/services/lesson_manifest.py), [`backend/app/services/lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py); tests [`backend/tests/services/test_lesson_manifest.py`](backend/tests/services/test_lesson_manifest.py), [`backend/tests/services/test_lesson_repo_sync.py`](backend/tests/services/test_lesson_repo_sync.py) |
+| In-memory fan-out hub | [`backend/app/services/workshop_realtime.py`](backend/app/services/workshop_realtime.py) |
+| API tests | [`backend/tests/api/routes/test_workshop_sessions.py`](backend/tests/api/routes/test_workshop_sessions.py) |
+| Prerequisites API tests | [`backend/tests/api/routes/test_workshop_lessons.py`](backend/tests/api/routes/test_workshop_lessons.py) |
+| Hub unit tests | [`backend/tests/services/test_workshop_realtime.py`](backend/tests/services/test_workshop_realtime.py) |
+| Local E2E session bootstrap (`ENVIRONMENT=local` only) | [`backend/app/api/routes/private.py`](backend/app/api/routes/private.py) — `bootstrap_e2e_workshop_live_session` (+ `with_incomplete_required_prerequisite`, distinct-trainee vs `FIRST_SUPERUSER` instructor split); tests in [`backend/tests/api/routes/test_private.py`](backend/tests/api/routes/test_private.py) |
+| Trainee workshop UI (enter + ws-ticket + WebSocket) | [`frontend/src/routes/_layout/workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) |
+| Workshop Playwright | [`frontend/tests/workshop.spec.ts`](frontend/tests/workshop.spec.ts) |
+| Dashboard landing + routing | [`frontend/src/lib/dashboardLanding.ts`](frontend/src/lib/dashboardLanding.ts), stub rails [`frontend/src/components/dashboard/DashboardStubRails.tsx`](frontend/src/components/dashboard/DashboardStubRails.tsx), routes under [`frontend/src/routes/_layout/dashboard/`](frontend/src/routes/_layout/dashboard/), [`frontend/src/routes/_layout/workshops.tsx`](frontend/src/routes/_layout/workshops.tsx), sidebar [`frontend/src/components/Sidebar/AppSidebar.tsx`](frontend/src/components/Sidebar/AppSidebar.tsx), OAuth landing [`frontend/src/routes/auth.callback.tsx`](frontend/src/routes/auth.callback.tsx) |
+| Admin users (`is_instructor`) | [`frontend/src/components/Admin/AddUser.tsx`](frontend/src/components/Admin/AddUser.tsx), [`frontend/src/components/Admin/EditUser.tsx`](frontend/src/components/Admin/EditUser.tsx), [`frontend/src/components/Admin/columns.tsx`](frontend/src/components/Admin/columns.tsx); E2E [`frontend/tests/admin.spec.ts`](frontend/tests/admin.spec.ts) |
+| Playwright harness (backend reset / env) | [`scripts/e2e-backend-reset.sh`](scripts/e2e-backend-reset.sh), [`frontend/playwright.global-setup.ts`](frontend/playwright.global-setup.ts), [`frontend/playwright.config.ts`](frontend/playwright.config.ts) |
+
+### Workshop HTTP vs realtime — delivery gap (audit)
+
+**Canonical router:** [`backend/app/api/routes/workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py).
+
+| Surface | Implemented today | Still 🔲 vs **REST sketch** (below, *REST sketch under /api/v1/*) |
+| ------- | ----------------- | ---------------------------------------------------------------- |
+| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove; **`PATCH …/sessions/{id}/participants/{user_id}`** instructor overrides (`live_status`/`joined_at`/`finished_at`); **`PATCH …/sessions/{id}`** — optional **`status`** (controlled transitions + realtime fanout on change), **`instructor_seat`** role updates, **`primary_instructor_user_id`** handoff (lead/co normalization), **`remove_instructor_user_id`** soft-remove with **409** when that would orphan a non-ended session; empty **422 `patch_requires_update`**; unknown seat **404**. **Lesson prerequisites** (`/workshop/lessons/{id}/prerequisites…`) ✅ for MVP slices. | Part-timer HTTP sketch (see below) still 🔲 |
+| **WebSocket** | `/{id}/ws` — `part.advance`, `session.pause` / `session.resume`, `participant.live_status`, … | Redis / multi-process hub (explicitly deferred) |
+
+**Shipped on `main` (summary):** list/detail + roster + session `PATCH`; prerequisites + pre-work UI (**banner, aggregates, mark complete**); pacing timer; badges + revoke/audit hardening. **Optional polish** — [Remaining work](#remaining-work-authoritative) §2.
+
+On every new HTTP route: regenerate **OpenAPI** + **`frontend/src/client`**.
+
+### Next actions (suggested order)
+
+1. **`git checkout main && git pull`.**
+2. **Ship [Remaining work](#remaining-work-authoritative) §1** — GitHub App + manifest-driven lesson sync (largest MVP gap vs spec).
+3. **Polish** per §2; **`/python-tdd-with-uv`**, OpenAPI + `frontend/src/client` regen, Playwright for each behavioral change.
+4. **Large feature?** Optionally reuse stacked PR model in [PR slicing](#pr-slicing-and-branch-strategy-locked) and extend the archived [stack table](#github-pr-stack-archived-collapsed-chain--historical-reference).
+5. **Local E2E:** [playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md) — standard workflow includes **`scripts/e2e-backend-reset.sh`** (and host runs typically pick it up again via **`globalSetup`** unless you opt out — see skill). **CI** is the merge gate for green.
+
+**When resuming from pause:** use [checkpoint](#pause--resume-checkpoint-handoff) → **`git pull`** → pick from **Remaining work**.
+
+### Backlog tracking
+
+**Shipped vs backlog** lives in **[Remaining work](#remaining-work-authoritative)** and the tracker table above; keep both in sync when scope changes.
+
+## Template code anchors
+
+| Layer         | Paths |
+| ------------- | ----- |
+| Backend       | [backend/app/models.py](backend/app/models.py); workshop routes under [backend/app/api/routes/](backend/app/api/routes/) (`workshop_sessions`, `workshop_lessons`, `workshop_badges`, etc.) |
+| Frontend      | Dashboard/workshop: [frontend/src/routes/_layout/dashboard/](frontend/src/routes/_layout/dashboard/), [frontend/src/routes/_layout/workshops.tsx](frontend/src/routes/_layout/workshops.tsx), [frontend/src/routes/_layout/workshop.$sessionId.tsx](frontend/src/routes/_layout/workshop.$sessionId.tsx); sidebar [frontend/src/components/Sidebar/AppSidebar.tsx](frontend/src/components/Sidebar/AppSidebar.tsx) |
+| Auth.js       | [authjs-service/auth.ts](authjs-service/auth.ts), [authjs-service/app/api/bridge/route.ts](authjs-service/app/api/bridge/route.ts) |
+| Bridge crypto | [backend/app/core/security.py](backend/app/core/security.py) |
 
 ## Out of scope (MVP)
 
@@ -95,143 +173,7 @@ Apply `/python-tdd-with-uv` for all Python backend changes in this plan:
 - Critical role/privacy/security behavior is validated in E2E before the slice is considered complete.
 - Docs/plan check: update affected plan/testing notes if scope or constraints evolved.
 
-## Implementation tracker (canonical — update whenever context would otherwise be lost)
-
-This section is the **recoverable checklist** when chat history or IDE session is gone. Prefer editing here over relying on conversational memory.
-
-**Maintenance rule:** After each meaningful backend/frontend/E2E slice, update **Last synced**, the **Active branch / PR**, toggle ✅ / 🔲 in the matrices below, and keep **[GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged)** in sync (new PR, merge, or base-branch change). For the open **tip** PR, run a **babysit loop** (see [Next actions](#next-actions-suggested-order)): `gh pr checks` / `gh pr checks --watch`, `gh run view --log-failed` on failures, fix + push on that PR’s head branch (≤3 remediation rounds per **babysitting-pr** Cursor skill — or an equivalent **Task** subagent mirroring `gh pr checks` → fix → push).
-
-| Field | Value |
-| ------ | ------ |
-| **Last synced** | **2026-05-06** — **PR07 [#27](https://github.com/justin-p/testing/pull/27)** merged into `ws-06-learning-workflows` (PR08 base branch deleted → **[#28](https://github.com/justin-p/testing/pull/28)** closed). **`ws-08-badges-revocation-v2`** merged `ws-06` back in and reopened as **PR08 v2 [#29](https://github.com/justin-p/testing/pull/29)** → `ws-06-learning-workflows`. PR09 remains merged via [#26](https://github.com/justin-p/testing/pull/26). |
-| **Branch tip (2026-05-06)** | **`ws-08-badges-revocation-v2`** contains PR07+PR08+PR09 work; open review on [#29](https://github.com/justin-p/testing/pull/29). |
-| **Active integration branch** | `ws-08-badges-revocation-v2` → [#29](https://github.com/justin-p/testing/pull/29) (base `ws-06-learning-workflows`) |
-| **Stack PR label** | **PR08 — BadgesRevocation** 🚧 in progress ([#29](https://github.com/justin-p/testing/pull/29); includes merged PR09 hardening) |
-
-### Pause / resume checkpoint (handoff)
-
-Use this section when reopening the project **after intentional stop**. Do **not** rely on chat history beyond what is committed and linked here.
-
-**Current active slice:**
-
-| Item | Value |
-| ---- | ----- |
-| Branch | `ws-08-badges-revocation-v2` |
-| PR | [#29](https://github.com/justin-p/testing/pull/29) (base `ws-06-learning-workflows`; replaces closed [#28](https://github.com/justin-p/testing/pull/28)) |
-| Latest work | **PR09 merged via [#26](https://github.com/justin-p/testing/pull/26):** badge hardening complete (roster-only grant/revoke, idempotent revoke retry, required non-empty revoke reason, structured audit logs). |
-
-**Resume in this order:**
-
-1. `git checkout ws-08-badges-revocation-v2`, run `uv run pytest tests/api/routes/test_workshop_badges.py`, and keep badge/hardening changes scoped while PR08 v2 remains open.
-2. Babysit [#29](https://github.com/justin-p/testing/pull/29) checks (`gh pr checks --watch`) — **PR07 [#27](https://github.com/justin-p/testing/pull/27) is merged**; resolve CI drift before merging PR08.
-3. Keep [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged), **Implementation tracker / Last synced / Stop-handoff**, and this checkpoint synced whenever PR/base/branch state changes — **especially after each intentional stop or resume.**
-
-**Open gaps (not blocking pause):**
-
-- Local Playwright **`auth.setup`** can time out without backend/`scripts/e2e-backend-reset.sh` — CI remains source of truth for E2E until env is reproduced locally.
-- **Dockerized frontend/backend** used by host Playwright (`:5173` / `:8000`): **rebuild images** after code changes (`docker compose build frontend` / `backend`); `compose` does not bind-mount app source for those services by default.
-- **`.github/workflows/playwright.yml`**: intentionally not bundled with recent PR06 UI/API slices; verify `git diff` vs remote before merging any local workflow experiments.
-- **Prerequisite** stack is **mostly implemented** for MVP (HTTP + workshop session UI); richer dashboard cards and timer/pacing HTTP may still be 🔲.
-- **Instructor onboarding:** admins can set **`is_instructor`** via **Users** admin (API already supported); no separate instructor-only onboarding flow assumed.
-- Optional: expand Playwright coverage for trainee/instructor **dashboard list** widgets (beyond current admin assertion in `dashboard-routing.spec.ts`).
-
-### GitHub PR stack (open — update when retargeted/merged)
-
-Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing). **Head → base** matches the locked stack model. When a PR merges, remove or mark it merged here and add the next open PR for that slice if you split/reopen.
-
-| Slice | Branch (head) | Pull request | Base branch |
-| ----- | --------------- | ------------ | ----------- |
-| PR01 | `ws-01-foundation-rbac` | [#18](https://github.com/justin-p/testing/pull/18) | `main` |
-| PR02 | `ws-02-github-sync-manifest` | [#19](https://github.com/justin-p/testing/pull/19) | `ws-01-foundation-rbac` |
-| PR03 | `ws-03-session-core` | [#20](https://github.com/justin-p/testing/pull/20) | `ws-02-github-sync-manifest` |
-| PR04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) | `ws-03-session-core` |
-| PR05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | `ws-04-realtime-privacy` |
-| PR06 | `ws-06-learning-workflows` | [#23](https://github.com/justin-p/testing/pull/23) | `ws-05-dashboard-nav` |
-| PR07 | `ws-07-pacing-timer-v2` | [#27](https://github.com/justin-p/testing/pull/27) *(merged)* | `ws-06-learning-workflows` |
-| PR08 | `ws-08-badges-revocation-v2` | [#29](https://github.com/justin-p/testing/pull/29) | `ws-06-learning-workflows` |
-| PR09 | `ws-09-hardening-and-tests` | [#26](https://github.com/justin-p/testing/pull/26) *(merged)* | *(landed on `ws-08-badges-revocation-v2` before PR07 merge; history preserved on branch)* |
-
-### Backend code anchors (workshop delivery slices)
-
-| Area | Primary paths |
-| ---- | ------------- |
-| HTTP + WebSocket routes | [`backend/app/api/routes/workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py) |
-| Prerequisites HTTP routes (PR06) | [`backend/app/api/routes/workshop_lessons.py`](backend/app/api/routes/workshop_lessons.py) |
-| In-memory fan-out hub | [`backend/app/services/workshop_realtime.py`](backend/app/services/workshop_realtime.py) |
-| API tests | [`backend/tests/api/routes/test_workshop_sessions.py`](backend/tests/api/routes/test_workshop_sessions.py) |
-| Prerequisites API tests (PR06) | [`backend/tests/api/routes/test_workshop_lessons.py`](backend/tests/api/routes/test_workshop_lessons.py) |
-| Hub unit tests | [`backend/tests/services/test_workshop_realtime.py`](backend/tests/services/test_workshop_realtime.py) |
-| Local E2E session bootstrap (`ENVIRONMENT=local` only) | [`backend/app/api/routes/private.py`](backend/app/api/routes/private.py) — `bootstrap_e2e_workshop_live_session` (+ `with_incomplete_required_prerequisite`, distinct-trainee vs `FIRST_SUPERUSER` instructor split); tests in [`backend/tests/api/routes/test_private.py`](backend/tests/api/routes/test_private.py) |
-| Trainee workshop UI (enter + ws-ticket + WebSocket) | [`frontend/src/routes/_layout/workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) |
-| Workshop Playwright | [`frontend/tests/workshop.spec.ts`](frontend/tests/workshop.spec.ts) |
-| Dashboard landing + routing | [`frontend/src/lib/dashboardLanding.ts`](frontend/src/lib/dashboardLanding.ts), stub rails [`frontend/src/components/dashboard/DashboardStubRails.tsx`](frontend/src/components/dashboard/DashboardStubRails.tsx), routes under [`frontend/src/routes/_layout/dashboard/`](frontend/src/routes/_layout/dashboard/), [`frontend/src/routes/_layout/workshops.tsx`](frontend/src/routes/_layout/workshops.tsx), sidebar [`frontend/src/components/Sidebar/AppSidebar.tsx`](frontend/src/components/Sidebar/AppSidebar.tsx), OAuth landing [`frontend/src/routes/auth.callback.tsx`](frontend/src/routes/auth.callback.tsx) |
-| Admin users (`is_instructor`) | [`frontend/src/components/Admin/AddUser.tsx`](frontend/src/components/Admin/AddUser.tsx), [`frontend/src/components/Admin/EditUser.tsx`](frontend/src/components/Admin/EditUser.tsx), [`frontend/src/components/Admin/columns.tsx`](frontend/src/components/Admin/columns.tsx); E2E [`frontend/tests/admin.spec.ts`](frontend/tests/admin.spec.ts) |
-| Playwright harness (backend reset / env) | [`scripts/e2e-backend-reset.sh`](scripts/e2e-backend-reset.sh), [`frontend/playwright.global-setup.ts`](frontend/playwright.global-setup.ts), [`frontend/playwright.config.ts`](frontend/playwright.config.ts) |
-
-### Workshop HTTP vs realtime — delivery gap (audit)
-
-**Canonical router:** [`backend/app/api/routes/workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py).
-
-| Surface | Implemented today | Still 🔲 vs **REST sketch** (below, *REST sketch under /api/v1/*) |
-| ------- | ----------------- | ---------------------------------------------------------------- |
-| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove; **`PATCH …/sessions/{id}/participants/{user_id}`** instructor overrides (`live_status`/`joined_at`/`finished_at`); **`PATCH …/sessions/{id}`** — optional **`status`** (controlled transitions + realtime fanout on change), **`instructor_seat`** role updates, **`primary_instructor_user_id`** handoff (lead/co normalization), **`remove_instructor_user_id`** soft-remove with **409** when that would orphan a non-ended session; empty **422 `patch_requires_update`**; unknown seat **404**. **Lesson prerequisites** (`/workshop/lessons/{id}/prerequisites…`) ✅ for MVP slices. | Part-timer HTTP sketch (see below) still 🔲 |
-| **WebSocket** | `/{id}/ws` — `part.advance`, `session.pause` / `session.resume`, `participant.live_status`, … | Redis / multi-process hub (explicitly deferred) |
-
-**Remaining vs dashboard/product polish:** session list/detail + roster + session `PATCH` are ✅; prerequisites + workshop pre-work UI (**banner, aggregates, inline complete**) are ✅; **host Playwright** workshop file stabilized (serial + bootstrap). Dashboard cards + broader pre-work/dashboard Playwright may still be 🔲.
-
-**Suggested PR06 vertical slices (backend `/python-tdd-with-uv` first):**
-
-1. **Prerequisite read enhancements** — per-user completion status in lesson prerequisite reads (self vs instructor-scoped views).
-2. **Prerequisite mutation breadth** — ✅ PATCH/update/delete prerequisite definitions with instructor/superuser guards.
-3. **Prework surfaces** — ✅ workshop session page + aggregates/gaps APIs + **inline mark-complete** + Playwright coverage (`workshop.spec.ts` serial block); optional: harder gating, dashboard list Playwright.
-
-Gate: regenerate **OpenAPI** + **`frontend/src/client`** on every new HTTP route.
-
-### PR06 (`ws-06-learning-workflows`) — current slice ([#23](https://github.com/justin-p/testing/pull/23))
-
-Forked from **`ws-05-dashboard-nav`** and tracked on [#23](https://github.com/justin-p/testing/pull/23). Aligns with [Branch/PR chain](#branchpr-chain) item 6 and roadmap id **`prework-prerequisites`**. **HTTP gap slices (1)-(2)** (list + session detail **`GET`s**) remain on **`ws-05-dashboard-nav`**; PR06 now advances prerequisites/prework APIs and downstream UX.
-
-| Planned capability | Notes |
-| ------------------ | ----- |
-| **Session list + detail GETs** | List + **`GET …/{id}`** ✅ on **`ws-05-dashboard-nav`** per [delivery gap audit](#workshop-http-vs-realtime--delivery-gap-audit); prerequisites + richer dashboard cards remain PR06. |
-| **Prerequisite / prework** data model | ✅ Landed: `LessonPrerequisite`, `UserPrerequisiteCompletion` (+ migration `4f6e7d8c9a01`); HTTP: create/list/patch/delete/complete, **`/me`**, **`/gaps`**, **`/aggregates`**; admin can grant **`is_instructor`** for roster/instructor UX. |
-| Trainee UX | ✅ Session page shows **required** incomplete pre-work banner (**`/prerequisites/me`**) + **Mark complete** per item; participant enter/ws-ticket now hard-gated (403) until required pre-work is complete, with dedicated gated UI state in workshop view. |
-| Instructor visibility | 🟨 Session page shows roster **aggregates** + gaps headline (same `session_id`); workshops dashboard now includes blocked counts, blocked-only filter, and blocked-session drilldown links. Deeper roster analytics remain optional. |
-| Tests | **`/python-tdd-with-uv`** backend + **`test_private`** E2E bootstrap cases; **Playwright** [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) (serial workshop `describe`, pre-work + fan-out + live flows). |
-| Stack hygiene | ✅ PR open: [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`); keep stack table + dependency graph in sync on retarget/merge. |
-
-### Stacked PRs — coarse roll-up
-
-Use ✅ when the slice is merged to **`main`** (or materially complete on its integration branch if pre-merge). Use 🟨 for partial. **GitHub:** see [PR stack table](#github-pr-stack-open--update-when-retargetedmerged) for current numbers and bases.
-
-| # | Branch (plan name) | GitHub PR | Status | Notes |
-| - | ------------------ | --------- | ------ | ----- |
-| 01 | `ws-01-foundation-rbac` | [#18](https://github.com/justin-p/testing/pull/18) | 🟨 | `User.is_instructor` + migrations; confirm against `main` |
-| 02 | `ws-02-github-sync-manifest` | [#19](https://github.com/justin-p/testing/pull/19) | 🔲 | GitHub App + manifest sync not tracked here yet |
-| 03 | `ws-03-session-core` | [#20](https://github.com/justin-p/testing/pull/20) | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
-| 04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) | 🟨 | Bounded realtime/privacy + `/workshop` E2E ✅ |
-| 05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | 🟨 | PR05 scope complete on branch (dashboard/nav + list/detail widgets + roster member add/remove/patch APIs); stacked merge + CI completion pending. |
-| 06 | `ws-06-learning-workflows` | [#23](https://github.com/justin-p/testing/pull/23) | 🟨 | Prerequisites + **`/me` `/gaps` `/aggregates`**, pre-work UI + **mark complete**, **distinct-trainee E2E bootstrap**, **Playwright workshop suite** serial/stability (**`1633910`**); **admin `is_instructor`**; merges/dashboard polish still 🔲 |
-| 07 | `ws-07-pacing-timer-v2` | [#27](https://github.com/justin-p/testing/pull/27) *(merged)* | ✅ | Persisted pacing timer state/history, remaining+elapsed payloads, instructor timer UI + E2E hardening; merged into `ws-06-learning-workflows`. |
-| 08 | `ws-08-badges-revocation-v2` | [#29](https://github.com/justin-p/testing/pull/29) | 🟨 | Badge catalog + grant/revoke + leaderboard plus merged PR09 hardening; replaces closed [#28](https://github.com/justin-p/testing/pull/28); merge into `ws-06` pending. |
-| 09 | `ws-09-hardening-and-tests` | [#26](https://github.com/justin-p/testing/pull/26) *(merged)* | ✅ | Cross-cutting hardening shipped: roster-only badge mutations, idempotent revoke retries, required non-empty revoke reason, structured badge mutation audit logs. |
-
-### Next actions (suggested order)
-
-1. **Confirm tip CI (PR06):** `gh pr checks 23` — if anything regresses, run **babysitting-pr** / Task fix loop on `ws-06-learning-workflows`.
-2. **Continue PR06 verticals:** dashboard **tiles** / list polish, **stricter pre-work gating** if product wants it, remaining REST sketch gaps (e.g. timer HTTP) — admin can already grant **instructor** from **Users**; **mark complete** is already in session UI (**`1633910`**).
-3. **Stack hygiene:** keep [#23](https://github.com/justin-p/testing/pull/23) rebased/retargeted as upstream stack PRs merge; update [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) after each shift.
-4. **Cross-slice gate:** regenerate OpenAPI + `frontend/src/client` on each API contract change; keep `/python-tdd-with-uv` discipline and focused regression runs.
-5. **E2E discipline:** `scripts/e2e-backend-reset.sh` before full local Playwright when diagnosing drift; Sonner-aware toasts ([playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md)).
-
-**When resuming from pause:** step through [Pause / resume checkpoint](#pause--resume-checkpoint-handoff) first.
-
-### YAML todos above
-
-The YAML `todos` list in the frontmatter is a **high-level roadmap** for Cursor/project tooling; it is not automatically synchronized with commits. **`Implementation tracker`** is the authoritative narrative for shipped vs remaining behavior.
-
 ## Locked decisions
-
 
 | Topic                   | Decision                                                                                                                                                                                                                                                                                                                                |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -251,25 +193,13 @@ The YAML `todos` list in the frontmatter is a **high-level roadmap** for Cursor/
 | Member role conflict    | Add-member role conflicts are resolved by **always replace** semantics atomically (no manual conflict endpoint required).                                                                                                                                                                                                               |
 | OAuth/App setup         | **Separate OAuth App (login)** + **separate GitHub App (repo sync)** for MVP.                                                                                                                                                                                                                                                           |
 | Entitlement scope       | **Instructor-bound** by default; instructors can invite other instructors explicitly.                                                                                                                                                                                                                                                   |
-| Realtime scaling path   | **Stay single-process** hub in PR04; defer Redis/multi-process fan-out until measured scale/concurrency requires it.                                                                                                                                                                                                                   |
+| Realtime scaling path   | **Single-process** WS hub on `main` today; defer Redis/multi-process fan-out until measured scale/concurrency requires it.                                                                                                                                                                                                               |
 | Avatar refresh          | Refresh stored avatar_url on each successful GitHub sign-in/link event (no periodic background refresh).                                                                                                                                                                                                                                |
 | Avatar unlink           | On GitHub unlink, clear stored avatar_url and fall back to initials/default avatar.                                                                                                                                                                                                                                                     |
 | API contract gate       | OpenAPI + TS client regeneration is **required on every API contract change**.                                                                                                                                                                                                                                                          |
 | CI branch gate          | Critical workflows (backend tests, docker-compose tests, Playwright, staging deploy checks) must run on default branch **main** and PRs; no `master`-only gaps.                                                                                                                                                                         |
 | Webhook replay safety   | Webhook processing requires signature verification + replay-window checks + delivery idempotency before side effects.                                                                                                                                                                                                                   |
 | Endpoint throttling     | Apply route-level throttling for auth bridge, login, and webhook endpoints.                                                                                                                                                                                                                                                             |
-
-
-## Template code anchors
-
-
-| Layer         | Paths                                                                                                                                                                                                     |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backend       | [backend/app/models.py](backend/app/models.py), extend API next to [backend/app/api/routes/oauth.py](backend/app/api/routes/oauth.py)                                                                     |
-| Frontend      | Replace/supplant [frontend/src/routes/_layout/items.tsx](frontend/src/routes/_layout/items.tsx); sidebar [frontend/src/components/Sidebar/AppSidebar.tsx](frontend/src/components/Sidebar/AppSidebar.tsx) |
-| Auth.js       | [authjs-service/auth.ts](authjs-service/auth.ts), [authjs-service/app/api/bridge/route.ts](authjs-service/app/api/bridge/route.ts) (login path unchanged)                                                 |
-| Bridge crypto | [backend/app/core/security.py](backend/app/core/security.py)                                                                                                                                              |
-
 
 ## GitHub App
 
@@ -496,8 +426,6 @@ flowchart TD
   revokeDecision -->|no| keepBadge[BadgeRemainsActive]
 ```
 
-
-
 ## Data model (illustrative)
 
 
@@ -539,7 +467,6 @@ flowchart TD
 | joined_at                             | First successful **POST …/enter** only.                                    |
 | live_status, finished_at (self-serve) | Only when session is **live**, not **paused** (WS or REST per API design). |
 | Instructor overrides                  | **PATCH** participant with audit columns.                                  |
-
 
 ## REST sketch (under /api/v1/…)
 
@@ -814,6 +741,7 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 
 ## Testing
 
+- **Local Playwright:** follow [playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md) — **`scripts/e2e-backend-reset.sh`** and the commands there are the authoritative host workflow (CI defines green across the matrix).
 - Unit: webhook bad signature; enter when scheduled; stale **part_generation** mutation; sync idempotency; handoff **422** when target not instructor; **last-instructor removal blocked (409)** on non-ended sessions; add-member opposite-role invokes always-replace atomically; badge grant only on instructor verification; badge revocation requires reason.
 - Unit: manifest missing/invalid hard-fails sync + marks repo unhealthy; relative asset rewrite to raw GitHub URLs; avatar cleared on unlink; bulk verify can grant for arbitrary selected trainees (no finished-only guardrail).
 - Playwright: two trainee profiles **cannot** observe each other's status or avatars in session views; instructor sees both; trainee GET/WS payloads snapshot-tested for absence of peer PII/live_status/avatar fields; badge appears only after instructor verify action; revocation removes badge from learner surfaces + leaderboard.
@@ -849,28 +777,13 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 
 ## Implementation order
 
-1. **is_instructor** + RBAC (superuser full management APIs; instructor scoped as above), including strict UI/API gating so only instructors see/install GitHub App prompts.
-2. GitHub App + webhooks + entitlement + **LessonRepo** + manual sync.
-3. Manifest-first lesson sync: per-lesson YAML manifest validation + **Lesson** / **LessonPart** ordering + relative-asset rewriting + sanitized read API.
-4. **WorkshopSession** + **SessionInstructor** + **WorkshopParticipant** + state machine + **enter** + exclusive member-role assignment API (no bulk finished_at on end).
-5. **ws-ticket** + WS + **part_generation** + pause rules.
-6. Instructor + participant UIs; replace **Items** navigation.
-7. Integrations: LessonRepo tombstone + handoff negatives.
-8. Learning workflow add-ons (**secure-by-default**): prerequisites/prework model + trainee checklist UX + instructor visibility, with scoped DTOs and prerequisite completion authorization checks.
-9. Session timer/pacing (**secure-by-default**): server-authoritative timer state, instructor controls, overrun indicators, immutable audit trail for timer transitions, and rate limits where abuse is plausible.
-10. Badge system (**secure-by-default**): catalog ownership rules + per-badge points + single/bulk verify-completion flow + mandatory-reason revocation + audit trail + profile/session/leaderboard UI with strict role checks.
-11. Dashboard parity pass: verify instructor and trainee dashboards include all applicable new modules and exclude non-applicable content by role/privacy.
-12. Migration rollout hardening: pre/post migration checks, backfill scripts, and destructive-change guardrails.
-13. Final cross-cutting hardening pass: default-branch workflow trigger audit, webhook replay/idempotency checks, throttling coverage validation, monitoring/alert calibration, and threat-model sanity review.
-14. Tests + env docs + strict OpenAPI/TS regen verification on each API slice; include dedicated security regression suite and full Playwright E2E coverage for implemented journeys.
-15. File post-MVP tickets (focus mode and other backlog items deferred from this plan).
-16. Ongoing PR operations lane: after each PR open/update in the stack, run `/babysitting-pr` until CI/checks are green or escalation is required for product/design decisions.
+**Historical (completed on `main` via stacked PR merge, ~2026-05-06):** original steps **4–11** and related UI (sessions, WS, dashboards, prerequisites, pacing, badges, hardening). **Outstanding from original numbering:** **`2.` GitHub App + webhooks + `LessonRepo` + manual sync** and **`3.` manifest-first ingest + sanitized read path** ([Remaining work](#remaining-work-authoritative) §1). Steps **12–14** (migrations rollout, webhook/throttle audits, observability stretch) remain applicable as you ship sync and tighten ops.
 
-Implementation guardrail for steps 1-15: for every backend Python slice, follow `/python-tdd-with-uv` (failing test first, minimal implementation, `uv run pytest` before advancing), and for every user-facing slice ensure corresponding Playwright E2E tests are added/updated before advancing.
+Guardrail unchanged: **`/python-tdd-with-uv`** backend; Playwright + OpenAPI/client regen for slices that touch contracts or UX.
 
 ## PR slicing and branch strategy (locked)
 
-Use a fully stacked PR chain for implementation delivery.
+Stacked chains are optional; one **successful** archive is in [GitHub PR stack](#github-pr-stack-archived-collapsed-chain--historical-reference).
 
 ### Stack model
 
@@ -880,17 +793,17 @@ Use a fully stacked PR chain for implementation delivery.
 
 ### Branch/PR chain
 
-Open GitHub PRs for workshop slices **01–06**: see [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged). PR07+ use the branch names below when opened.
+Workshop slices **01–06** merged as **[#18](https://github.com/justin-p/testing/pull/18)**–**[#23](https://github.com/justin-p/testing/pull/23)** — see archived **[stack table](#github-pr-stack-archived-collapsed-chain--historical-reference)**. **PR07–PR09**: **[#26](https://github.com/justin-p/testing/pull/26)**, **[#27](https://github.com/justin-p/testing/pull/27)** (supersedes closed **[#28](https://github.com/justin-p/testing/pull/28)**), **[#29](https://github.com/justin-p/testing/pull/29)**. New slices branch from **`main`**.
 
 1. `ws-01-foundation-rbac` ([PR #18](https://github.com/justin-p/testing/pull/18) → `main`) — roles, RBAC groundwork, initial schema scaffolding.
-2. `ws-02-github-sync-manifest` ([PR #19](https://github.com/justin-p/testing/pull/19) → `ws-01-*`) — GitHub App sync and manifest-first lesson ingestion.
+2. `ws-02-github-sync-manifest` ([PR #19](https://github.com/justin-p/testing/pull/19) → `ws-01-*`) — *Branch merged;* **GitHub App + manifest lesson pipeline** still to build ([Remaining work](#remaining-work-authoritative) §1).
 3. `ws-03-session-core` ([PR #20](https://github.com/justin-p/testing/pull/20) → `ws-02-*`) — session lifecycle, rostering, enter semantics, role exclusivity.
 4. `ws-04-realtime-privacy` ([PR #21](https://github.com/justin-p/testing/pull/21) → `ws-03-*`) — ws-ticket flow, role-scoped fanout, privacy-safe DTO behavior.
 5. `ws-05-dashboard-nav` ([PR #22](https://github.com/justin-p/testing/pull/22) → `ws-04-*`) — post-login routing, instructor/trainee/admin homes, nav replacement.
 6. `ws-06-learning-workflows` ([PR #23](https://github.com/justin-p/testing/pull/23) → `ws-05-*`) — prerequisites/prework APIs + UI, E2E bootstrap, Playwright workshop suite, living plan scope alignment.
-7. `ws-07-pacing-timer` — session timer and pacing tools (part timers, overrun, instructor controls). *PR TBD*
-8. `ws-08-badges-revocation` — badge catalog, grants, revocation, leaderboard surfaces. *PR TBD*
-9. `ws-09-hardening-and-tests` — cross-cutting hardening, stabilization, and final test consolidation. *PR TBD*
+7. `ws-07-pacing-timer-v2` — pacing/timer merged via **[#27](https://github.com/justin-p/testing/pull/27)** *(into stack before `#23` collapsed)*.
+8. `ws-08-badges-revocation-v2` — badges merged via **[#29](https://github.com/justin-p/testing/pull/29)**.
+9. `ws-09-hardening-and-tests` — hardened via **[#26](https://github.com/justin-p/testing/pull/26)**.
 
 ### PR scope guardrails
 
@@ -914,23 +827,23 @@ flowchart TD
   pr02 --> pr03["PR03 #20 ws-03"]
   pr03 --> pr04["PR04 #21 ws-04"]
   pr04 --> pr05["PR05 #22 ws-05"]
-  pr05 --> pr06[PR06 LearningWorkflows]
-  pr06 --> pr07[PR07 PacingTimer]
-  pr07 --> pr08[PR08 BadgesRevocation]
-  pr08 --> pr09[PR09 HardeningAndTests]
+  pr05 --> pr06["PR06 #23 LearningWorkflows"]
+  pr06 --> pr07["PR07 #27 PacingTimer"]
+  pr07 --> pr08["PR08 #29 BadgesRevocation"]
+  pr08 --> pr09["PR09 #26 Hardening"]
 ```
-*(PR numbers for PR06–PR09 appear when those PRs are opened; update diagram with the stack table.)*
+*(PR06–PR09 numbers above merged as part of the collapsed stack; **`main`** is the integration tip.)*
 
 ### `/split-to-prs` readiness checklist
 
 - Approve the split map before any branch/commit/push/PR operations.
 - Save a recoverable backup ref before moving work between slices.
 - Stage only named files/hunks for each slice (`no git add .` / `no git add -A`).
-- Report PR titles/URLs and remaining working-tree status after execution, and refresh **[GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged)** plus mermaid labels for opened slices.
+- Report PR titles/URLs and remaining working-tree status after execution; if you recreate a stacked chain, update the archival **[GitHub PR stack](#github-pr-stack-archived-collapsed-chain--historical-reference)** table (or successor doc).
 
 ## PR babysitting policy (locked)
 
-`/babysitting-pr` is mandatory for **every PR** in the 9-PR stacked chain before merge.
+Workshop stack PRs (**[#18](https://github.com/justin-p/testing/pull/18)** … **[#23](https://github.com/justin-p/testing/pull/23)**) are merged — **still apply** **`gh pr checks` → fix → push** for **every PR to `main`** (single-PR deliveries or future stacks).
 
 ### Execution loop
 
