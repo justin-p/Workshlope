@@ -3376,3 +3376,35 @@ def test_timer_events_endpoint_returns_recent_actions(
     assert payload["count"] == 2
     assert payload["data"][0]["action"] == "resume"
     assert payload["data"][1]["action"] == "pause"
+
+
+def test_timer_countdown_includes_remaining_seconds(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-remaining-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    start = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=headers,
+        json={"mode": "countdown", "target_seconds": 120},
+    )
+    assert start.status_code == 200
+    remaining = start.json()["remaining_seconds"]
+    assert isinstance(remaining, int)
+    assert 0 <= remaining <= 120

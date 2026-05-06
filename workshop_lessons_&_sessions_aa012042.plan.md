@@ -103,7 +103,7 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-06** — **PR07 `ws-07-pacing-timer`** now includes DB-backed timer lifecycle + event-history vertical: timer state persisted in `workshop_session_timer`, timer actions logged in `workshop_session_timer_event`, new instructor endpoint `GET /workshop/sessions/{session_id}/timer/events` (limit-bounded recent actions), regenerated frontend SDK/types, and workshop instructor UI now renders a "Recent timer events" panel sourced from that endpoint. Backend timer route tests remain green. |
+| **Last synced** | **2026-05-06** — **PR07 `ws-07-pacing-timer`** now includes DB-backed timer lifecycle + event-history + countdown-remaining slice: timer state persisted in `workshop_session_timer`, timer actions logged in `workshop_session_timer_event`, instructor endpoint `GET /workshop/sessions/{session_id}/timer/events`, and timer payload now includes `remaining_seconds` for countdown mode with pause/resume drift correction (resume shifts `started_at` by paused duration). Frontend instructor timer status now shows remaining seconds and recent event history. |
 | **Branch tip (2026-05-06)** | **`ws-07-pacing-timer`** (new branch, PR not opened yet) contains persisted timer lifecycle + audit-event groundwork. Base for upcoming PR should be `ws-06-learning-workflows`. |
 | **Active integration branch** | `ws-07-pacing-timer` → *(PR pending; expected base `ws-06-learning-workflows`)* |
 | **Stack PR label** | **PR07 — PacingTimer** 🚧 in progress (DB-backed timer state + audit events first slice landed locally) |
@@ -118,7 +118,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-07-pacing-timer` |
 | PR | *(not opened yet; will target `ws-06-learning-workflows`)* |
-| Latest work | **PR07 slice 2 (2026-05-06):** added timer event history endpoint (`/timer/events`) with instructor-only access + limit query, extended backend tests for recent action ordering, regenerated OpenAPI frontend client artifacts, and wired workshop instructor page to display the latest timer actions in a dedicated panel. |
+| Latest work | **PR07 slice 3 (2026-05-06):** added countdown `remaining_seconds` to timer responses, corrected pause/resume timing drift by offsetting `started_at` on resume, regenerated OpenAPI/SDK artifacts, updated instructor timer status UI to show remaining seconds, and extended backend timer tests to assert remaining-seconds presence for countdown starts. |
 
 **Resume in this order:**
 

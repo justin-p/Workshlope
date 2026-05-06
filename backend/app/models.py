@@ -480,6 +480,7 @@ class WorkshopSessionTimerPublic(SQLModel):
     target_seconds: int | None = None
     started_at: datetime | None = None
     paused_at: datetime | None = None
+    remaining_seconds: int | None = None
 
 
 class WorkshopSessionTimerEventPublic(SQLModel):
