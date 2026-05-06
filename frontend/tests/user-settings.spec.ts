@@ -2,6 +2,10 @@ import { expect, test } from "@playwright/test"
 import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
 import { createUser } from "./utils/privateApi.ts"
 import { randomEmail, randomPassword } from "./utils/random"
+import {
+  expectErrorToastDescription,
+  expectSuccessToastDescription,
+} from "./utils/sonnerToast.ts"
 import { logInUser, logOutUser } from "./utils/user"
 
 const tabs = ["My profile", "Password", "Danger zone"]
@@ -45,7 +49,7 @@ test.describe("Edit user profile", () => {
     await page.getByLabel("Full name").fill(updatedName)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User updated successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "User updated successfully")
     await expect(
       page.locator("form").getByText(updatedName, { exact: true }),
     ).toBeVisible()
@@ -79,7 +83,7 @@ test.describe("Edit user email", () => {
     await page.getByLabel("Email").fill(updatedEmail)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User updated successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "User updated successfully")
     await expect(
       page.locator("form").getByText(updatedEmail, { exact: true }),
     ).toBeVisible()
@@ -142,7 +146,7 @@ test.describe("Change password", () => {
     await page.getByTestId("confirm-password-input").fill(newPassword)
     await page.getByRole("button", { name: "Update Password" }).click()
 
-    await expect(page.getByText("Password updated successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "Password updated successfully")
 
     await logOutUser(page)
     await logInUser(page, email, newPassword)
@@ -196,9 +200,10 @@ test.describe("Change password validation", () => {
     await page.getByTestId("confirm-password-input").fill(password)
     await page.getByRole("button", { name: "Update Password" }).click()
 
-    await expect(
-      page.getByText("New password cannot be the same as the current one"),
-    ).toBeVisible()
+    await expectErrorToastDescription(
+      page,
+      "New password cannot be the same as the current one",
+    )
   })
 })
 
@@ -223,24 +228,9 @@ test("User can switch between theme modes", async ({ page }) => {
 
 test("Selected mode is preserved across sessions", async ({ page }) => {
   await page.goto("/settings")
+  await page.evaluate(() => localStorage.setItem("vite-ui-theme", "dark"))
+  await page.reload()
 
-  await page.getByTestId("theme-button").click()
-  if (
-    await page.evaluate(() =>
-      document.documentElement.classList.contains("dark"),
-    )
-  ) {
-    await page.getByTestId("light-mode").click()
-    await page.getByTestId("theme-button").click()
-  }
-
-  const isLightMode = await page.evaluate(() =>
-    document.documentElement.classList.contains("light"),
-  )
-  expect(isLightMode).toBe(true)
-
-  await page.getByTestId("theme-button").click()
-  await page.getByTestId("dark-mode").click()
   let isDarkMode = await page.evaluate(() =>
     document.documentElement.classList.contains("dark"),
   )

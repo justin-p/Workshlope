@@ -1,31 +1,27 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router"
 
-import useAuth from "@/hooks/useAuth"
+import { UsersService } from "@/client"
+import { isLoggedIn } from "@/hooks/useAuth"
+import { getDashboardLandingPath } from "@/lib/dashboardLanding"
 
 export const Route = createFileRoute("/_layout/")({
-  component: Dashboard,
+  beforeLoad: async () => {
+    if (!isLoggedIn()) return
+    try {
+      const user = await UsersService.readUserMe()
+      throw redirect({ to: getDashboardLandingPath(user) })
+    } catch (err) {
+      if (isRedirect(err)) throw err
+      throw redirect({ to: "/login" })
+    }
+  },
+  component: LayoutIndexStub,
   head: () => ({
-    meta: [
-      {
-        title: "Dashboard - FastAPI Template",
-      },
-    ],
+    meta: [{ title: "Workshop" }],
   }),
 })
 
-function Dashboard() {
-  const { user: currentUser } = useAuth()
-
-  return (
-    <div>
-      <div>
-        <h1 className="text-2xl truncate max-w-sm">
-          Hi, {currentUser?.full_name || currentUser?.email} 👋
-        </h1>
-        <p className="text-muted-foreground">
-          Welcome back, nice to see you again!!!
-        </p>
-      </div>
-    </div>
-  )
+/** Never shown when logged in — `/` redirects to a role dashboard. */
+function LayoutIndexStub() {
+  return null
 }

@@ -18,20 +18,38 @@ Use this skill when staged or modified files include:
 
 ## Required Local Validation
 
-1. Start backend required by frontend tests:
+1. **Always reset the backend before Playwright** (fresh DB volume + known superuser seed). From repo root:
 
 ```bash
-/usr/bin/docker compose --env-file .env.local up -d --wait backend
+bash scripts/e2e-backend-reset.sh
 ```
+
+This is also run automatically via `globalSetup` in `frontend/playwright.config.ts` when you execute Playwright **on the host** (not inside the Playwright Docker service, where CI already resets the stack). To skip the automated reset: `SKIP_E2E_BACKEND_RESET=1`.
+
+The reset script starts the backend with `USER_REGISTRATION_ENABLED=true` so sign-up specs pass even when `.env.local` disables registration. For host `vite` dev, only `USER_REGISTRATION_ENABLED` in repo-root `.env.local` needs to stay in sync—the Vite client flag is derived unless you set `VITE_USER_REGISTRATION_ENABLED` explicitly.
 
 2. Run Playwright from `frontend`:
 
 ```bash
 cd frontend
-bunx playwright test --fail-on-flaky-tests
+bunx playwright test tests/workshop.spec.ts --project=chromium --fail-on-flaky-tests
 ```
 
-3. If tests fail, do not commit. Fix, rerun, then proceed.
+3. If the touched test is not `workshop.spec.ts`, run only touched specs first:
+
+```bash
+cd frontend
+bunx playwright test tests/<changed-spec>.spec.ts --project=chromium --fail-on-flaky-tests
+```
+
+4. Before commit/PR update, run a broader check:
+
+```bash
+cd frontend
+bunx playwright test --project=chromium --fail-on-flaky-tests
+```
+
+5. If tests fail, do not commit. Fix, rerun, then proceed.
 
 ## CI Babysitting Rule
 

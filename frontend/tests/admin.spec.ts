@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test"
 import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
+import { maximizeAdminUsersTablePageSize } from "./utils/adminUsersTable"
 import { createUser } from "./utils/privateApi"
 import { randomEmail, randomPassword } from "./utils/random"
+import { expectSuccessToastDescription } from "./utils/sonnerToast.ts"
 import { logInUser } from "./utils/user"
 
 test("Admin page is accessible and shows correct title", async ({ page }) => {
@@ -18,6 +20,7 @@ test("Add User button is visible", async ({ page }) => {
 test.describe("Admin user management", () => {
   test("Create a new user successfully", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     const email = randomEmail()
     const password = randomPassword()
@@ -32,16 +35,40 @@ test.describe("Admin user management", () => {
 
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User created successfully")).toBeVisible()
-
+    await expectSuccessToastDescription(page, "User created successfully")
     await expect(page.getByRole("dialog")).not.toBeVisible()
 
     const userRow = page.getByRole("row").filter({ hasText: email })
     await expect(userRow).toBeVisible()
   })
 
+  test("Create a workshop instructor user", async ({ page }) => {
+    await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
+
+    const email = randomEmail()
+    const password = randomPassword()
+
+    await page.getByRole("button", { name: "Add User" }).click()
+
+    await page.getByPlaceholder("Email").fill(email)
+    await page.getByPlaceholder("Password").first().fill(password)
+    await page.getByPlaceholder("Password").last().fill(password)
+    await page.getByLabel("Workshop instructor?").check()
+    await page.getByLabel("Is active?").check()
+
+    await page.getByRole("button", { name: "Save" }).click()
+
+    await expectSuccessToastDescription(page, "User created successfully")
+    await expect(page.getByRole("dialog")).not.toBeVisible()
+
+    const userRow = page.getByRole("row").filter({ hasText: email })
+    await expect(userRow.getByText("Instructor")).toBeVisible()
+  })
+
   test("Create a superuser", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     const email = randomEmail()
     const password = randomPassword()
@@ -56,8 +83,7 @@ test.describe("Admin user management", () => {
 
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User created successfully")).toBeVisible()
-
+    await expectSuccessToastDescription(page, "User created successfully")
     await expect(page.getByRole("dialog")).not.toBeVisible()
 
     const userRow = page.getByRole("row").filter({ hasText: email })
@@ -66,6 +92,7 @@ test.describe("Admin user management", () => {
 
   test("Edit a user successfully", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     const email = randomEmail()
     const password = randomPassword()
@@ -79,7 +106,7 @@ test.describe("Admin user management", () => {
     await page.getByPlaceholder("Password").last().fill(password)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User created successfully")).toBeVisible()
+    await expectSuccessToastDescription(page, "User created successfully")
     await expect(page.getByRole("dialog")).not.toBeVisible()
 
     const userRow = page.getByRole("row").filter({ hasText: email })
@@ -90,12 +117,15 @@ test.describe("Admin user management", () => {
     await page.getByPlaceholder("Full name").fill(updatedName)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User updated successfully")).toBeVisible()
-    await expect(userRow).toContainText(updatedName)
+    await expectSuccessToastDescription(page, "User updated successfully")
+    await expect(
+      page.getByRole("row").filter({ hasText: email }),
+    ).toContainText(updatedName)
   })
 
   test("Delete a user successfully", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     const email = randomEmail()
     const password = randomPassword()
@@ -106,8 +136,7 @@ test.describe("Admin user management", () => {
     await page.getByPlaceholder("Password").last().fill(password)
     await page.getByRole("button", { name: "Save" }).click()
 
-    await expect(page.getByText("User created successfully")).toBeVisible()
-
+    await expectSuccessToastDescription(page, "User created successfully")
     await expect(page.getByRole("dialog")).not.toBeVisible()
 
     const userRow = page.getByRole("row").filter({ hasText: email })
@@ -117,9 +146,10 @@ test.describe("Admin user management", () => {
 
     await page.getByRole("button", { name: "Delete" }).click()
 
-    await expect(
-      page.getByText("The user was deleted successfully"),
-    ).toBeVisible()
+    await expectSuccessToastDescription(
+      page,
+      "The user was deleted successfully",
+    )
 
     await expect(
       page.getByRole("row").filter({ hasText: email }),
@@ -128,6 +158,7 @@ test.describe("Admin user management", () => {
 
   test("Cancel user creation", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     await page.getByRole("button", { name: "Add User" }).click()
     await page.getByPlaceholder("Email").fill("test@example.com")
@@ -139,6 +170,7 @@ test.describe("Admin user management", () => {
 
   test("Email is required and must be valid", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     await page.getByRole("button", { name: "Add User" }).click()
 
@@ -150,6 +182,7 @@ test.describe("Admin user management", () => {
 
   test("Password must be at least 8 characters", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     await page.getByRole("button", { name: "Add User" }).click()
 
@@ -165,6 +198,7 @@ test.describe("Admin user management", () => {
 
   test("Passwords must match", async ({ page }) => {
     await page.goto("/admin")
+    await maximizeAdminUsersTablePageSize(page)
 
     await page.getByRole("button", { name: "Add User" }).click()
 

@@ -84,6 +84,9 @@ services:
     volumes:
       - ./backend/htmlcov:/app/backend/htmlcov
     environment:
+      # Docker E2E parity: .env.local often disables registration locally; Playwright
+      # sign-up / reset-password specs need the API to accept /users/signup (overrides env_file).
+      USER_REGISTRATION_ENABLED: "true"
       SMTP_HOST: "mailcatcher"
       SMTP_PORT: "1025"
       SMTP_TLS: "false"
@@ -108,13 +111,17 @@ services:
     restart: "no"
     ports:
       - "5173:80"
+    volumes:
+      # Same-origin /api/v1 → backend (Playwright chromium must not call localhost:8000).
+      - ./frontend/nginx-compose-api-proxy.conf:/etc/nginx/extra-conf.d/backend-not-found.conf:ro
     build:
       context: .
       dockerfile: frontend/Dockerfile
       args:
-        - VITE_API_URL=http://localhost:8000
-        - VITE_AUTHJS_URL=http://localhost:3001
-        - NODE_ENV=development
+        VITE_API_URL: ""
+        VITE_AUTHJS_URL: http://localhost:3001
+        USER_REGISTRATION_ENABLED: "true"
+        NODE_ENV: development
 
   playwright:
     build:
@@ -128,6 +135,7 @@ services:
     depends_on:
       - backend
       - mailcatcher
+      - frontend
     env_file:
       - .env.local
     environment:
