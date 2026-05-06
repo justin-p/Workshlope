@@ -1,9 +1,15 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
-import { ApiError, WorkshopSessionsService } from "@/client"
+import {
+  ApiError,
+  WorkshopLessonsService,
+  WorkshopSessionsService,
+} from "@/client"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import useAuth from "@/hooks/useAuth"
 
 /** Matches UUID v4 from `uuid.uuid4()` used for workshop sessions. */
 const UUID_V4_RE =
@@ -17,6 +23,20 @@ function httpToWsBase(httpBase: string): string {
     return `ws://${httpBase.slice("http://".length)}`
   }
   return httpBase
+}
+
+function formatTimerRemainingSeconds(totalSeconds: number): string {
+  const clamped = Math.max(0, totalSeconds)
+  const minutes = Math.floor(clamped / 60)
+  const seconds = clamped % 60
+  return `${minutes}:${String(seconds).padStart(2, "0")}`
+}
+
+function formatEventTimestamp(iso: string | null | undefined): string {
+  if (!iso) return "unknown time"
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return "unknown time"
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
 /** Decode JWT payload segment (no verification — UI routing only). */
@@ -64,6 +84,8 @@ export const Route = createFileRoute("/_layout/workshop/$sessionId")({
 
 function WorkshopSessionPage() {
   const { sessionId } = Route.useParams()
+  const queryClient = useQueryClient()
+  const { user: currentUser } = useAuth()
   const uuidOk = UUID_V4_RE.test(sessionId)
   const detailQuery = useQuery({
     queryKey: ["workshopSessionDetail", sessionId],
@@ -72,6 +94,188 @@ function WorkshopSessionPage() {
     enabled: uuidOk,
     retry: false,
   })
+
+  const lessonId = detailQuery.data?.lesson.id
+  const detailView = detailQuery.data?.view
+  const detail = detailQuery.data
+  /** HTTP detail is instructor-first when user has both seats; WS still uses participant. */
+  const userSeesTraineePrework =
+    detail?.view === "participant" ||
+    (detail?.view === "instructor" &&
+      currentUser?.id !== undefined &&
+      detail.participants.some((p) => p.user_id === currentUser.id))
+
+  const myPrerequisitesQuery = useQuery({
+    queryKey: ["workshopMyLessonPrerequisites", lessonId],
+    queryFn: () =>
+      WorkshopLessonsService.readMyLessonPrerequisites({ lessonId: lessonId! }),
+    enabled:
+      uuidOk &&
+      detailQuery.isSuccess &&
+      lessonId !== undefined &&
+      userSeesTraineePrework,
+    retry: false,
+  })
+
+  const aggregatesQuery = useQuery({
+    queryKey: ["workshopPrerequisiteAggregates", lessonId, sessionId],
+    queryFn: () =>
+      WorkshopLessonsService.readLessonPrerequisiteAggregatesForSessionRoster({
+        lessonId: lessonId!,
+        sessionId,
+      }),
+    enabled:
+      uuidOk &&
+      detailQuery.isSuccess &&
+      lessonId !== undefined &&
+      detailView === "instructor",
+    retry: false,
+  })
+
+  const gapsQuery = useQuery({
+    queryKey: ["workshopPrerequisiteGaps", lessonId, sessionId],
+    queryFn: () =>
+      WorkshopLessonsService.readLessonPrerequisiteGapsForSessionRoster({
+        lessonId: lessonId!,
+        sessionId,
+      }),
+    enabled:
+      uuidOk &&
+      detailQuery.isSuccess &&
+      lessonId !== undefined &&
+      detailView === "instructor",
+    retry: false,
+  })
+
+  const completePrerequisiteMutation = useMutation({
+    mutationFn: ({
+      lessonId: lid,
+      prerequisiteId,
+    }: {
+      lessonId: string
+      prerequisiteId: string
+    }) =>
+      WorkshopLessonsService.completeLessonPrerequisite({
+        lessonId: lid,
+        prerequisiteId,
+      }),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopMyLessonPrerequisites", variables.lessonId],
+      })
+    },
+  })
+
+  const timerQuery = useQuery({
+    queryKey: ["workshopSessionTimer", sessionId],
+    queryFn: () =>
+      WorkshopSessionsService.readWorkshopSessionTimer({ sessionId }),
+    enabled: uuidOk && detailView === "instructor",
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.status === "running" ? 1_000 : false,
+  })
+
+  const timerEventsQuery = useQuery({
+    queryKey: ["workshopSessionTimerEvents", sessionId],
+    queryFn: () =>
+      WorkshopSessionsService.readWorkshopSessionTimerEvents({
+        sessionId,
+        limit: 5,
+      }),
+    enabled: uuidOk && detailView === "instructor",
+    retry: false,
+    refetchInterval: () =>
+      timerQuery.data?.status === "running" ? 5_000 : false,
+  })
+
+  const startTimerMutation = useMutation({
+    mutationFn: () =>
+      WorkshopSessionsService.startWorkshopSessionTimer({
+        sessionId,
+        requestBody: { mode: "countdown", target_seconds: 300 },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimer", sessionId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
+      })
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
+  const pauseTimerMutation = useMutation({
+    mutationFn: () =>
+      WorkshopSessionsService.pauseWorkshopSessionTimer({ sessionId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimer", sessionId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
+      })
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
+  const resumeTimerMutation = useMutation({
+    mutationFn: () =>
+      WorkshopSessionsService.resumeWorkshopSessionTimer({ sessionId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimer", sessionId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
+      })
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
+  const stopTimerMutation = useMutation({
+    mutationFn: () =>
+      WorkshopSessionsService.stopWorkshopSessionTimer({ sessionId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimer", sessionId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
+      })
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
   const [phase, setPhase] = useState<
     "idle" | "entering" | "ws_connecting" | "ready" | "error"
   >("idle")
@@ -85,6 +289,7 @@ function WorkshopSessionPage() {
     "live",
   )
   const wsRef = useRef<WebSocket | null>(null)
+  const wsSessionReadyRef = useRef(false)
 
   useEffect(() => {
     if (!UUID_V4_RE.test(sessionId)) {
@@ -101,6 +306,7 @@ function WorkshopSessionPage() {
       setConnectedRole(null)
       setRoomStatus("live")
       setLastAckEvent("")
+      wsSessionReadyRef.current = false
       try {
         const ticketRes =
           await createWorkshopWsTicketWithOptionalEnter(sessionId)
@@ -143,6 +349,7 @@ function WorkshopSessionPage() {
               if (msg.role === "participant" || msg.role === "instructor") {
                 setConnectedRole(msg.role)
               }
+              wsSessionReadyRef.current = true
               setPhase("ready")
             }
             if (
@@ -165,6 +372,12 @@ function WorkshopSessionPage() {
         ws.onclose = () => {
           if (cancelled) return
           wsRef.current = null
+          if (!wsSessionReadyRef.current) {
+            setPhase("error")
+            setErrorDetail(
+              "Realtime disconnected before the session was ready.",
+            )
+          }
         }
       } catch (e: unknown) {
         if (cancelled) return
@@ -230,6 +443,22 @@ function WorkshopSessionPage() {
 
   const instructorReady = phase === "ready" && connectedRole === "instructor"
 
+  const overdueRequiredPrerequisites =
+    myPrerequisitesQuery.data?.data.filter(
+      (p) => p.required_flag && !p.is_completed,
+    ) ?? []
+
+  const requiredAggregateRows =
+    aggregatesQuery.data?.data.filter((r) => r.prerequisite.required_flag) ?? []
+  const timerStatus = timerQuery.data?.status ?? "inactive"
+  const timerMode = timerQuery.data?.mode
+  const timerElapsedSeconds = timerQuery.data?.elapsed_seconds
+  const timerRemainingSeconds = timerQuery.data?.remaining_seconds
+  const timerEvents = timerEventsQuery.data?.data ?? []
+  const isPreworkGateError = errorDetail === "Required prerequisites incomplete"
+  const participantRemainingRequiredCount = overdueRequiredPrerequisites.length
+  const instructorBlockedTraineesCount = gapsQuery.data?.count ?? 0
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">
@@ -244,6 +473,135 @@ function WorkshopSessionPage() {
           </>
         ) : null}
       </p>
+      {detailView === "participant" ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="workshop-prework-header-count"
+        >
+          Required pre-work remaining: {participantRemainingRequiredCount}
+        </p>
+      ) : null}
+      {detailView === "instructor" ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="workshop-prework-header-count"
+        >
+          Roster trainees blocked by required pre-work:{" "}
+          {instructorBlockedTraineesCount}
+        </p>
+      ) : null}
+
+      {userSeesTraineePrework &&
+      overdueRequiredPrerequisites.length > 0 &&
+      !myPrerequisitesQuery.isFetching ? (
+        <Alert
+          variant="destructive"
+          data-testid="workshop-prework-participant-banner"
+        >
+          <AlertTitle>Incomplete pre-work</AlertTitle>
+          <AlertDescription>
+            <span className="block mb-2">
+              Finish these before class so you&apos;re ready to start.
+            </span>
+            <ul className="list-none space-y-2 pl-0">
+              {overdueRequiredPrerequisites.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2"
+                >
+                  <span className="min-w-0 text-sm">
+                    {p.url ? (
+                      <a
+                        href={p.url}
+                        className="underline font-medium text-foreground"
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        {p.title}
+                      </a>
+                    ) : (
+                      p.title
+                    )}
+                  </span>
+                  {lessonId ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={completePrerequisiteMutation.isPending}
+                      data-testid="workshop-prework-mark-complete"
+                      aria-label={`Mark “${p.title}” complete`}
+                      onClick={() =>
+                        completePrerequisiteMutation.mutate({
+                          lessonId,
+                          prerequisiteId: p.id,
+                        })
+                      }
+                    >
+                      Mark complete
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {detailView === "instructor" ? (
+        <div
+          className="rounded-lg border px-4 py-3 text-sm space-y-2 bg-card"
+          data-testid="workshop-prework-instructor-panel"
+        >
+          <div className="font-medium">Pre-work (rostered trainees)</div>
+          {aggregatesQuery.isLoading || gapsQuery.isLoading ? (
+            <p className="text-muted-foreground">Loading pre-work snapshot…</p>
+          ) : aggregatesQuery.isError ? (
+            <p className="text-destructive text-xs">
+              Could not load prerequisite aggregates for this roster.
+            </p>
+          ) : (aggregatesQuery.data?.data ?? []).length === 0 ? (
+            <p className="text-muted-foreground">
+              No lesson prerequisites are defined yet.
+            </p>
+          ) : (
+            <>
+              <p
+                className="text-muted-foreground text-xs"
+                data-testid="workshop-prework-instructor-gaps-count"
+              >
+                {gapsQuery.isError
+                  ? "Could not load who still owes required pre-work."
+                  : `${gapsQuery.data?.count ?? 0} trainee(s) still missing at least one required prerequisite.`}
+              </p>
+              {requiredAggregateRows.length === 0 ? (
+                <p className="text-muted-foreground">
+                  No required prerequisites to track across the roster.
+                </p>
+              ) : (
+                <ul className="space-y-1 list-disc ml-5 text-muted-foreground">
+                  {requiredAggregateRows.map((r) => (
+                    <li key={r.prerequisite.id}>
+                      <span className="text-foreground">
+                        {r.prerequisite.title}
+                      </span>
+                      {": "}
+                      {r.completed_count}/{r.roster_count} trainees done
+                      {r.roster_count === 0 ? (
+                        <span className="italic">
+                          {" "}
+                          — nobody on the roster yet
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-sm text-muted-foreground">Realtime:</span>
@@ -251,17 +609,28 @@ function WorkshopSessionPage() {
           {phase === "ready"
             ? "connected"
             : phase === "error"
-              ? "error"
+              ? isPreworkGateError
+                ? "gated"
+                : "error"
               : phase === "idle"
                 ? "…"
                 : "connecting"}
         </span>
       </div>
 
-      {errorDetail ? (
+      {errorDetail && !isPreworkGateError ? (
         <p className="text-sm text-destructive" data-testid="workshop-error">
           {errorDetail}
         </p>
+      ) : null}
+      {isPreworkGateError ? (
+        <Alert variant="destructive" data-testid="workshop-prework-gate-error">
+          <AlertTitle>Pre-work required before joining live session</AlertTitle>
+          <AlertDescription>
+            Complete all required prerequisites, then reload or re-open this
+            session to connect.
+          </AlertDescription>
+        </Alert>
       ) : null}
       {errorDetail === "Session not started yet" ? (
         <div className="flex gap-2">
@@ -333,6 +702,62 @@ function WorkshopSessionPage() {
           </Button>
           <Button
             type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-timer-start"
+            disabled={
+              !instructorReady ||
+              timerStatus !== "inactive" ||
+              startTimerMutation.isPending
+            }
+            onClick={() => startTimerMutation.mutate()}
+          >
+            Start 5m countdown
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-timer-pause"
+            disabled={
+              !instructorReady ||
+              timerStatus !== "running" ||
+              pauseTimerMutation.isPending
+            }
+            onClick={() => pauseTimerMutation.mutate()}
+          >
+            Pause timer
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-timer-resume"
+            disabled={
+              !instructorReady ||
+              timerStatus !== "paused" ||
+              resumeTimerMutation.isPending
+            }
+            onClick={() => resumeTimerMutation.mutate()}
+          >
+            Resume timer
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-timer-stop"
+            disabled={
+              !instructorReady ||
+              timerStatus === "inactive" ||
+              stopTimerMutation.isPending
+            }
+            onClick={() => stopTimerMutation.mutate()}
+          >
+            Stop timer
+          </Button>
+          <Button
+            type="button"
             variant="destructive"
             size="sm"
             data-testid="workshop-instructor-end"
@@ -341,6 +766,50 @@ function WorkshopSessionPage() {
           >
             End session
           </Button>
+          <span
+            className="text-xs text-muted-foreground self-center"
+            data-testid="workshop-timer-status"
+          >
+            Timer: {timerStatus}
+            {timerMode ? ` (${timerMode})` : ""}
+            {typeof timerRemainingSeconds === "number"
+              ? ` (${formatTimerRemainingSeconds(timerRemainingSeconds)} left)`
+              : typeof timerElapsedSeconds === "number"
+                ? ` (${formatTimerRemainingSeconds(timerElapsedSeconds)} elapsed)`
+                : ""}
+          </span>
+          <div
+            className="w-full rounded-md border p-2 text-xs text-muted-foreground"
+            data-testid="workshop-timer-events"
+          >
+            <div className="font-medium text-foreground mb-1">
+              Recent timer events
+            </div>
+            {timerEventsQuery.isLoading ? (
+              <p>Loading timer events...</p>
+            ) : timerEvents.length === 0 ? (
+              <p>No timer actions recorded yet.</p>
+            ) : (
+              <ul className="space-y-1">
+                {timerEvents.map((event) => (
+                  <li key={event.id} className="flex gap-2 items-center">
+                    <span className="uppercase text-[10px] tracking-wide">
+                      {event.action}
+                    </span>
+                    <span>{event.mode ?? "n/a"}</span>
+                    <span>
+                      {event.target_seconds
+                        ? `${event.target_seconds}s`
+                        : "countup"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/80">
+                      {formatEventTimestamp(event.created_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       ) : null}
 

@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, OauthBridgeLoginData, OauthBridgeLoginResponse, OauthListPendingLoginsData, OauthListPendingLoginsResponse, OauthApprovePendingLoginData, OauthApprovePendingLoginResponse, OauthDenyPendingLoginData, OauthDenyPendingLoginResponse, OauthGetLinkStatusData, OauthGetLinkStatusResponse, OauthAdminUnlinkGithubData, OauthAdminUnlinkGithubResponse, PrivateCreateUserData, PrivateCreateUserResponse, PrivateBootstrapE2eWorkshopLiveSessionData, PrivateBootstrapE2eWorkshopLiveSessionResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WorkshopSessionsReadWorkshopSessionsForUserData, WorkshopSessionsReadWorkshopSessionsForUserResponse, WorkshopSessionsReadWorkshopSessionDetailData, WorkshopSessionsReadWorkshopSessionDetailResponse, WorkshopSessionsPatchWorkshopSessionData, WorkshopSessionsPatchWorkshopSessionResponse, WorkshopSessionsUpsertWorkshopSessionMemberData, WorkshopSessionsUpsertWorkshopSessionMemberResponse, WorkshopSessionsRemoveWorkshopSessionParticipantData, WorkshopSessionsRemoveWorkshopSessionParticipantResponse, WorkshopSessionsPatchWorkshopSessionParticipantData, WorkshopSessionsPatchWorkshopSessionParticipantResponse, WorkshopSessionsEnterWorkshopSessionData, WorkshopSessionsEnterWorkshopSessionResponse, WorkshopSessionsStartWorkshopSessionData, WorkshopSessionsStartWorkshopSessionResponse, WorkshopSessionsEndWorkshopSessionData, WorkshopSessionsEndWorkshopSessionResponse, WorkshopSessionsCreateWorkshopWsTicketData, WorkshopSessionsCreateWorkshopWsTicketResponse } from './types.gen';
+import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, OauthBridgeLoginData, OauthBridgeLoginResponse, OauthListPendingLoginsData, OauthListPendingLoginsResponse, OauthApprovePendingLoginData, OauthApprovePendingLoginResponse, OauthDenyPendingLoginData, OauthDenyPendingLoginResponse, OauthGetLinkStatusData, OauthGetLinkStatusResponse, OauthAdminUnlinkGithubData, OauthAdminUnlinkGithubResponse, PrivateCreateUserData, PrivateCreateUserResponse, PrivateBootstrapE2eWorkshopLiveSessionData, PrivateBootstrapE2eWorkshopLiveSessionResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WorkshopBadgesReadWorkshopBadgesResponse, WorkshopBadgesCreateWorkshopBadgeData, WorkshopBadgesCreateWorkshopBadgeResponse, WorkshopBadgesGrantWorkshopBadgeData, WorkshopBadgesGrantWorkshopBadgeResponse, WorkshopBadgesRevokeWorkshopBadgeData, WorkshopBadgesRevokeWorkshopBadgeResponse, WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData, WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse, WorkshopLessonsCreateLessonPrerequisiteData, WorkshopLessonsCreateLessonPrerequisiteResponse, WorkshopLessonsReadLessonPrerequisitesData, WorkshopLessonsReadLessonPrerequisitesResponse, WorkshopLessonsPatchLessonPrerequisiteData, WorkshopLessonsPatchLessonPrerequisiteResponse, WorkshopLessonsDeleteLessonPrerequisiteData, WorkshopLessonsDeleteLessonPrerequisiteResponse, WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterData, WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterResponse, WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterData, WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterResponse, WorkshopLessonsReadMyLessonPrerequisitesData, WorkshopLessonsReadMyLessonPrerequisitesResponse, WorkshopLessonsCompleteLessonPrerequisiteData, WorkshopLessonsCompleteLessonPrerequisiteResponse, WorkshopSessionsReadWorkshopSessionsForUserData, WorkshopSessionsReadWorkshopSessionsForUserResponse, WorkshopSessionsReadWorkshopSessionDetailData, WorkshopSessionsReadWorkshopSessionDetailResponse, WorkshopSessionsPatchWorkshopSessionData, WorkshopSessionsPatchWorkshopSessionResponse, WorkshopSessionsUpsertWorkshopSessionMemberData, WorkshopSessionsUpsertWorkshopSessionMemberResponse, WorkshopSessionsRemoveWorkshopSessionParticipantData, WorkshopSessionsRemoveWorkshopSessionParticipantResponse, WorkshopSessionsPatchWorkshopSessionParticipantData, WorkshopSessionsPatchWorkshopSessionParticipantResponse, WorkshopSessionsEnterWorkshopSessionData, WorkshopSessionsEnterWorkshopSessionResponse, WorkshopSessionsStartWorkshopSessionData, WorkshopSessionsStartWorkshopSessionResponse, WorkshopSessionsEndWorkshopSessionData, WorkshopSessionsEndWorkshopSessionResponse, WorkshopSessionsReadWorkshopSessionTimerData, WorkshopSessionsReadWorkshopSessionTimerResponse, WorkshopSessionsReadWorkshopSessionTimerEventsData, WorkshopSessionsReadWorkshopSessionTimerEventsResponse, WorkshopSessionsStartWorkshopSessionTimerData, WorkshopSessionsStartWorkshopSessionTimerResponse, WorkshopSessionsPauseWorkshopSessionTimerData, WorkshopSessionsPauseWorkshopSessionTimerResponse, WorkshopSessionsResumeWorkshopSessionTimerData, WorkshopSessionsResumeWorkshopSessionTimerResponse, WorkshopSessionsStopWorkshopSessionTimerData, WorkshopSessionsStopWorkshopSessionTimerResponse, WorkshopSessionsCreateWorkshopWsTicketData, WorkshopSessionsCreateWorkshopWsTicketResponse } from './types.gen';
 
 export class ItemsService {
     /**
@@ -385,10 +385,19 @@ export class PrivateService {
      * instructor (no ``WorkshopParticipant`` row), so ``ws-ticket`` yields the
      * **instructor** role while the frontend skips ``POST …/enter`` for that flow.
      * Pass ``initial_status=scheduled`` to exercise instructor start flows.
+     * Pass ``with_incomplete_required_prerequisite=true`` to add one **required**
+     * lesson prerequisite with **no** completion row for the rostered trainee
+     * (participant flows / Playwright pre-work UI).
+     *
+     * When ``participant_email`` is set and differs from ``FIRST_SUPERUSER``, the
+     * trainee is rostered **only** as a participant and **``FIRST_SUPERUSER``** is
+     * the sole lead instructor (avoids dual instructor+participant seats on the
+     * trainee, which breaks HTTP ``view: participant`` and complicates WS E2E).
      * @param data The data for the request.
      * @param data.participantEmail
      * @param data.omitParticipantSeat
      * @param data.initialStatus
+     * @param data.withIncompleteRequiredPrerequisite
      * @returns PrivateWorkshopE2ELiveSessionResponse Successful Response
      * @throws ApiError
      */
@@ -399,7 +408,8 @@ export class PrivateService {
             query: {
                 participant_email: data.participantEmail,
                 omit_participant_seat: data.omitParticipantSeat,
-                initial_status: data.initialStatus
+                initial_status: data.initialStatus,
+                with_incomplete_required_prerequisite: data.withIncompleteRequiredPrerequisite
             },
             errors: {
                 422: 'Validation Error'
@@ -640,6 +650,292 @@ export class UtilsService {
     }
 }
 
+export class WorkshopBadgesService {
+    /**
+     * Read Workshop Badges
+     * @returns WorkshopBadgeDefinitionsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readWorkshopBadges(): CancelablePromise<WorkshopBadgesReadWorkshopBadgesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/badges'
+        });
+    }
+    
+    /**
+     * Create Workshop Badge
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns WorkshopBadgeDefinitionPublic Successful Response
+     * @throws ApiError
+     */
+    public static createWorkshopBadge(data: WorkshopBadgesCreateWorkshopBadgeData): CancelablePromise<WorkshopBadgesCreateWorkshopBadgeResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/badges',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Grant Workshop Badge
+     * @param data The data for the request.
+     * @param data.sessionId
+     * @param data.requestBody
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static grantWorkshopBadge(data: WorkshopBadgesGrantWorkshopBadgeData): CancelablePromise<WorkshopBadgesGrantWorkshopBadgeResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/badges/sessions/{session_id}/grant',
+            path: {
+                session_id: data.sessionId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Revoke Workshop Badge
+     * @param data The data for the request.
+     * @param data.sessionId
+     * @param data.requestBody
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static revokeWorkshopBadge(data: WorkshopBadgesRevokeWorkshopBadgeData): CancelablePromise<WorkshopBadgesRevokeWorkshopBadgeResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/badges/sessions/{session_id}/revoke',
+            path: {
+                session_id: data.sessionId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Workshop Session Badge Leaderboard
+     * @param data The data for the request.
+     * @param data.sessionId
+     * @returns WorkshopSessionLeaderboardPublic Successful Response
+     * @throws ApiError
+     */
+    public static readWorkshopSessionBadgeLeaderboard(data: WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData): CancelablePromise<WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/badges/sessions/{session_id}/leaderboard',
+            path: {
+                session_id: data.sessionId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class WorkshopLessonsService {
+    /**
+     * Create Lesson Prerequisite
+     * @param data The data for the request.
+     * @param data.lessonId
+     * @param data.requestBody
+     * @returns WorkshopLessonPrerequisitePublic Successful Response
+     * @throws ApiError
+     */
+    public static createLessonPrerequisite(data: WorkshopLessonsCreateLessonPrerequisiteData): CancelablePromise<WorkshopLessonsCreateLessonPrerequisiteResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites',
+            path: {
+                lesson_id: data.lessonId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Lesson Prerequisites
+     * @param data The data for the request.
+     * @param data.lessonId
+     * @returns WorkshopLessonPrerequisitesPublic Successful Response
+     * @throws ApiError
+     */
+    public static readLessonPrerequisites(data: WorkshopLessonsReadLessonPrerequisitesData): CancelablePromise<WorkshopLessonsReadLessonPrerequisitesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites',
+            path: {
+                lesson_id: data.lessonId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Patch Lesson Prerequisite
+     * @param data The data for the request.
+     * @param data.lessonId
+     * @param data.prerequisiteId
+     * @param data.requestBody
+     * @returns WorkshopLessonPrerequisitePublic Successful Response
+     * @throws ApiError
+     */
+    public static patchLessonPrerequisite(data: WorkshopLessonsPatchLessonPrerequisiteData): CancelablePromise<WorkshopLessonsPatchLessonPrerequisiteResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites/{prerequisite_id}',
+            path: {
+                lesson_id: data.lessonId,
+                prerequisite_id: data.prerequisiteId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Lesson Prerequisite
+     * @param data The data for the request.
+     * @param data.lessonId
+     * @param data.prerequisiteId
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static deleteLessonPrerequisite(data: WorkshopLessonsDeleteLessonPrerequisiteData): CancelablePromise<WorkshopLessonsDeleteLessonPrerequisiteResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites/{prerequisite_id}',
+            path: {
+                lesson_id: data.lessonId,
+                prerequisite_id: data.prerequisiteId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Lesson Prerequisite Gaps For Session Roster
+     * List session roster trainees who owe at least one *required* prerequisite (instructor tooling).
+     * @param data The data for the request.
+     * @param data.lessonId
+     * @param data.sessionId
+     * @returns WorkshopLessonPrerequisiteGapsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readLessonPrerequisiteGapsForSessionRoster(data: WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterData): CancelablePromise<WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites/gaps',
+            path: {
+                lesson_id: data.lessonId
+            },
+            query: {
+                session_id: data.sessionId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Lesson Prerequisite Aggregates For Session Roster
+     * Per-prerequisite completion counts for the session roster (widgets; no per-user fields).
+     * @param data The data for the request.
+     * @param data.lessonId
+     * @param data.sessionId
+     * @returns WorkshopLessonPrerequisiteAggregatesPublic Successful Response
+     * @throws ApiError
+     */
+    public static readLessonPrerequisiteAggregatesForSessionRoster(data: WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterData): CancelablePromise<WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites/aggregates',
+            path: {
+                lesson_id: data.lessonId
+            },
+            query: {
+                session_id: data.sessionId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read My Lesson Prerequisites
+     * @param data The data for the request.
+     * @param data.lessonId
+     * @returns WorkshopLessonPrerequisitesMyPublic Successful Response
+     * @throws ApiError
+     */
+    public static readMyLessonPrerequisites(data: WorkshopLessonsReadMyLessonPrerequisitesData): CancelablePromise<WorkshopLessonsReadMyLessonPrerequisitesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites/me',
+            path: {
+                lesson_id: data.lessonId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Complete Lesson Prerequisite
+     * @param data The data for the request.
+     * @param data.lessonId
+     * @param data.prerequisiteId
+     * @param data.requestBody
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static completeLessonPrerequisite(data: WorkshopLessonsCompleteLessonPrerequisiteData): CancelablePromise<WorkshopLessonsCompleteLessonPrerequisiteResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/lessons/{lesson_id}/prerequisites/{prerequisite_id}/complete',
+            path: {
+                lesson_id: data.lessonId,
+                prerequisite_id: data.prerequisiteId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
 export class WorkshopSessionsService {
     /**
      * Read Workshop Sessions For User
@@ -833,6 +1129,133 @@ export class WorkshopSessionsService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/workshop/sessions/{session_id}/end',
+            path: {
+                session_id: data.sessionId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Workshop Session Timer
+     * @param data The data for the request.
+     * @param data.sessionId
+     * @returns WorkshopSessionTimerPublic Successful Response
+     * @throws ApiError
+     */
+    public static readWorkshopSessionTimer(data: WorkshopSessionsReadWorkshopSessionTimerData): CancelablePromise<WorkshopSessionsReadWorkshopSessionTimerResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/sessions/{session_id}/timer',
+            path: {
+                session_id: data.sessionId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Workshop Session Timer Events
+     * @param data The data for the request.
+     * @param data.sessionId
+     * @param data.limit
+     * @returns WorkshopSessionTimerEventsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readWorkshopSessionTimerEvents(data: WorkshopSessionsReadWorkshopSessionTimerEventsData): CancelablePromise<WorkshopSessionsReadWorkshopSessionTimerEventsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/sessions/{session_id}/timer/events',
+            path: {
+                session_id: data.sessionId
+            },
+            query: {
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Start Workshop Session Timer
+     * @param data The data for the request.
+     * @param data.sessionId
+     * @param data.requestBody
+     * @returns WorkshopSessionTimerPublic Successful Response
+     * @throws ApiError
+     */
+    public static startWorkshopSessionTimer(data: WorkshopSessionsStartWorkshopSessionTimerData): CancelablePromise<WorkshopSessionsStartWorkshopSessionTimerResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/sessions/{session_id}/timer/start',
+            path: {
+                session_id: data.sessionId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Pause Workshop Session Timer
+     * @param data The data for the request.
+     * @param data.sessionId
+     * @returns WorkshopSessionTimerPublic Successful Response
+     * @throws ApiError
+     */
+    public static pauseWorkshopSessionTimer(data: WorkshopSessionsPauseWorkshopSessionTimerData): CancelablePromise<WorkshopSessionsPauseWorkshopSessionTimerResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/sessions/{session_id}/timer/pause',
+            path: {
+                session_id: data.sessionId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Resume Workshop Session Timer
+     * @param data The data for the request.
+     * @param data.sessionId
+     * @returns WorkshopSessionTimerPublic Successful Response
+     * @throws ApiError
+     */
+    public static resumeWorkshopSessionTimer(data: WorkshopSessionsResumeWorkshopSessionTimerData): CancelablePromise<WorkshopSessionsResumeWorkshopSessionTimerResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/sessions/{session_id}/timer/resume',
+            path: {
+                session_id: data.sessionId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Stop Workshop Session Timer
+     * @param data The data for the request.
+     * @param data.sessionId
+     * @returns WorkshopSessionTimerPublic Successful Response
+     * @throws ApiError
+     */
+    public static stopWorkshopSessionTimer(data: WorkshopSessionsStopWorkshopSessionTimerData): CancelablePromise<WorkshopSessionsStopWorkshopSessionTimerResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/sessions/{session_id}/timer/stop',
             path: {
                 session_id: data.sessionId
             },

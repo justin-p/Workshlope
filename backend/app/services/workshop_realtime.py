@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import WebSocket
@@ -18,6 +19,15 @@ class WorkshopWsConnection:
     part_generation: int
 
 
+@dataclass(slots=True)
+class WorkshopTimerState:
+    status: Literal["running", "paused"]
+    mode: Literal["countdown", "countup"]
+    target_seconds: int | None
+    started_at: datetime
+    paused_at: datetime | None
+
+
 class WorkshopRealtimeHub:
     """In-memory workshop session fan-out (single-process MVP).
 
@@ -28,6 +38,7 @@ class WorkshopRealtimeHub:
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
         self._rooms: dict[uuid.UUID, list[WorkshopWsConnection]] = {}
+        self._timers: dict[uuid.UUID, WorkshopTimerState] = {}
 
     async def attach(self, connection: WorkshopWsConnection) -> None:
         async with self._lock:
@@ -122,6 +133,60 @@ class WorkshopRealtimeHub:
                 await conn.websocket.send_json(payload)
             except Exception:
                 continue
+
+    async def start_timer(
+        self,
+        *,
+        session_id: uuid.UUID,
+        mode: Literal["countdown", "countup"],
+        target_seconds: int | None,
+    ) -> WorkshopTimerState:
+        async with self._lock:
+            existing = self._timers.get(session_id)
+            if existing is not None:
+                raise ValueError("timer_already_active")
+            state = WorkshopTimerState(
+                status="running",
+                mode=mode,
+                target_seconds=target_seconds,
+                started_at=datetime.now(timezone.utc),
+                paused_at=None,
+            )
+            self._timers[session_id] = state
+            return state
+
+    async def pause_timer(self, *, session_id: uuid.UUID) -> WorkshopTimerState:
+        async with self._lock:
+            state = self._timers.get(session_id)
+            if state is None:
+                raise ValueError("timer_not_active")
+            if state.status != "running":
+                raise ValueError("timer_not_running")
+            state.status = "paused"
+            state.paused_at = datetime.now(timezone.utc)
+            return state
+
+    async def resume_timer(self, *, session_id: uuid.UUID) -> WorkshopTimerState:
+        async with self._lock:
+            state = self._timers.get(session_id)
+            if state is None:
+                raise ValueError("timer_not_active")
+            if state.status != "paused":
+                raise ValueError("timer_not_paused")
+            state.status = "running"
+            state.paused_at = None
+            return state
+
+    async def stop_timer(self, *, session_id: uuid.UUID) -> None:
+        async with self._lock:
+            state = self._timers.get(session_id)
+            if state is None:
+                raise ValueError("timer_not_active")
+            self._timers.pop(session_id, None)
+
+    async def get_timer(self, *, session_id: uuid.UUID) -> WorkshopTimerState | None:
+        async with self._lock:
+            return self._timers.get(session_id)
 
 
 workshop_hub = WorkshopRealtimeHub()

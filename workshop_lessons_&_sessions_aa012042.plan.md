@@ -23,35 +23,17 @@ todos:
   - id: badges-awards
     content: Instructor-verified badge issuance on completion (single + bulk); badge catalog + user badge grants with per-badge points; profile/session/instructor surfaces + public leaderboard
     status: pending
-  - id: attendance-analytics
-    content: "Instructor analytics dashboards: join delay, completion rate, time-to-finish distributions, pause frequency, per-session and cross-session trends"
-    status: pending
   - id: badge-revocation
     content: Badge revoke workflow with reason + audit trail + optional learner-visible rationale; leaderboard/profile updates on revoke
-    status: pending
-  - id: instructor-notes
-    content: Private instructor notes per lesson/session with searchable history and non-trainee visibility guarantees
     status: pending
   - id: prework-prerequisites
     content: Prework and prerequisite checklist per lesson with completion tracking and session gating warnings
     status: pending
-  - id: attendance-exports
-    content: Attendance exports (CSV) with joined/finished/delay/badge columns and cohort filters
-    status: pending
-  - id: cohorts-teams
-    content: Cohorts/teams model with assignment, filtering, and cohort-level analytics slices
-    status: pending
-  - id: reminders-automation
-    content: In-app reminder automation for upcoming sessions and pause/resume transitions
-    status: pending
   - id: pacing-tools
     content: Session timer and pacing tools (part timer, overrun indicators, instructor controls)
     status: pending
-  - id: learner-feedback
-    content: End-of-session learner reflection/feedback capture and instructor review dashboard
-    status: pending
   - id: security-hardening-new-features
-    content: Security hardening for notes/prereqs/cohorts/reminders/timers/feedback/exports (RBAC, anti-abuse, audit, privacy thresholds, CSV injection protections)
+    content: Security hardening for in-scope workshop features only — prerequisites, pacing/timer (server-authoritative state + audit), badges/grants/revocations (RBAC, audit trail, leaderboard/profile DTO rules); strict trainee vs instructor DTO boundaries; no controls deferred for out-of-scope surfaces (see Out of scope table)
     status: pending
 isProject: false
 ---
@@ -61,12 +43,19 @@ isProject: false
 ## Out of scope (MVP)
 
 
-| Area                 | Decision                                                               |
-| -------------------- | ---------------------------------------------------------------------- |
-| Messaging            | No chat, no DMs, no in-session threads. Only busy/done pacing signals. |
-| Guests / magic links | No. Participants must be existing app users on the session roster.     |
-| Video / screen-share | No integrated A/V in the app; use external tools if needed.            |
+| Area                       | Decision                                                                                                                                                                                                 |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Messaging                  | No chat, no DMs, no in-session threads. Only busy/done pacing signals.                                                                                                                                    |
+| Guests / magic links       | No. Participants must be existing app users on the session roster.                                                                                                                                       |
+| Video / screen-share       | No integrated A/V in the app; use external tools if needed.                                                                                                                                              |
+| Attendance analytics       | No instructor-facing attendance/completion analytics dashboards (session or cross-session KPIs, distributions, trends).                                                                                |
+| Instructor notes           | No private lesson- or session-scoped instructor note stores or APIs.                                                                                                                                     |
+| Attendance exports         | No CSV/XLSX/PDF attendance export endpoints, jobs, or UI.                                                                                                                                                |
+| Cohorts / teams            | No cohort/team entities, membership, session assignment, or cohort-filtered roster/analytics.                                                                                                            |
+| Reminder automation        | No scheduled or “send now” in-app reminder campaigns beyond generic notifications already listed for roster/session/badge events (no per-session reminder scheduler/worker product).                      |
+| Learner feedback           | No end-of-session reflection forms, feedback prompts/responses, or instructor aggregate feedback views.                                                                                                    |
 
+> **Recoverable detail:** Cut scope is summarized again in the [appendix](#appendix--archived-scope-reference-only) (product bullets, entities, REST sketch, security, UX, delivery slices). That appendix is **not** authoritative for MVP; this table and the body of the plan are.
 
 ## Product constraints
 
@@ -77,14 +66,9 @@ isProject: false
 - **Roster**: Instructor manages **WorkshopParticipant** rows (add/remove; soft-remove with **removed_at**). GitHub avatars are used across application identity surfaces when available; trainee session payloads still exclude peer identities/avatars.
 - **Signals**: **live_status** = busy | done for the **current part**, shown **only to that user and to instructors** — **trainees must not see other trainees’ status**, roster, joined/finished timestamps, or presence (privacy + reduces comparison anxiety). Instructor cockpit remains the aggregate view.
 - **Pause**: No participant busy/done writes; **no part navigation** (no **part_generation** bump) until **resume** or **end**.
-- **Awards**: Badge grants are issued **only after instructor verification** of completion (not immediately on trainee self-finish), and surfaced across profile, session views, instructor views, and a global leaderboard.
-- **Analytics**: Instructor-facing attendance analytics are part of scope (session and aggregate metrics). Badge revocation workflows are also in scope with auditable reasons.
-- **Instructor notes**: Private instructor-only notes are supported at lesson and session level; never exposed to trainees.
+- **Awards**: Badge grants are issued **only after instructor verification** of completion (not immediately on trainee self-finish), and surfaced across profile, session views, instructor views, and a global leaderboard. Revocation requires auditable reasons and updates active counts/leaderboard views.
 - **Prework/prerequisites**: Lessons can define prerequisite tasks; trainee completion is tracked and surfaced before session start.
-- **Cohorts/teams**: Participants can be grouped into cohorts/teams for roster filtering and analytics breakdowns.
-- **Reminder automation**: In-app reminders are automatically sent for upcoming starts and pause/resume changes.
 - **Pacing tools**: Session timer controls (per-part countdown/elapsed and overrun flags) are instructor-facing.
-- **Feedback**: End-of-session learner reflection/feedback is captured and available to instructors in aggregate and per-session views.
 - **Backend delivery method**: Use `/python-tdd-with-uv` workflow across the entire backend implementation (test-first, vertical slices, `uv run pytest` loop).
 
 ## Delivery methodology (locked)
@@ -119,46 +103,36 @@ This section is the **recoverable checklist** when chat history or IDE session i
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-04** — Session **`PATCH …/sessions/{id}`** polish landed: added **`primary_instructor_user_id`** handoff semantics (promote target active instructor to `lead`, demote previous `lead` to `co_instructor`; **`422 handoff_target_not_instructor`** when target is not an active instructor), plus combined-ops UX (allow multi-field patch; only block contradictory same-user ops with **`422 cannot_update_and_remove_same_instructor`** / **`422 cannot_handoff_to_removed_instructor`**). Existing status transitions + **`409 last_instructor_removal_blocked`** remain. Tests + OpenAPI client regen on **`ws-05-dashboard-nav`**. |
-| **Active integration branch** | `ws-05-dashboard-nav` → [PR #22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`). **Successor branch:** `ws-06-learning-workflows` (*not created until PR06 slice starts*) |
-| **Stack PR label** | **PR05 — DashboardNav** ✅ on branch; **`main`** after stacked merge (**#18** → … → **#22**) or retarget per [stack table](#github-pr-stack-open--update-when-retargetedmerged) |
+| **Last synced** | **2026-05-06** — **PR07 [#27](https://github.com/justin-p/testing/pull/27)** merged into `ws-06-learning-workflows` (PR08 base branch deleted → **[#28](https://github.com/justin-p/testing/pull/28)** closed). **`ws-08-badges-revocation-v2`** merged `ws-06` back in and reopened as **PR08 v2 [#29](https://github.com/justin-p/testing/pull/29)** → `ws-06-learning-workflows`. PR09 remains merged via [#26](https://github.com/justin-p/testing/pull/26). |
+| **Branch tip (2026-05-06)** | **`ws-08-badges-revocation-v2`** contains PR07+PR08+PR09 work; open review on [#29](https://github.com/justin-p/testing/pull/29). |
+| **Active integration branch** | `ws-08-badges-revocation-v2` → [#29](https://github.com/justin-p/testing/pull/29) (base `ws-06-learning-workflows`) |
+| **Stack PR label** | **PR08 — BadgesRevocation** 🚧 in progress ([#29](https://github.com/justin-p/testing/pull/29); includes merged PR09 hardening) |
 
 ### Pause / resume checkpoint (handoff)
 
 Use this section when reopening the project **after intentional stop**. Do **not** rely on chat history beyond what is committed and linked here.
 
-**Stopped:** 2026-05-04.
-
-**Git tip (must match when resuming work on this slice):**
+**Current active slice:**
 
 | Item | Value |
 | ---- | ----- |
-| Branch | `ws-05-dashboard-nav` |
-| Canonical history | Prefer **`git log --oneline -10`** on **`ws-05-dashboard-nav`** after pull. Landmark SHAs near pause: **`de9f1c5`** (`GET …/{id}`), **`2f85219`** (dashboard/workshops list widgets), **`20f8e0f`** (GET list API). |
-| PR | [#22](https://github.com/justin-p/testing/pull/22) (base `ws-04-realtime-privacy`) |
-
-**Shipped on this branch since last stack merge expectation:**
-
-- **`GET /api/v1/workshop/sessions/`** — scoped list (`WorkshopSessionsPublic`); dashboards + `/workshops` use [`DashboardWorkshopSessions`](frontend/src/components/dashboard/DashboardWorkshopSessions.tsx) + `WorkshopSessionsService.readWorkshopSessionsForUser`.
-- **`GET /api/v1/workshop/sessions/{id}`** — participant vs instructor DTOs (`WorkshopSessionPublicParticipant` \| `WorkshopSessionPublicInstructor`); superuser ⇒ instructor-shaped view; roster **`avatar_url`** is always **`null`** until **`User.avatar_url`** exists in schema.
-- **`POST /api/v1/workshop/sessions/{id}/members`** — instructor/superuser roster upsert for participant vs instructor with opposite-role deactivation in one transaction (always-replace semantics).
-- **`DELETE /api/v1/workshop/sessions/{id}/participants/{user_id}`** — instructor/superuser soft-remove participant seat (`removed_at`) with membership guardrails.
-- **`PATCH /api/v1/workshop/sessions/{id}/participants/{user_id}`** — instructor/superuser participant overrides (`live_status`, `joined_at`, `finished_at`) for active seats.
-- **`PATCH /api/v1/workshop/sessions/{id}`** — instructor/superuser: optional **`status`** (aligned with **`POST /start`**, pause/resume, **`POST /end`** + hub fanout), **`instructor_seat`** role updates, **`remove_instructor_user_id`** soft-remove with **409** when that would orphan a non-ended session.
-- **`/workshop/$sessionId`** — hydrates lesson **title/slug** via `WorkshopSessionsService.readWorkshopSessionDetail` (`useQuery`), then existing ws-ticket/WebSocket flow.
-- **Tests:** `test_workshop_sessions.py` includes detail + member-upsert + participant-remove + participant-patch + session-**`PATCH`** (status, seat role, remove, **409**/validation) cases.
-- **Client:** regenerated under [`frontend/src/client/`](frontend/src/client/) whenever OpenAPI changed (pre-commit `generate-frontend-sdk`).
+| Branch | `ws-08-badges-revocation-v2` |
+| PR | [#29](https://github.com/justin-p/testing/pull/29) (base `ws-06-learning-workflows`; replaces closed [#28](https://github.com/justin-p/testing/pull/28)) |
+| Latest work | **PR09 merged via [#26](https://github.com/justin-p/testing/pull/26):** badge hardening complete (roster-only grant/revoke, idempotent revoke retry, required non-empty revoke reason, structured audit logs). |
 
 **Resume in this order:**
 
-1. `git checkout ws-05-dashboard-nav && git pull`, then **`gh pr checks 22`** (or CI dashboard) — fix regressions on the **same head branch** if needed.
-2. Proceed with **[Next actions](#next-actions-suggested-order)** — session **`PATCH`** vertical is **done** on this branch; next vertical work is **PR06** prerequisites (or stack merge / babysit **#22**) unless you reorder the stack.
-3. When starting **PR06**: fork **`ws-06-learning-workflows`** from current **`ws-05`** tip (or from **`main`** if #18–#22 have landed), update [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) + mermaid dependency graph nodes.
+1. `git checkout ws-08-badges-revocation-v2`, run `uv run pytest tests/api/routes/test_workshop_badges.py`, and keep badge/hardening changes scoped while PR08 v2 remains open.
+2. Babysit [#29](https://github.com/justin-p/testing/pull/29) checks (`gh pr checks --watch`) — **PR07 [#27](https://github.com/justin-p/testing/pull/27) is merged**; resolve CI drift before merging PR08.
+3. Keep [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged), **Implementation tracker / Last synced / Stop-handoff**, and this checkpoint synced whenever PR/base/branch state changes — **especially after each intentional stop or resume.**
 
 **Open gaps (not blocking pause):**
 
 - Local Playwright **`auth.setup`** can time out without backend/`scripts/e2e-backend-reset.sh` — CI remains source of truth for E2E until env is reproduced locally.
-- **Prerequisite** endpoints from REST sketch remain 🔲 ([gap audit](#workshop-http-vs-realtime--delivery-gap-audit)); session **`PATCH`** gap is largely closed (see HTTP matrix).
+- **Dockerized frontend/backend** used by host Playwright (`:5173` / `:8000`): **rebuild images** after code changes (`docker compose build frontend` / `backend`); `compose` does not bind-mount app source for those services by default.
+- **`.github/workflows/playwright.yml`**: intentionally not bundled with recent PR06 UI/API slices; verify `git diff` vs remote before merging any local workflow experiments.
+- **Prerequisite** stack is **mostly implemented** for MVP (HTTP + workshop session UI); richer dashboard cards and timer/pacing HTTP may still be 🔲.
+- **Instructor onboarding:** admins can set **`is_instructor`** via **Users** admin (API already supported); no separate instructor-only onboarding flow assumed.
 - Optional: expand Playwright coverage for trainee/instructor **dashboard list** widgets (beyond current admin assertion in `dashboard-routing.spec.ts`).
 
 ### GitHub PR stack (open — update when retargeted/merged)
@@ -172,20 +146,26 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 | PR03 | `ws-03-session-core` | [#20](https://github.com/justin-p/testing/pull/20) | `ws-02-github-sync-manifest` |
 | PR04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) | `ws-03-session-core` |
 | PR05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | `ws-04-realtime-privacy` |
-| PR06–PR10 | `ws-06-*` … `ws-10-*` | *not opened yet* | *(next PR targets prior branch when created)* |
+| PR06 | `ws-06-learning-workflows` | [#23](https://github.com/justin-p/testing/pull/23) | `ws-05-dashboard-nav` |
+| PR07 | `ws-07-pacing-timer-v2` | [#27](https://github.com/justin-p/testing/pull/27) *(merged)* | `ws-06-learning-workflows` |
+| PR08 | `ws-08-badges-revocation-v2` | [#29](https://github.com/justin-p/testing/pull/29) | `ws-06-learning-workflows` |
+| PR09 | `ws-09-hardening-and-tests` | [#26](https://github.com/justin-p/testing/pull/26) *(merged)* | *(landed on `ws-08-badges-revocation-v2` before PR07 merge; history preserved on branch)* |
 
-### Backend code anchors (workshop realtime slice)
+### Backend code anchors (workshop delivery slices)
 
 | Area | Primary paths |
 | ---- | ------------- |
 | HTTP + WebSocket routes | [`backend/app/api/routes/workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py) |
+| Prerequisites HTTP routes (PR06) | [`backend/app/api/routes/workshop_lessons.py`](backend/app/api/routes/workshop_lessons.py) |
 | In-memory fan-out hub | [`backend/app/services/workshop_realtime.py`](backend/app/services/workshop_realtime.py) |
 | API tests | [`backend/tests/api/routes/test_workshop_sessions.py`](backend/tests/api/routes/test_workshop_sessions.py) |
+| Prerequisites API tests (PR06) | [`backend/tests/api/routes/test_workshop_lessons.py`](backend/tests/api/routes/test_workshop_lessons.py) |
 | Hub unit tests | [`backend/tests/services/test_workshop_realtime.py`](backend/tests/services/test_workshop_realtime.py) |
-| Local E2E session bootstrap (`ENVIRONMENT=local` only) | [`backend/app/api/routes/private.py`](backend/app/api/routes/private.py) — `bootstrap_e2e_workshop_live_session` |
+| Local E2E session bootstrap (`ENVIRONMENT=local` only) | [`backend/app/api/routes/private.py`](backend/app/api/routes/private.py) — `bootstrap_e2e_workshop_live_session` (+ `with_incomplete_required_prerequisite`, distinct-trainee vs `FIRST_SUPERUSER` instructor split); tests in [`backend/tests/api/routes/test_private.py`](backend/tests/api/routes/test_private.py) |
 | Trainee workshop UI (enter + ws-ticket + WebSocket) | [`frontend/src/routes/_layout/workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) |
 | Workshop Playwright | [`frontend/tests/workshop.spec.ts`](frontend/tests/workshop.spec.ts) |
 | Dashboard landing + routing | [`frontend/src/lib/dashboardLanding.ts`](frontend/src/lib/dashboardLanding.ts), stub rails [`frontend/src/components/dashboard/DashboardStubRails.tsx`](frontend/src/components/dashboard/DashboardStubRails.tsx), routes under [`frontend/src/routes/_layout/dashboard/`](frontend/src/routes/_layout/dashboard/), [`frontend/src/routes/_layout/workshops.tsx`](frontend/src/routes/_layout/workshops.tsx), sidebar [`frontend/src/components/Sidebar/AppSidebar.tsx`](frontend/src/components/Sidebar/AppSidebar.tsx), OAuth landing [`frontend/src/routes/auth.callback.tsx`](frontend/src/routes/auth.callback.tsx) |
+| Admin users (`is_instructor`) | [`frontend/src/components/Admin/AddUser.tsx`](frontend/src/components/Admin/AddUser.tsx), [`frontend/src/components/Admin/EditUser.tsx`](frontend/src/components/Admin/EditUser.tsx), [`frontend/src/components/Admin/columns.tsx`](frontend/src/components/Admin/columns.tsx); E2E [`frontend/tests/admin.spec.ts`](frontend/tests/admin.spec.ts) |
 | Playwright harness (backend reset / env) | [`scripts/e2e-backend-reset.sh`](scripts/e2e-backend-reset.sh), [`frontend/playwright.global-setup.ts`](frontend/playwright.global-setup.ts), [`frontend/playwright.config.ts`](frontend/playwright.config.ts) |
 
 ### Workshop HTTP vs realtime — delivery gap (audit)
@@ -194,68 +174,31 @@ Canonical mapping for [`justin-p/testing`](https://github.com/justin-p/testing).
 
 | Surface | Implemented today | Still 🔲 vs **REST sketch** (below, *REST sketch under /api/v1/*) |
 | ------- | ----------------- | ---------------------------------------------------------------- |
-| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove; **`PATCH …/sessions/{id}/participants/{user_id}`** instructor overrides (`live_status`/`joined_at`/`finished_at`); **`PATCH …/sessions/{id}`** — optional **`status`** (controlled transitions + realtime fanout on change), **`instructor_seat`** role updates, **`primary_instructor_user_id`** handoff (lead/co normalization), **`remove_instructor_user_id`** soft-remove with **409** when that would orphan a non-ended session; empty **422 `patch_requires_update`**; unknown seat **404** | Prerequisites; exports — see sketch table |
+| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove; **`PATCH …/sessions/{id}/participants/{user_id}`** instructor overrides (`live_status`/`joined_at`/`finished_at`); **`PATCH …/sessions/{id}`** — optional **`status`** (controlled transitions + realtime fanout on change), **`instructor_seat`** role updates, **`primary_instructor_user_id`** handoff (lead/co normalization), **`remove_instructor_user_id`** soft-remove with **409** when that would orphan a non-ended session; empty **422 `patch_requires_update`**; unknown seat **404**. **Lesson prerequisites** (`/workshop/lessons/{id}/prerequisites…`) ✅ for MVP slices. | Part-timer HTTP sketch (see below) still 🔲 |
 | **WebSocket** | `/{id}/ws` — `part.advance`, `session.pause` / `session.resume`, `participant.live_status`, … | Redis / multi-process hub (explicitly deferred) |
 
-**Remaining vs dashboard/product polish:** roster management + prerequisites/export paths in the sketch are still 🔲 (list + read/detail for session context are ✅ on **`ws-05-dashboard-nav`**).
+**Remaining vs dashboard/product polish:** session list/detail + roster + session `PATCH` are ✅; prerequisites + workshop pre-work UI (**banner, aggregates, inline complete**) are ✅; **host Playwright** workshop file stabilized (serial + bootstrap). Dashboard cards + broader pre-work/dashboard Playwright may still be 🔲.
 
-**Suggested vertical slices (backend `/python-tdd-with-uv` first):**
+**Suggested PR06 vertical slices (backend `/python-tdd-with-uv` first):**
 
-1. **`GET /workshop/sessions/` (scoped list)** — ✅ **`WorkshopSessionsPublic`** on **`ws-05-dashboard-nav`** — participant/instructor seats + optional **`my_role`**; superuser sees all with **`my_role`** null when unseated.
-2. **`GET /workshop/sessions/{id}`** — ✅ **`WorkshopSessionPublicParticipant`** (lesson + ordered part metadata + **`self`**) vs **`WorkshopSessionPublicInstructor`** (+ **`participants`** / **`instructors`** roster rows with **`avatar_url`** placeholder `null` until stored on **`User`**); superuser ⇒ instructor-shaped view — matches ws-ticket elevation.
-3. **Roster completion + PR06 prerequisites** — round out session/participant mutation routes, then add `LessonPrerequisite` / `UserPrerequisiteCompletion` and lesson prerequisite routes from the same REST sketch section.
+1. **Prerequisite read enhancements** — per-user completion status in lesson prerequisite reads (self vs instructor-scoped views).
+2. **Prerequisite mutation breadth** — ✅ PATCH/update/delete prerequisite definitions with instructor/superuser guards.
+3. **Prework surfaces** — ✅ workshop session page + aggregates/gaps APIs + **inline mark-complete** + Playwright coverage (`workshop.spec.ts` serial block); optional: harder gating, dashboard list Playwright.
 
 Gate: regenerate **OpenAPI** + **`frontend/src/client`** on every new HTTP route.
 
-### PR04 (`ws-04-realtime-privacy`) — detailed status
+### PR06 (`ws-06-learning-workflows`) — current slice ([#23](https://github.com/justin-p/testing/pull/23))
 
-Aligned with plan bullets: ws-ticket, role-scoped fan-out, trainee privacy.
-
-| Capability | Status | Notes |
-| ---------- | ------ | ----- |
-| `POST …/ws-ticket` JWT + claims (`sid`, `uid`, `role`, `pg`) | ✅ | |
-| WS auth via `Sec-WebSocket-Protocol: ticket,<jwt>` | ✅ | |
-| Handshake rejects non-`live`/`paused` session and wrong `part_generation` | ✅ | |
-| Trainee→instructor-only `participant.live_status` fan-out | ✅ | Trainees never receive peer roster payloads on this channel |
-| Instructor `part.advance` (live only); bumps `part_generation`; `session.part_changed` to room | ✅ | |
-| Instructor `session.pause` / `session.resume` + `session.status_changed` broadcast | ✅ | |
-| Trainee `live_status` WS **only when session status is `live`** (blocked while `paused`) | ✅ | Pause matrix |
-| Instructor `POST …/start` (`scheduled→live`) + hub broadcast | ✅ | |
-| Instructor `POST …/end` (`live`\|`paused→ended`) + hub broadcast | ✅ | Does not bulk-set `finished_at` |
-| Enter + ws-ticket reject `scheduled` / `ended` with clear HTTP errors | ✅ | |
-| OpenAPI + regenerated TS client when HTTP contract changed | ✅ | Run pre-commit hook on API edits |
-| **`part_generation` mirror + stale teardown** (hub sync after advance; **`part_generation_stale`** payload then close **`1008`**; receive loop stops — mint new ws-ticket and reconnect) | ✅ | `_dispatch_workshop_ws_text` returns `False`; `sync_bump_room_part_generation` after advance commit |
-| **Multi-process realtime** (Redis or equivalent hub) | 🔲 | MVP is in-memory `WorkshopRealtimeHub` |
-| **Playwright** for instructor + trainee flows on these APIs | ✅ | Bounded PR04 cockpit: `/workshop/:id` only — **start / pause / resume / advance / end** smoke + two-user **participant.live_status** fan-out to instructor + explicit trainee denial of same roster-style payload |
-
-### PR05 (`ws-05-dashboard-nav`) — slice status (integration branch ✅, merge pending)
-
-All rows below reflect **`ws-05-dashboard-nav` / [#22](https://github.com/justin-p/testing/pull/22)**. Roll-up **`main`** ✅ only after this PR (or retargeted equivalent) merges.
-
-| Capability | Status | Notes |
-| ---------- | ------ | ----- |
-| Post-login landing rules (`is_instructor` → Instructor Home; superuser-only → Admin Home; else My Learning) | ✅ | [`getDashboardLandingPath`](frontend/src/lib/dashboardLanding.ts) |
-| Routes `/dashboard/instructor`, `/dashboard/trainee`, `/dashboard/admin` + role guards in `beforeLoad` | ✅ | Placeholder dashboards + `dashboard-home-root` testid |
-| `/` redirects to role dashboard when logged in; login mutation navigates to landing path | ✅ | Avoids fragile blank `/` after `readUserMe` |
-| Sidebar: primary home label/path by role; **Workshops** stub (`/workshops`) for instructor/superuser; **Admin** → `/admin` | ✅ | Items removed from default nav |
-| Playwright: `dashboard-routing.spec.ts`, login/auth paths updated for dashboards | ✅ | Shared `loggedInDashboard` + Sonner toast helper for admin/items/settings resets |
-| Static **stub rails** on each dashboard (privacy-safe copy + “Soon” cues; trainee has no Workshops link) | ✅ | [`DashboardStubRails.tsx`](frontend/src/components/dashboard/DashboardStubRails.tsx) |
-| Sidebar item **active** when path matches or is under same prefix | ✅ | e.g. future `/dashboard/trainee/*` highlights My Learning |
-| OAuth **GitHub bridge** navigates to role dashboard (parity with password login) | ✅ | Clears token if `/users/me` fails |
-| Live **widgets** wired to workshop session **list + read/detail** APIs | ✅ | Dashboard list + workshops hub use scoped list; cockpit hydrates lesson heading via **GET `{id}`**. Remaining prerequisites work is tracked under PR06. |
-
-### PR06 (`ws-06-learning-workflows`) — planned next slice (*PR not opened*)
-
-Fork from **`ws-05-dashboard-nav`** (or **`main`** after stack lands). Aligns with [Branch/PR chain](#branchpr-chain) item 6 and the frontmatter roadmap id **`prework-prerequisites`**. **HTTP gap slices (1)-(2)** (list + session detail **`GET`s**) landed on **`ws-05-dashboard-nav`** ([gap audit](#workshop-http-vs-realtime--delivery-gap-audit)); PR06 focuses on prerequisites / prework UX and downstream APIs, unless you carve roster management paths first.
+Forked from **`ws-05-dashboard-nav`** and tracked on [#23](https://github.com/justin-p/testing/pull/23). Aligns with [Branch/PR chain](#branchpr-chain) item 6 and roadmap id **`prework-prerequisites`**. **HTTP gap slices (1)-(2)** (list + session detail **`GET`s**) remain on **`ws-05-dashboard-nav`**; PR06 now advances prerequisites/prework APIs and downstream UX.
 
 | Planned capability | Notes |
 | ------------------ | ----- |
 | **Session list + detail GETs** | List + **`GET …/{id}`** ✅ on **`ws-05-dashboard-nav`** per [delivery gap audit](#workshop-http-vs-realtime--delivery-gap-audit); prerequisites + richer dashboard cards remain PR06. |
-| **Prerequisite / prework** data model | Per-lesson checklist; completion tracking linked to **`User`** and **Lesson**/session context; secure-by-default DTOs ([**Data model (illustrative)**](#data-model-illustrative) — `LessonPrerequisite`, `UserPrerequisiteCompletion`). |
-| Trainee UX | Pre-session **warnings / gating hints** where prerequisites incomplete (no trainee peer leakage). |
-| Instructor visibility | Scoped view of cohort prerequisite status (details TBD in slice RFC). |
-| Tests | **`/python-tdd-with-uv`** backend; Playwright flows for trainee + instructor when UI ships. |
-| Stack hygiene | Open **PR #TBD** with base **`ws-05-dashboard-nav`** (or retarget after #22 merges); add row to [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) + mermaid **PR06** node. |
+| **Prerequisite / prework** data model | ✅ Landed: `LessonPrerequisite`, `UserPrerequisiteCompletion` (+ migration `4f6e7d8c9a01`); HTTP: create/list/patch/delete/complete, **`/me`**, **`/gaps`**, **`/aggregates`**; admin can grant **`is_instructor`** for roster/instructor UX. |
+| Trainee UX | ✅ Session page shows **required** incomplete pre-work banner (**`/prerequisites/me`**) + **Mark complete** per item; participant enter/ws-ticket now hard-gated (403) until required pre-work is complete, with dedicated gated UI state in workshop view. |
+| Instructor visibility | 🟨 Session page shows roster **aggregates** + gaps headline (same `session_id`); workshops dashboard now includes blocked counts, blocked-only filter, and blocked-session drilldown links. Deeper roster analytics remain optional. |
+| Tests | **`/python-tdd-with-uv`** backend + **`test_private`** E2E bootstrap cases; **Playwright** [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) (serial workshop `describe`, pre-work + fan-out + live flows). |
+| Stack hygiene | ✅ PR open: [#23](https://github.com/justin-p/testing/pull/23) (base `ws-05-dashboard-nav`); keep stack table + dependency graph in sync on retarget/merge. |
 
 ### Stacked PRs — coarse roll-up
 
@@ -268,14 +211,17 @@ Use ✅ when the slice is merged to **`main`** (or materially complete on its in
 | 03 | `ws-03-session-core` | [#20](https://github.com/justin-p/testing/pull/20) | 🟨 | Tables + enter semantics overlap with current branch; roster APIs may still be incomplete |
 | 04 | `ws-04-realtime-privacy` | [#21](https://github.com/justin-p/testing/pull/21) | 🟨 | Bounded realtime/privacy + `/workshop` E2E ✅ |
 | 05 | `ws-05-dashboard-nav` | [#22](https://github.com/justin-p/testing/pull/22) | 🟨 | PR05 scope complete on branch (dashboard/nav + list/detail widgets + roster member add/remove/patch APIs); stacked merge + CI completion pending. |
-| 06–10 | `ws-06-*` … `ws-10-*` | — | 🔲 | Branches/PRs in [Branch/PR chain](#branchpr-chain); open PRs when slicing |
+| 06 | `ws-06-learning-workflows` | [#23](https://github.com/justin-p/testing/pull/23) | 🟨 | Prerequisites + **`/me` `/gaps` `/aggregates`**, pre-work UI + **mark complete**, **distinct-trainee E2E bootstrap**, **Playwright workshop suite** serial/stability (**`1633910`**); **admin `is_instructor`**; merges/dashboard polish still 🔲 |
+| 07 | `ws-07-pacing-timer-v2` | [#27](https://github.com/justin-p/testing/pull/27) *(merged)* | ✅ | Persisted pacing timer state/history, remaining+elapsed payloads, instructor timer UI + E2E hardening; merged into `ws-06-learning-workflows`. |
+| 08 | `ws-08-badges-revocation-v2` | [#29](https://github.com/justin-p/testing/pull/29) | 🟨 | Badge catalog + grant/revoke + leaderboard plus merged PR09 hardening; replaces closed [#28](https://github.com/justin-p/testing/pull/28); merge into `ws-06` pending. |
+| 09 | `ws-09-hardening-and-tests` | [#26](https://github.com/justin-p/testing/pull/26) *(merged)* | ✅ | Cross-cutting hardening shipped: roster-only badge mutations, idempotent revoke retries, required non-empty revoke reason, structured badge mutation audit logs. |
 
 ### Next actions (suggested order)
 
-1. **Confirm tip CI:** `gh pr checks 22` — if anything regresses, run **babysitting-pr** / Task fix loop on `ws-05-dashboard-nav`.
-2. **Stack merge:** review + land [#18](https://github.com/justin-p/testing/pull/18) → … → [#22](https://github.com/justin-p/testing/pull/22) (or retarget heads after each base merges to `main`); update [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) after each merge.
-3. **PR06 kickoff:** create `ws-06-learning-workflows` from merged tip (or from `ws-05` if stacking without waiting for `main`); follow [PR06 planned slice](#pr06-ws-06-learning-workflows--planned-next-slice-pr-not-opened); open PR + stack table row.
-4. **Next backend verticals (gap audit):** PR05 roster slices ✅; session **`PATCH …/sessions/{id}`** ✅ (`status`, `instructor_seat`, `primary_instructor_user_id`, `remove_instructor_user_id`, last-instructor **409**). Next: **PR06** prerequisite models + routes (`LessonPrerequisite`, `UserPrerequisiteCompletion`) and exports.
+1. **Confirm tip CI (PR06):** `gh pr checks 23` — if anything regresses, run **babysitting-pr** / Task fix loop on `ws-06-learning-workflows`.
+2. **Continue PR06 verticals:** dashboard **tiles** / list polish, **stricter pre-work gating** if product wants it, remaining REST sketch gaps (e.g. timer HTTP) — admin can already grant **instructor** from **Users**; **mark complete** is already in session UI (**`1633910`**).
+3. **Stack hygiene:** keep [#23](https://github.com/justin-p/testing/pull/23) rebased/retargeted as upstream stack PRs merge; update [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged) after each shift.
+4. **Cross-slice gate:** regenerate OpenAPI + `frontend/src/client` on each API contract change; keep `/python-tdd-with-uv` discipline and focused regression runs.
 5. **E2E discipline:** `scripts/e2e-backend-reset.sh` before full local Playwright when diagnosing drift; Sonner-aware toasts ([playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md)).
 
 **When resuming from pause:** step through [Pause / resume checkpoint](#pause--resume-checkpoint-handoff) first.
@@ -565,16 +511,9 @@ flowchart TD
 | WorkshopSession                             | lesson_id, status, current_part_index, current_part_slug, **part_generation**, timestamps. (Primary instructor id optional convenience pointer if desired.)                                                                                                                                                                      |
 | WorkshopParticipant                         | session_id, user_id (nullable after anonymize); invited_at, joined_at, finished_at, live_status, removed_at; anonymization_ref, anonymized_at; instructor audit columns (adjusted_*, reason).                                                                                                                                    |
 | SessionInstructor                           | session_id, user_id (must be **is_instructor=true**), role enum (primary/co_instructor optional), assigned_at, removed_at; unique active (session_id,user_id).                                                                                                                                                                   |
-| InstructorNote                              | scope (lesson/session), scope_id, author_user_id, note_md/text, created_at, updated_at; instructor/superuser visible only.                                                                                                                                                                                                       |
 | LessonPrerequisite                          | lesson_id, type (task/link/check), title, details/url, ordering, required_flag.                                                                                                                                                                                                                                                  |
 | UserPrerequisiteCompletion                  | user_id, lesson_id, prerequisite_id, completed_at, source (self/instructor).                                                                                                                                                                                                                                                     |
-| Cohort                                      | name, slug, description, owner_instructor_id, archived_at.                                                                                                                                                                                                                                                                       |
-| CohortMembership                            | cohort_id, user_id, role (member/lead optional), added_at, removed_at.                                                                                                                                                                                                                                                           |
-| SessionCohortAssignment                     | session_id, cohort_id (optional for cohort-targeted sessions and filtering).                                                                                                                                                                                                                                                     |
-| SessionReminder                             | session_id, reminder_type (start_24h/start_1h/pause/resume/custom), scheduled_for, sent_at, channel=in_app.                                                                                                                                                                                                                      |
 | SessionTimerEvent                           | session_id, part_slug/index, timer_mode (countdown/countup), started_at, paused_at, ended_at, target_seconds.                                                                                                                                                                                                                    |
-| SessionFeedbackPrompt                       | lesson_id or session_template_id, question_text, question_type (rating/text/multi), required_flag, ordering.                                                                                                                                                                                                                     |
-| SessionFeedbackResponse                     | session_id, user_id, prompt_id, response_value/text, submitted_at (trainee-visible only to self; instructor sees aggregate and authorized drill-down).                                                                                                                                                                           |
 | User (extend template)                      | Nullable `**avatar_url`** (or `**github_avatar_url`**) — set/updated when GitHub is linked (from GitHub profile `**avatar_url`** at link/approval or periodic refresh on successful GitHub sign-in). Join instructor roster DTO with `**full_name**`, `**email**` (optional policy), `**github_login**` from `**OAuthAccount**`. |
 | OAuthAccount (template)                     | Already links **GitHub**; ensure `**avatar_url`** is captured if not present today (may require extending model + bridge payload from Auth.js **profile.image** at link time).                                                                                                                                                   |
 
@@ -620,13 +559,8 @@ Routes are illustrative; align names with your OpenAPI layout. **Separate respon
 
 Additional endpoint groups to include:
 
-- `GET/POST/PATCH /workshop/sessions/{id}/notes` (private instructor notes)
 - `GET/POST/PATCH /workshop/lessons/{id}/prerequisites` and `POST /workshop/lessons/{id}/prerequisites/{pid}/complete`
-- `GET/POST/PATCH /workshop/cohorts` + membership endpoints; optional `POST /workshop/sessions/{id}/cohorts/{cohort_id}`
-- `POST /workshop/sessions/{id}/reminders/schedule` + worker-driven send/status endpoints
 - `POST /workshop/sessions/{id}/timer/start|pause|resume|stop` + `GET /workshop/sessions/{id}/timer`
-- `GET /workshop/sessions/{id}/feedback/prompts` + `POST /workshop/sessions/{id}/feedback/responses` + instructor aggregate read endpoint
-- `GET /workshop/attendance/exports` + `POST /workshop/attendance/exports` (CSV generation, scoped filters)
 
 Role guardrail (consistent with Locked decisions): add-member endpoint applies **always replace** semantics for opposite-role conflicts in a single transaction; dual-role state is forbidden.
 
@@ -661,16 +595,11 @@ Rewrite relative markdown asset links/images to `raw.githubusercontent.com` URLs
 
 ## Security hardening for added workshop features
 
-- **Field-level RBAC:** enforce instructor/superuser-only access for instructor notes, cohort management, attendance export endpoints, reminder controls, timer controls, and feedback aggregate drill-down endpoints.
-- **Scoped data exposure:** trainees can read only their own prerequisite completions and feedback responses; never return peer identity/response payloads in trainee DTOs.
-- **CSV injection defenses:** sanitize export cells that begin with spreadsheet formula prefixes (`=`, `+`, `-`, `@`) and emit safe quoted CSV.
-- **Export minimization:** default attendance export mode includes only necessary columns; extended PII columns require explicit privileged flag.
-- **Reminder anti-abuse controls:** enforce per-session/per-instructor cooldown, deduplication keys, and max reminders per time window.
+- **Field-level RBAC:** enforce instructor/superuser-only access for timer/pacing controls, prerequisite definition mutations, badge grant/revoke actions, and any instructor-only roster/completion surfaces.
+- **Scoped data exposure:** trainees can read only their own prerequisite completions; never return peer identity or roster fields in trainee DTOs.
 - **Timer integrity:** timer state is server-authoritative; reject client-supplied backdated timestamps and enforce legal state transitions.
-- **Notes and timer auditing:** immutable audit trail for note create/edit/delete and timer start/pause/resume/stop with actor and timestamp.
-- **Feedback privacy threshold:** only show cohort/segment feedback aggregates when minimum respondent threshold is met.
-- **Background job integrity:** reminder/export workers must use idempotency keys and trusted queue payloads (no unauthenticated trigger path).
-- **Retention and deletion policy:** define retention windows and deletion/anonymization behavior for notes, feedback text, reminder logs, and export artifacts.
+- **Timer auditing:** immutable audit trail for timer start/pause/resume/stop with actor and timestamp.
+- **Badge actions:** grant only after instructor verification; revoke requires persisted reason + actor/timestamp; leaderboard/profile DTOs exclude revoked grants from active counts per product rules.
 
 ## Privacy (user delete)
 
@@ -695,7 +624,7 @@ Persist user's last dashboard tab (optional quality-of-life), but first-login de
 
 | Dashboard            | Audience    | Purpose                                                                                                                                                           |
 | -------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Instructor Home**  | instructors | Today's sessions, active/paused sessions, repo health, pending completion verifications, badge/revocation actions, quick links to lesson repos/sessions/analytics |
+| **Instructor Home**  | instructors | Today's sessions, active/paused sessions, repo health, pending completion verifications, badge/revocation actions, quick links to lesson repos and sessions |
 | **My Learning Home** | trainees    | sessions needing action (live/starting soon), recent completions, earned badges, personal progress summary                                                        |
 | **Admin Home**       | superusers  | user/instructor management, system health summaries, policy/role oversight, links into workshop data                                                              |
 
@@ -731,11 +660,10 @@ The app should present role-specific dashboard content that matches all features
 
 | Surface                      | Instructor dashboard                                                                                                                                                            | Trainee dashboard                                                                             |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **Primary nav**              | Instructor Home, Workshops hub, Lesson repos, Sessions, Analytics, Badge management/revocations; includes trainee routes only when instructor is separately rostered as trainee | My Learning Home, My sessions, My badges/profile progress (plus standard account settings)    |
+| **Primary nav**              | Instructor Home, Workshops hub, Lesson repos, Sessions, Badge management/revocations; includes trainee routes only when instructor is separately rostered as trainee | My Learning Home, My sessions, My badges/profile progress (plus standard account settings)    |
 | **Session list cards/table** | lesson, status, invited/joined/finished counts, health warnings, open/manage actions                                                                                            | only sessions where user is participant/instructor, personal status; no peer metrics          |
 | **Session detail**           | full roster, avatars, busy/done per trainee, joined/finished timestamps, verify completion, revoke badge, pause/resume/end, member role assignment                              | current lesson part, own busy/done + own completion action, status badge; no roster/peer data |
 | **Badges**                   | badge grant/revoke actions, per-session badge events, leaderboard moderation context                                                                                            | own earned badges + progress only                                                             |
-| **Analytics**                | attendance/completion analytics (session + cross-session trends)                                                                                                                | none (trainee gets personal progress only, no cohort analytics)                               |
 | **Error/health banners**     | sync failures, unhealthy LessonRepo, entitlement issues                                                                                                                         | session-level read-only/error guidance only; no admin internals                               |
 
 
@@ -743,7 +671,7 @@ The app should present role-specific dashboard content that matches all features
 
 - **Role-gated widgets:** every widget/card/query in dashboards must check role scope server-side and client-side.
 - **Single source DTOs:** use separate API response models for instructor and trainee dashboards; never reuse instructor DTOs in trainee routes.
-- **Feature propagation checklist:** whenever a new domain feature is added (badges, revocation, analytics, role rules), update both dashboards intentionally: either add relevant widget or explicitly mark "not applicable".
+- **Feature propagation checklist:** whenever a new domain feature is added (badges, revocation, prerequisites, pacing/timer, role rules), update both dashboards intentionally: either add relevant widget or explicitly mark "not applicable".
 - **No silent gaps:** dashboard pages should not expose empty placeholders for unsupported role actions; hide or replace with contextual copy.
 
 ## UI / UX specification
@@ -793,7 +721,7 @@ Trainees without instructor flag land on **My Learning Home** and see trainee en
 **2) Sessions list**
 
 - Filters: status, date, lesson title search.
-- Additional filters: cohort/team, prerequisite completion state, reminder state.
+- Additional filters: prerequisite completion state (roster/session scoped).
 - Columns: Lesson name, Status (color chip), Participant count invited / joined, **Open**.
 
 **3) Session detail — scheduled (lobby)**
@@ -806,17 +734,16 @@ Trainees without instructor flag land on **My Learning Home** and see trainee en
 **4) Session detail — live / paused (cockpit)**
 
 - **Top bar (full width):** Session status chip (**Live** green / **Paused** amber / **Ended** gray), **Pause** / **Resume** / **End session** (destructive confirm for End). If **LessonRepo** unhealthy: **inline banner** (“Source unavailable — showing last synced content”) non-blocking.
-- **Top bar tools:** session timer widget (countdown/count-up, part target, overrun indicator) and reminder controls (send now / schedule in-app reminder).
+- **Top bar tools:** session timer widget (countdown/count-up, part target, overrun indicator).
 - **Content drift handling:** if sync changes active lesson structure while session is live, show instructor prompt with choices **Switch to latest** (default preselected) or **Keep current snapshot** for this session.
 - **Split panel:**
   - **Left rail (≈30–40% min-width 280px):** “Roster” table — **Avatar** (32–40px circle, **GitHub profile image** or **fallback initials**), Name / **GitHub @handle** (optional subline), **Status** pill (**busy** red / **done** green), **Joined** / **Finished** times. Sort by name or status. Row actions: **Adjust…** (opens sheet: edit timestamps + reason for audit). **Add participant** / remove if session not ended.
   - **Right main:** **Current part** title (H2) + **Part N of M** + **Prev** / **Next** (disabled when **paused** or **ended**; disabled **Next** on last part). Below: **rendered Markdown** in a scrollable card (prose width max ~65ch for readability).
 - **Pause:** show subtle **“Paused — participant updates frozen”** subtext; Prev/Next visibly disabled; roster still readable; instructor can still edit roster / audits / handoff per API rules.
-- **Private notes panel:** instructor-only notes drawer for session observations, blockers, and follow-up actions.
 
 **5) Session detail — ended**
 
-- Read-only roster + final timestamps; **no** pace controls. Option: **Duplicate session** (backlog) for another cohort.
+- Read-only roster + final timestamps; **no** pace controls. Option: **Duplicate session** (backlog) for a future run of the same lesson.
 
 ---
 
@@ -839,22 +766,8 @@ Trainees without instructor flag land on **My Learning Home** and see trainee en
 - **Paused:** banner; toggles disabled; content frozen.
 - **Ended:** closed state; optional last part read-only; no toggles.
 - **Reconnect:** toast + resilient **ws-ticket** refresh.
-- **End-of-session feedback:** after session end (or explicit instructor trigger), show reflection form (rating + free text as configured prompts).
 
 Accessibility: unchanged for **personal** toggles + **aria-live** for **your** view when instructor advances parts (announcement text like “Moved to Part 3” — **no** peer names).
-
-### Instructor analytics screens
-
-- **Session analytics tab (instructor-only):**
-  - KPIs: invited, joined, finished, completion %
-  - Join delay distribution (e.g., median + p90)
-  - Time-to-finish distribution for verified completions
-  - Pause/resume count + total paused duration
-  - Badge grant/revocation summary for that session
-  - Cohort/team comparison slices and prerequisite completion correlation
-  - Feedback summary (ratings distribution + tagged themes)
-- **Cross-session analytics page (instructor-only):** trends over time by lesson/session and cohort-level completion.
-- **Visibility scope lock:** instructors see analytics only for sessions they own/are rostered on; no org-wide instructor visibility into unrelated sessions.
 
 ### Badge revocation workflow
 
@@ -869,12 +782,6 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 - **Instructor session detail:** verified-completion action includes visible badge grant confirmation per trainee.
 - **Global leaderboard page:** rank by total score from **per-badge custom points** (active, non-revoked grants only); clearly separate from live session UI.
 - **Badge catalog ownership:** instructors can manage badges only for lessons/repos they control; superusers have global override.
-
-### Cohorts / teams and exports
-
-- Instructor cohort management screen: create/archive cohorts, add/remove members, assign cohorts to sessions.
-- Session roster supports cohort filter and team-level pacing view (instructor-only).
-- Attendance export supports CSV columns for cohort, joined_at, finished_at, join_delay, verification/badge status, and prerequisite completion.
 
 ### Visual / design system notes
 
@@ -903,8 +810,7 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 
 ### Post-MVP UI (references only)
 
-- XLSX/PDF export templates and scheduled report delivery.
-- Optional **focus mode** for participants (if feedback says full chrome is distracting) — **not** in MVP given your choice above.
+- Optional **focus mode** for participants (if UX research shows full chrome is distracting) — **not** in MVP given your choice above.
 
 ## Testing
 
@@ -912,16 +818,15 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 - Unit: manifest missing/invalid hard-fails sync + marks repo unhealthy; relative asset rewrite to raw GitHub URLs; avatar cleared on unlink; bulk verify can grant for arbitrary selected trainees (no finished-only guardrail).
 - Playwright: two trainee profiles **cannot** observe each other's status or avatars in session views; instructor sees both; trainee GET/WS payloads snapshot-tested for absence of peer PII/live_status/avatar fields; badge appears only after instructor verify action; revocation removes badge from learner surfaces + leaderboard.
 - Playwright: in-app notifications appear as toast and in notification center for roster/session/badge events; live content drift prompt appears to instructor with default preselection **Switch to latest**.
-- Analytics API/UI tests: instructor can view analytics pages; trainee receives 403; metrics reflect join/finish/pause events accurately.
 - Dashboard role-scope tests: trainee dashboard never renders instructor-only cards (roster, peer stats, revocation controls); instructor dashboard shows all applicable management cards.
 - Post-login landing tests: route to correct dashboard by role (`is_instructor`, superuser combinations), including fallback when role changes after login.
 - UI consistency checks: avatar helper renders GitHub avatars on sidebar/profile/admin table/instructor roster/session cards with fallback initials when missing.
 - Contract checks: OpenAPI + generated TS client updated on every API contract change (CI-enforced).
 - CI readiness checks: critical workflows trigger on `main` + PR; fail build on OpenAPI/client drift for changed API surfaces.
 - Security checks: webhook replay/idempotency tests and route-throttling tests for auth bridge/login/webhook routes.
-- Unit/API: private notes visibility tests (instructor-only), prerequisite completion semantics, cohort membership constraints, reminder scheduling idempotency, timer state transitions, feedback prompt/response validation.
-- Playwright: trainee prework checklist flow, instructor timer controls + overrun UI, cohort-filtered roster analytics, attendance CSV export success path, end-of-session reflection submission.
-- Security tests: RBAC denial tests for all new endpoint families; CSV formula-injection regression tests; reminder cooldown/max-rate enforcement; feedback privacy-threshold checks for aggregate analytics.
+- Unit/API: prerequisite completion semantics, timer state transitions, badge grant/revoke authorization and audit fields.
+- Playwright: trainee prework checklist flow, instructor timer controls + overrun UI.
+- Security tests: RBAC denial tests for all new endpoint families; trainee DTO/WS contract tests for absence of peer PII.
 
 ## Risks
 
@@ -938,11 +843,6 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 | Multi-instructor consistency      | SessionInstructor unique-active constraints + role exclusivity tests (never dual-role same user/session) + last-active-instructor 409 guard |
 | CI blind spots                    | enforce default-branch (`main`) + PR triggers for critical workflows                                                                        |
 | Low incident visibility           | structured logs + metrics + alert thresholds for workshop sync/realtime flows                                                               |
-| Reminder fatigue/noise            | instructor-configurable reminder presets + cooldown/de-dup rules                                                                            |
-| Feedback privacy leakage          | strict scoped DTOs and aggregate thresholds before showing drill-down                                                                       |
-| CSV formula injection             | spreadsheet-safe escaping + export sanitization tests                                                                                       |
-| Reminder abuse/spam               | rate limits, cooldown windows, and per-session send caps                                                                                    |
-| Excessive PII exposure in exports | minimal default export schema + privileged explicit expansion                                                                               |
 
 
 **Scale**: MVP single-node WS broker; later Redis pub/sub or similar for multi-instance.
@@ -957,18 +857,16 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 6. Instructor + participant UIs; replace **Items** navigation.
 7. Integrations: LessonRepo tombstone + handoff negatives.
 8. Learning workflow add-ons (**secure-by-default**): prerequisites/prework model + trainee checklist UX + instructor visibility, with scoped DTOs and prerequisite completion authorization checks.
-9. Cohorts/teams + attendance exports (**secure-by-default**): cohort CRUD/membership + session assignment + CSV export endpoints/UI with RBAC, export minimization, and CSV formula-injection protections.
-10. Session operations add-ons (**secure-by-default**): private instructor notes, reminder automation, and timer/pacing controls with anti-abuse rate limits/cooldowns, server-authoritative timer state, and immutable audit logs.
-11. Badge system (**secure-by-default**): catalog ownership rules + per-badge points + single/bulk verify-completion flow + profile/session/leaderboard UI with strict role checks.
-12. Analytics + feedback + revocation (**secure-by-default**): session/cross-session analytics, learner reflection summaries, badge revoke endpoint + audit UX with feedback privacy-threshold enforcement.
-13. Dashboard parity pass: verify instructor and trainee dashboards include all applicable new modules and exclude non-applicable content by role/privacy.
-14. Migration rollout hardening: pre/post migration checks, backfill scripts, and destructive-change guardrails.
-15. Final cross-cutting hardening pass: default-branch workflow trigger audit, webhook replay/idempotency checks, throttling coverage validation, monitoring/alert calibration, and threat-model sanity review.
-16. Tests + env docs + strict OpenAPI/TS regen verification on each API slice; include dedicated security regression suite and full Playwright E2E coverage for implemented journeys.
-17. File post-MVP tickets (focus mode, advanced export templates, optional encryption-at-rest for note/feedback blobs).
-18. Ongoing PR operations lane: after each PR open/update in the stack, run `/babysitting-pr` until CI/checks are green or escalation is required for product/design decisions.
+9. Session timer/pacing (**secure-by-default**): server-authoritative timer state, instructor controls, overrun indicators, immutable audit trail for timer transitions, and rate limits where abuse is plausible.
+10. Badge system (**secure-by-default**): catalog ownership rules + per-badge points + single/bulk verify-completion flow + mandatory-reason revocation + audit trail + profile/session/leaderboard UI with strict role checks.
+11. Dashboard parity pass: verify instructor and trainee dashboards include all applicable new modules and exclude non-applicable content by role/privacy.
+12. Migration rollout hardening: pre/post migration checks, backfill scripts, and destructive-change guardrails.
+13. Final cross-cutting hardening pass: default-branch workflow trigger audit, webhook replay/idempotency checks, throttling coverage validation, monitoring/alert calibration, and threat-model sanity review.
+14. Tests + env docs + strict OpenAPI/TS regen verification on each API slice; include dedicated security regression suite and full Playwright E2E coverage for implemented journeys.
+15. File post-MVP tickets (focus mode and other backlog items deferred from this plan).
+16. Ongoing PR operations lane: after each PR open/update in the stack, run `/babysitting-pr` until CI/checks are green or escalation is required for product/design decisions.
 
-Implementation guardrail for steps 1-17: for every backend Python slice, follow `/python-tdd-with-uv` (failing test first, minimal implementation, `uv run pytest` before advancing), and for every user-facing slice ensure corresponding Playwright E2E tests are added/updated before advancing.
+Implementation guardrail for steps 1-15: for every backend Python slice, follow `/python-tdd-with-uv` (failing test first, minimal implementation, `uv run pytest` before advancing), and for every user-facing slice ensure corresponding Playwright E2E tests are added/updated before advancing.
 
 ## PR slicing and branch strategy (locked)
 
@@ -982,18 +880,17 @@ Use a fully stacked PR chain for implementation delivery.
 
 ### Branch/PR chain
 
-Open GitHub PRs for slices 01–05: see [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged). Add the same-style link here when PR06+ exist.
+Open GitHub PRs for workshop slices **01–06**: see [GitHub PR stack](#github-pr-stack-open--update-when-retargetedmerged). PR07+ use the branch names below when opened.
 
 1. `ws-01-foundation-rbac` ([PR #18](https://github.com/justin-p/testing/pull/18) → `main`) — roles, RBAC groundwork, initial schema scaffolding.
 2. `ws-02-github-sync-manifest` ([PR #19](https://github.com/justin-p/testing/pull/19) → `ws-01-*`) — GitHub App sync and manifest-first lesson ingestion.
 3. `ws-03-session-core` ([PR #20](https://github.com/justin-p/testing/pull/20) → `ws-02-*`) — session lifecycle, rostering, enter semantics, role exclusivity.
 4. `ws-04-realtime-privacy` ([PR #21](https://github.com/justin-p/testing/pull/21) → `ws-03-*`) — ws-ticket flow, role-scoped fanout, privacy-safe DTO behavior.
 5. `ws-05-dashboard-nav` ([PR #22](https://github.com/justin-p/testing/pull/22) → `ws-04-*`) — post-login routing, instructor/trainee/admin homes, nav replacement.
-6. `ws-06-learning-workflows` — prerequisites/prework and learner workflow surfaces. *PR TBD*
-7. `ws-07-cohorts-exports` — cohorts/teams model and attendance exports. *PR TBD*
-8. `ws-08-notes-reminders-timer` — private notes, reminders, timer/pacing tools. *PR TBD*
-9. `ws-09-badges-analytics-feedback` — badges/revocation, analytics, learner feedback. *PR TBD*
-10. `ws-10-hardening-and-tests` — cross-cutting hardening, stabilization, and final test consolidation. *PR TBD*
+6. `ws-06-learning-workflows` ([PR #23](https://github.com/justin-p/testing/pull/23) → `ws-05-*`) — prerequisites/prework APIs + UI, E2E bootstrap, Playwright workshop suite, living plan scope alignment.
+7. `ws-07-pacing-timer` — session timer and pacing tools (part timers, overrun, instructor controls). *PR TBD*
+8. `ws-08-badges-revocation` — badge catalog, grants, revocation, leaderboard surfaces. *PR TBD*
+9. `ws-09-hardening-and-tests` — cross-cutting hardening, stabilization, and final test consolidation. *PR TBD*
 
 ### PR scope guardrails
 
@@ -1018,12 +915,11 @@ flowchart TD
   pr03 --> pr04["PR04 #21 ws-04"]
   pr04 --> pr05["PR05 #22 ws-05"]
   pr05 --> pr06[PR06 LearningWorkflows]
-  pr06 --> pr07[PR07 CohortsExports]
-  pr07 --> pr08[PR08 NotesRemindersTimer]
-  pr08 --> pr09[PR09 BadgesAnalyticsFeedback]
-  pr09 --> pr10[PR10 HardeningAndTests]
+  pr06 --> pr07[PR07 PacingTimer]
+  pr07 --> pr08[PR08 BadgesRevocation]
+  pr08 --> pr09[PR09 HardeningAndTests]
 ```
-*(PR numbers for PR06–PR10 appear when those PRs are opened; update diagram with the stack table.)*
+*(PR numbers for PR06–PR09 appear when those PRs are opened; update diagram with the stack table.)*
 
 ### `/split-to-prs` readiness checklist
 
@@ -1034,7 +930,7 @@ flowchart TD
 
 ## PR babysitting policy (locked)
 
-`/babysitting-pr` is mandatory for **every PR** in the 10-PR stacked chain before merge.
+`/babysitting-pr` is mandatory for **every PR** in the 9-PR stacked chain before merge.
 
 ### Execution loop
 
@@ -1060,3 +956,75 @@ flowchart TD
 ### Testing flow note
 
 CI-failure triage and remediation is part of the normal per-PR execution flow, not a final end-of-project phase.
+
+---
+
+## Appendix — archived scope (reference only)
+
+**Purpose:** Preserve **recoverable** product, data-model, API, UX, and delivery notes for workshop items **removed from MVP** (trimmed from this plan). **Do not** treat this appendix as in-scope work; use [Out of scope (MVP)](#out-of-scope-mvp) and the main sections for authoritative decisions.
+
+**Removed roadmap todo ids (historical):** `attendance-analytics`, `instructor-notes`, `attendance-exports`, `cohorts-teams`, `reminders-automation`, `learner-feedback`.
+
+### Former product-constraint bullets (intent)
+
+- **Analytics:** Instructor-facing attendance analytics (session + aggregate metrics).
+- **Instructor notes:** Private instructor-only notes at **lesson** and **session** level; never exposed to trainees.
+- **Cohorts/teams:** Participants grouped for roster filtering and analytics breakdowns.
+- **Reminder automation:** In-app reminders automatically sent for upcoming starts and pause/resume changes.
+- **Feedback:** End-of-session learner reflection captured for instructors in aggregate and per-session views.
+
+### Former data model entities (illustrative)
+
+| Entity | Notes (archived) |
+| ------ | ---------------- |
+| InstructorNote | scope (lesson/session), scope_id, author_user_id, note_md/text, created_at, updated_at; instructor/superuser visible only. |
+| Cohort | name, slug, description, owner_instructor_id, archived_at. |
+| CohortMembership | cohort_id, user_id, role (member/lead optional), added_at, removed_at. |
+| SessionCohortAssignment | session_id, cohort_id (optional for cohort-targeted sessions and filtering). |
+| SessionReminder | session_id, reminder_type (start_24h/start_1h/pause/resume/custom), scheduled_for, sent_at, channel=in_app. |
+| SessionFeedbackPrompt | lesson_id or session_template_id, question_text, question_type (rating/text/multi), required_flag, ordering. |
+| SessionFeedbackResponse | session_id, user_id, prompt_id, response_value/text, submitted_at (trainee self-visible; instructor aggregate + authorized drill-down). |
+
+### Former REST sketch additions (illustrative)
+
+- `GET/POST/PATCH /workshop/sessions/{id}/notes` (private instructor notes)
+- `GET/POST/PATCH /workshop/cohorts` + membership endpoints; optional `POST /workshop/sessions/{id}/cohorts/{cohort_id}`
+- `POST /workshop/sessions/{id}/reminders/schedule` + worker-driven send/status endpoints
+- `GET /workshop/sessions/{id}/feedback/prompts` + `POST /workshop/sessions/{id}/feedback/responses` + instructor aggregate read endpoint
+- `GET /workshop/attendance/exports` + `POST /workshop/attendance/exports` (CSV generation, scoped filters)
+
+### Former security / compliance themes (archived)
+
+- RBAC for notes, cohort management, export endpoints, reminder controls, feedback aggregate drill-down.
+- Trainee-scoped prerequisite + **feedback response** reads; no peer response payloads in trainee DTOs.
+- CSV injection defenses and export minimization / PII expansion flags.
+- Reminder anti-abuse (cooldown, dedup, caps); feedback aggregate **minimum respondent** threshold; idempotent reminder/export workers; retention for notes, feedback text, reminder logs, export artifacts.
+
+### Former UX / dashboard highlights (archived)
+
+- Instructor Home / nav: links to **analytics**; primary nav **Analytics** entry; dashboard matrix **Analytics** row (session + cross-session trends; trainees personal progress only, no cohort analytics).
+- Sessions list: filters for **cohort/team**, **reminder state** (alongside prerequisite state).
+- Live cockpit: **reminder controls** (send now / schedule); **private notes** drawer.
+- Trainee session: **end-of-session feedback** (rating + free text per prompts).
+- **Instructor analytics screens:** session analytics tab (KPIs, join delay, time-to-finish, pause duration, badge summary, cohort/prerequisite correlation, feedback summary); cross-session analytics by lesson/cohort; visibility scoped to rostered sessions.
+- **Cohorts / teams and exports:** cohort CRUD + session assignment; cohort filter / team-level pacing on roster; CSV export columns (cohort, joined_at, finished_at, join_delay, verification/badge, prerequisites).
+- Post-MVP UI note: XLSX/PDF export templates and scheduled report delivery.
+
+### Former stacked PR / implementation slices (pre–9-PR trim)
+
+- `ws-07-cohorts-exports` — cohorts/teams model and attendance exports.
+- `ws-08-notes-reminders-timer` — private notes, reminders, timer/pacing tools (timer kept in current plan under `ws-07-pacing-timer` only).
+- `ws-09-badges-analytics-feedback` — badges/revocation bundled with analytics + learner feedback (current plan splits badges to `ws-08-badges-revocation` without analytics/feedback).
+- Mermaid labels formerly chained: `PR07 CohortsExports` → `PR08 NotesRemindersTimer` → `PR09 BadgesAnalyticsFeedback` → `PR10 HardeningAndTests`.
+
+### Former implementation-order themes (archived)
+
+- Cohort CRUD/membership + session assignment + **CSV export** UI/API with RBAC and formula-injection protections.
+- Session add-ons: **private instructor notes**, **reminder automation**, and timer/pacing (timer portion retained separately in current plan).
+- **Analytics + feedback + revocation** slice: session/cross-session analytics, learner reflection summaries, revoke UX with feedback privacy thresholds.
+
+### Former testing / risks (examples)
+
+- Analytics API/UI tests; private notes visibility; cohort membership; reminder idempotency; feedback prompt/response validation; cohort-filtered roster analytics; CSV export success path; end-of-session reflection; CSV injection / reminder abuse / export PII / feedback leakage / reminder fatigue risk rows.
+
+*If this appendix is revived into MVP, reconcile explicitly with [Notifications (MVP)](#notifications-mvp) and current badge/prerequisite/timer scope to avoid duplicate or conflicting product definitions.*

@@ -177,6 +177,37 @@ export type ValidationError = {
     };
 };
 
+export type WorkshopBadgeDefinitionCreate = {
+    slug: string;
+    title: string;
+    description?: (string | null);
+    points?: number;
+};
+
+export type WorkshopBadgeDefinitionPublic = {
+    id: string;
+    slug: string;
+    title: string;
+    description?: (string | null);
+    points: number;
+};
+
+export type WorkshopBadgeDefinitionsPublic = {
+    data: Array<WorkshopBadgeDefinitionPublic>;
+    count: number;
+};
+
+export type WorkshopBadgeGrantRequest = {
+    user_id: string;
+    badge_id: string;
+};
+
+export type WorkshopBadgeRevokeRequest = {
+    user_id: string;
+    badge_id: string;
+    reason?: (string | null);
+};
+
 /**
  * Lesson part metadata for workshop session screens (body omitted).
  */
@@ -185,6 +216,101 @@ export type WorkshopLessonPartBrief = {
     ordering: number;
     slug: string;
     title: string;
+};
+
+/**
+ * Session roster completion counts per prerequisite definition (no per-user identity).
+ */
+export type WorkshopLessonPrerequisiteAggregatePublic = {
+    prerequisite: WorkshopLessonPrerequisitePublic;
+    /**
+     * Active roster trainee seats.
+     */
+    roster_count: number;
+    /**
+     * Roster trainees with a completion row for this prerequisite.
+     */
+    completed_count: number;
+};
+
+export type WorkshopLessonPrerequisiteAggregatesPublic = {
+    data: Array<WorkshopLessonPrerequisiteAggregatePublic>;
+    count: number;
+};
+
+export type WorkshopLessonPrerequisiteComplete = {
+    user_id?: (string | null);
+};
+
+export type WorkshopLessonPrerequisiteCreate = {
+    type?: string;
+    title: string;
+    details?: (string | null);
+    url?: (string | null);
+    ordering?: number;
+    required_flag?: boolean;
+};
+
+/**
+ * Trainee prerequisite gap for instructor cohort views (scoped to a workshop session roster).
+ */
+export type WorkshopLessonPrerequisiteGapPublic = {
+    user_id: string;
+    email: string;
+    full_name?: (string | null);
+    incomplete_required_prerequisites: Array<WorkshopLessonPrerequisitePublic>;
+};
+
+/**
+ * Users on the session roster who still owe at least one *required* prerequisite.
+ */
+export type WorkshopLessonPrerequisiteGapsPublic = {
+    data: Array<WorkshopLessonPrerequisiteGapPublic>;
+    count: number;
+};
+
+export type WorkshopLessonPrerequisiteMyPublic = {
+    id: string;
+    lesson_id: string;
+    type: string;
+    title: string;
+    details?: (string | null);
+    url?: (string | null);
+    ordering: number;
+    required_flag: boolean;
+    is_completed: boolean;
+    completed_at?: (string | null);
+    source?: (string | null);
+};
+
+export type WorkshopLessonPrerequisitePatch = {
+    type?: (string | null);
+    title?: (string | null);
+    details?: (string | null);
+    url?: (string | null);
+    ordering?: (number | null);
+    required_flag?: (boolean | null);
+};
+
+export type WorkshopLessonPrerequisitePublic = {
+    id: string;
+    lesson_id: string;
+    type: string;
+    title: string;
+    details?: (string | null);
+    url?: (string | null);
+    ordering: number;
+    required_flag: boolean;
+};
+
+export type WorkshopLessonPrerequisitesMyPublic = {
+    data: Array<WorkshopLessonPrerequisiteMyPublic>;
+    count: number;
+};
+
+export type WorkshopLessonPrerequisitesPublic = {
+    data: Array<WorkshopLessonPrerequisitePublic>;
+    count: number;
 };
 
 export type WorkshopLessonSummaryPublic = {
@@ -249,6 +375,17 @@ export type WorkshopSessionInstructorSeatRoleUpdate = {
     role: string;
 };
 
+export type WorkshopSessionLeaderboardPublic = {
+    data: Array<WorkshopSessionLeaderboardRowPublic>;
+    count: number;
+};
+
+export type WorkshopSessionLeaderboardRowPublic = {
+    user_id: string;
+    total_points: number;
+    badge_count: number;
+};
+
 /**
  * Minimal session row for dashboard lists — no roster, no peer data.
  */
@@ -263,6 +400,10 @@ export type WorkshopSessionListItem = {
      * Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.
      */
     my_role?: ('participant' | 'instructor' | null);
+    /**
+     * Roster trainees still missing at least one required prerequisite; only included for instructor/admin visibility.
+     */
+    blocked_required_prereq_count?: (number | null);
 };
 
 /**
@@ -302,6 +443,43 @@ export type WorkshopSessionsPublic = {
     data: Array<WorkshopSessionListItem>;
     count: number;
 };
+
+export type WorkshopSessionTimerEventPublic = {
+    id: string;
+    session_id: string;
+    actor_user_id: string;
+    action: 'start' | 'pause' | 'resume' | 'stop';
+    mode?: ('countdown' | 'countup' | null);
+    target_seconds?: (number | null);
+    created_at?: (string | null);
+};
+
+export type action = 'start' | 'pause' | 'resume' | 'stop';
+
+export type WorkshopSessionTimerEventsPublic = {
+    data: Array<WorkshopSessionTimerEventPublic>;
+    count: number;
+};
+
+export type WorkshopSessionTimerPublic = {
+    session_id: string;
+    status: 'inactive' | 'running' | 'paused';
+    mode?: ('countdown' | 'countup' | null);
+    target_seconds?: (number | null);
+    started_at?: (string | null);
+    paused_at?: (string | null);
+    elapsed_seconds?: (number | null);
+    remaining_seconds?: (number | null);
+};
+
+export type status2 = 'inactive' | 'running' | 'paused';
+
+export type WorkshopSessionTimerStart = {
+    mode?: 'countdown' | 'countup';
+    target_seconds?: (number | null);
+};
+
+export type mode = 'countdown' | 'countup';
 
 /**
  * Assign a user as participant or instructor for one session.
@@ -425,6 +603,7 @@ export type PrivateBootstrapE2eWorkshopLiveSessionData = {
     initialStatus?: 'live' | 'scheduled';
     omitParticipantSeat?: boolean;
     participantEmail?: (string | null);
+    withIncompleteRequiredPrerequisite?: boolean;
 };
 
 export type PrivateBootstrapE2eWorkshopLiveSessionResponse = (PrivateWorkshopE2ELiveSessionResponse);
@@ -491,6 +670,90 @@ export type UtilsTestEmailResponse = (Message);
 
 export type UtilsHealthCheckResponse = (boolean);
 
+export type WorkshopBadgesReadWorkshopBadgesResponse = (WorkshopBadgeDefinitionsPublic);
+
+export type WorkshopBadgesCreateWorkshopBadgeData = {
+    requestBody: WorkshopBadgeDefinitionCreate;
+};
+
+export type WorkshopBadgesCreateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
+
+export type WorkshopBadgesGrantWorkshopBadgeData = {
+    requestBody: WorkshopBadgeGrantRequest;
+    sessionId: string;
+};
+
+export type WorkshopBadgesGrantWorkshopBadgeResponse = (Message);
+
+export type WorkshopBadgesRevokeWorkshopBadgeData = {
+    requestBody: WorkshopBadgeRevokeRequest;
+    sessionId: string;
+};
+
+export type WorkshopBadgesRevokeWorkshopBadgeResponse = (Message);
+
+export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData = {
+    sessionId: string;
+};
+
+export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse = (WorkshopSessionLeaderboardPublic);
+
+export type WorkshopLessonsCreateLessonPrerequisiteData = {
+    lessonId: string;
+    requestBody: WorkshopLessonPrerequisiteCreate;
+};
+
+export type WorkshopLessonsCreateLessonPrerequisiteResponse = (WorkshopLessonPrerequisitePublic);
+
+export type WorkshopLessonsReadLessonPrerequisitesData = {
+    lessonId: string;
+};
+
+export type WorkshopLessonsReadLessonPrerequisitesResponse = (WorkshopLessonPrerequisitesPublic);
+
+export type WorkshopLessonsPatchLessonPrerequisiteData = {
+    lessonId: string;
+    prerequisiteId: string;
+    requestBody: WorkshopLessonPrerequisitePatch;
+};
+
+export type WorkshopLessonsPatchLessonPrerequisiteResponse = (WorkshopLessonPrerequisitePublic);
+
+export type WorkshopLessonsDeleteLessonPrerequisiteData = {
+    lessonId: string;
+    prerequisiteId: string;
+};
+
+export type WorkshopLessonsDeleteLessonPrerequisiteResponse = (Message);
+
+export type WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterData = {
+    lessonId: string;
+    sessionId: string;
+};
+
+export type WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterResponse = (WorkshopLessonPrerequisiteGapsPublic);
+
+export type WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterData = {
+    lessonId: string;
+    sessionId: string;
+};
+
+export type WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterResponse = (WorkshopLessonPrerequisiteAggregatesPublic);
+
+export type WorkshopLessonsReadMyLessonPrerequisitesData = {
+    lessonId: string;
+};
+
+export type WorkshopLessonsReadMyLessonPrerequisitesResponse = (WorkshopLessonPrerequisitesMyPublic);
+
+export type WorkshopLessonsCompleteLessonPrerequisiteData = {
+    lessonId: string;
+    prerequisiteId: string;
+    requestBody?: (WorkshopLessonPrerequisiteComplete | null);
+};
+
+export type WorkshopLessonsCompleteLessonPrerequisiteResponse = (Message);
+
 export type WorkshopSessionsReadWorkshopSessionsForUserData = {
     limit?: number;
     skip?: number;
@@ -550,6 +813,44 @@ export type WorkshopSessionsEndWorkshopSessionData = {
 };
 
 export type WorkshopSessionsEndWorkshopSessionResponse = (Message);
+
+export type WorkshopSessionsReadWorkshopSessionTimerData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsReadWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
+
+export type WorkshopSessionsReadWorkshopSessionTimerEventsData = {
+    limit?: number;
+    sessionId: string;
+};
+
+export type WorkshopSessionsReadWorkshopSessionTimerEventsResponse = (WorkshopSessionTimerEventsPublic);
+
+export type WorkshopSessionsStartWorkshopSessionTimerData = {
+    requestBody: WorkshopSessionTimerStart;
+    sessionId: string;
+};
+
+export type WorkshopSessionsStartWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
+
+export type WorkshopSessionsPauseWorkshopSessionTimerData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsPauseWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
+
+export type WorkshopSessionsResumeWorkshopSessionTimerData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsResumeWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
+
+export type WorkshopSessionsStopWorkshopSessionTimerData = {
+    sessionId: string;
+};
+
+export type WorkshopSessionsStopWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
 
 export type WorkshopSessionsCreateWorkshopWsTicketData = {
     sessionId: string;

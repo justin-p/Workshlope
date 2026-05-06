@@ -227,6 +227,139 @@ class SessionInstructor(SQLModel, table=True):
     removed_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
 
 
+class LessonPrerequisite(SQLModel, table=True):
+    __tablename__ = "lesson_prerequisite"
+    __table_args__ = (
+        UniqueConstraint(
+            "lesson_id", "ordering", name="uq_lesson_prerequisite_ordering"
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    lesson_id: uuid.UUID = Field(
+        foreign_key="lesson.id", nullable=False, ondelete="CASCADE"
+    )
+    type: str = Field(max_length=32, default="task")
+    title: str = Field(max_length=255)
+    details: str | None = Field(default=None, max_length=1024)
+    url: str | None = Field(default=None, max_length=1024)
+    ordering: int = Field(default=0, ge=0)
+    required_flag: bool = True
+
+
+class UserPrerequisiteCompletion(SQLModel, table=True):
+    __tablename__ = "user_prerequisite_completion"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "prerequisite_id",
+            name="uq_user_prerequisite_completion",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    lesson_id: uuid.UUID = Field(
+        foreign_key="lesson.id", nullable=False, ondelete="CASCADE"
+    )
+    prerequisite_id: uuid.UUID = Field(
+        foreign_key="lesson_prerequisite.id", nullable=False, ondelete="CASCADE"
+    )
+    completed_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    source: str = Field(default="self", max_length=32)
+
+
+class WorkshopSessionTimer(SQLModel, table=True):
+    __tablename__ = "workshop_session_timer"
+    __table_args__ = (
+        UniqueConstraint("session_id", name="uq_workshop_session_timer_session"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    session_id: uuid.UUID = Field(
+        foreign_key="workshop_session.id", nullable=False, ondelete="CASCADE"
+    )
+    status: str = Field(default="inactive", max_length=16)
+    mode: str | None = Field(default=None, max_length=16)
+    target_seconds: int | None = Field(default=None, ge=1, le=86_400)
+    started_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    paused_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class WorkshopSessionTimerEvent(SQLModel, table=True):
+    __tablename__ = "workshop_session_timer_event"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    session_id: uuid.UUID = Field(
+        foreign_key="workshop_session.id", nullable=False, ondelete="CASCADE"
+    )
+    actor_user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    action: str = Field(max_length=16)
+    mode: str | None = Field(default=None, max_length=16)
+    target_seconds: int | None = Field(default=None, ge=1, le=86_400)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class WorkshopBadgeDefinition(SQLModel, table=True):
+    __tablename__ = "workshop_badge_definition"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    slug: str = Field(max_length=64, unique=True, index=True)
+    title: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
+    points: int = Field(default=1, ge=0, le=1000)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class WorkshopBadgeGrant(SQLModel, table=True):
+    __tablename__ = "workshop_badge_grant"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "user_id", "badge_id", name="uq_workshop_badge_grant_once"
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    session_id: uuid.UUID = Field(
+        foreign_key="workshop_session.id", nullable=False, ondelete="CASCADE"
+    )
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    badge_id: uuid.UUID = Field(
+        foreign_key="workshop_badge_definition.id", nullable=False, ondelete="CASCADE"
+    )
+    granted_by_user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE"
+    )
+    granted_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    revoked_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore
+    revoked_by_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="user.id", nullable=True, ondelete="SET NULL"
+    )
+    revoked_reason: str | None = Field(default=None, max_length=255)
+
+
 class WorkshopSessionListItem(SQLModel):
     """Minimal session row for dashboard lists — no roster, no peer data."""
 
@@ -239,6 +372,11 @@ class WorkshopSessionListItem(SQLModel):
     my_role: Literal["participant", "instructor"] | None = Field(
         default=None,
         description="Trainee/participant vs instructor roster seat; ``null`` when superuser is not seated on this session.",
+    )
+    blocked_required_prereq_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Roster trainees still missing at least one required prerequisite; only included for instructor/admin visibility.",
     )
 
 
@@ -279,6 +417,94 @@ class WorkshopSessionPatch(SQLModel):
     remove_instructor_user_id: uuid.UUID | None = None
 
 
+class WorkshopLessonPrerequisiteCreate(SQLModel):
+    type: str = Field(default="task", max_length=32)
+    title: str = Field(max_length=255)
+    details: str | None = Field(default=None, max_length=1024)
+    url: str | None = Field(default=None, max_length=1024)
+    ordering: int = Field(default=0, ge=0)
+    required_flag: bool = True
+
+
+class WorkshopLessonPrerequisitePatch(SQLModel):
+    type: str | None = Field(default=None, max_length=32)
+    title: str | None = Field(default=None, max_length=255)
+    details: str | None = Field(default=None, max_length=1024)
+    url: str | None = Field(default=None, max_length=1024)
+    ordering: int | None = Field(default=None, ge=0)
+    required_flag: bool | None = None
+
+
+class WorkshopLessonPrerequisitePublic(SQLModel):
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    type: str
+    title: str
+    details: str | None = None
+    url: str | None = None
+    ordering: int
+    required_flag: bool
+
+
+class WorkshopLessonPrerequisitesPublic(SQLModel):
+    data: list[WorkshopLessonPrerequisitePublic]
+    count: int
+
+
+class WorkshopLessonPrerequisiteMyPublic(SQLModel):
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    type: str
+    title: str
+    details: str | None = None
+    url: str | None = None
+    ordering: int
+    required_flag: bool
+    is_completed: bool
+    completed_at: datetime | None = None
+    source: str | None = None
+
+
+class WorkshopLessonPrerequisitesMyPublic(SQLModel):
+    data: list[WorkshopLessonPrerequisiteMyPublic]
+    count: int
+
+
+class WorkshopLessonPrerequisiteGapPublic(SQLModel):
+    """Trainee prerequisite gap for instructor cohort views (scoped to a workshop session roster)."""
+
+    user_id: uuid.UUID
+    email: str
+    full_name: str | None = None
+    incomplete_required_prerequisites: list[WorkshopLessonPrerequisitePublic]
+
+
+class WorkshopLessonPrerequisiteGapsPublic(SQLModel):
+    """Users on the session roster who still owe at least one *required* prerequisite."""
+
+    data: list[WorkshopLessonPrerequisiteGapPublic]
+    count: int
+
+
+class WorkshopLessonPrerequisiteAggregatePublic(SQLModel):
+    """Session roster completion counts per prerequisite definition (no per-user identity)."""
+
+    prerequisite: WorkshopLessonPrerequisitePublic
+    roster_count: int = Field(ge=0, description="Active roster trainee seats.")
+    completed_count: int = Field(
+        ge=0, description="Roster trainees with a completion row for this prerequisite."
+    )
+
+
+class WorkshopLessonPrerequisiteAggregatesPublic(SQLModel):
+    data: list[WorkshopLessonPrerequisiteAggregatePublic]
+    count: int
+
+
+class WorkshopLessonPrerequisiteComplete(SQLModel):
+    user_id: uuid.UUID | None = None
+
+
 class WorkshopLessonPartBrief(SQLModel):
     """Lesson part metadata for workshop session screens (body omitted)."""
 
@@ -286,6 +512,79 @@ class WorkshopLessonPartBrief(SQLModel):
     ordering: int
     slug: str
     title: str
+
+
+class WorkshopSessionTimerStart(SQLModel):
+    mode: Literal["countdown", "countup"] = "countdown"
+    target_seconds: int | None = Field(default=None, ge=1, le=86_400)
+
+
+class WorkshopSessionTimerPublic(SQLModel):
+    session_id: uuid.UUID
+    status: Literal["inactive", "running", "paused"]
+    mode: Literal["countdown", "countup"] | None = None
+    target_seconds: int | None = None
+    started_at: datetime | None = None
+    paused_at: datetime | None = None
+    elapsed_seconds: int | None = None
+    remaining_seconds: int | None = None
+
+
+class WorkshopSessionTimerEventPublic(SQLModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    actor_user_id: uuid.UUID
+    action: Literal["start", "pause", "resume", "stop"]
+    mode: Literal["countdown", "countup"] | None = None
+    target_seconds: int | None = None
+    created_at: datetime | None = None
+
+
+class WorkshopSessionTimerEventsPublic(SQLModel):
+    data: list[WorkshopSessionTimerEventPublic]
+    count: int
+
+
+class WorkshopBadgeDefinitionCreate(SQLModel):
+    slug: str = Field(max_length=64)
+    title: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
+    points: int = Field(default=1, ge=0, le=1000)
+
+
+class WorkshopBadgeDefinitionPublic(SQLModel):
+    id: uuid.UUID
+    slug: str
+    title: str
+    description: str | None = None
+    points: int
+
+
+class WorkshopBadgeDefinitionsPublic(SQLModel):
+    data: list[WorkshopBadgeDefinitionPublic]
+    count: int
+
+
+class WorkshopBadgeGrantRequest(SQLModel):
+    user_id: uuid.UUID
+    badge_id: uuid.UUID
+
+
+class WorkshopBadgeRevokeRequest(SQLModel):
+    user_id: uuid.UUID
+    badge_id: uuid.UUID
+    reason: str | None = Field(default=None, max_length=255)
+
+
+class WorkshopSessionLeaderboardRowPublic(SQLModel):
+    user_id: uuid.UUID
+    total_points: int = Field(ge=0)
+    badge_count: int = Field(ge=0)
+
+
+class WorkshopSessionLeaderboardPublic(SQLModel):
+    data: list[WorkshopSessionLeaderboardRowPublic]
+    count: int
 
 
 class WorkshopSessionCorePublic(SQLModel):
