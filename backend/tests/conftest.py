@@ -2,6 +2,7 @@ from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import inspect
 from sqlmodel import Session, delete
 
 from app.core.config import settings
@@ -49,8 +50,9 @@ def db() -> Generator[Session, None, None]:
         session.execute(statement)
         statement = delete(LessonRepo)
         session.execute(statement)
-        statement = delete(GithubAppInstallation)
-        session.execute(statement)
+        if inspect(engine).has_table("github_app_installation"):
+            statement = delete(GithubAppInstallation)
+            session.execute(statement)
         statement = delete(OAuthAccount)
         session.execute(statement)
         statement = delete(PendingGitHubLogin)
