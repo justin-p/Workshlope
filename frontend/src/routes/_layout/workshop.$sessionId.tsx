@@ -32,6 +32,13 @@ function formatTimerRemainingSeconds(totalSeconds: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`
 }
 
+function formatEventTimestamp(iso: string | null | undefined): string {
+  if (!iso) return "unknown time"
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return "unknown time"
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+}
+
 /** Decode JWT payload segment (no verification — UI routing only). */
 function decodeJwtPayloadJson(
   rawToken: string,
@@ -178,6 +185,8 @@ function WorkshopSessionPage() {
       }),
     enabled: uuidOk && detailView === "instructor",
     retry: false,
+    refetchInterval: () =>
+      timerQuery.data?.status === "running" ? 5_000 : false,
   })
 
   const startTimerMutation = useMutation({
@@ -787,6 +796,9 @@ function WorkshopSessionPage() {
                       {event.target_seconds
                         ? `${event.target_seconds}s`
                         : "countup"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/80">
+                      {formatEventTimestamp(event.created_at)}
                     </span>
                   </li>
                 ))}

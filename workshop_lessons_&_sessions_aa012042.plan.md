@@ -118,7 +118,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | `ws-07-pacing-timer` |
 | PR | *(not opened yet; will target `ws-06-learning-workflows`)* |
-| Latest work | **PR07 slice 5 (2026-05-06):** fixed instructor start-timer UX so "Start 5m countdown" now sends a real countdown request (`mode=countdown`, `target_seconds=300`) instead of countup, aligning button copy with backend behavior and remaining-time display. |
+| Latest work | **PR07 slice 6 (2026-05-06):** improved timer-events instructor UX with periodic refresh while timer is running and readable event timestamps in the panel, so pacing history stays current without manual button interactions. |
 
 **Resume in this order:**
 
