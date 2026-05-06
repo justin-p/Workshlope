@@ -43,6 +43,7 @@ const formSchema = z
       .string()
       .min(1, { message: "Please confirm your password" }),
     is_superuser: z.boolean(),
+    is_instructor: z.boolean(),
     is_active: z.boolean(),
   })
   .refine((data) => data.password === data.confirm_password, {
@@ -67,6 +68,7 @@ const AddUser = () => {
       password: "",
       confirm_password: "",
       is_superuser: false,
+      is_instructor: false,
       is_active: false,
     },
   })
@@ -86,7 +88,8 @@ const AddUser = () => {
   })
 
   const onSubmit = (data: FormData) => {
-    mutation.mutate(data)
+    const { confirm_password: _, ...body } = data
+    mutation.mutate(body)
   }
 
   return (
@@ -197,6 +200,24 @@ const AddUser = () => {
                       />
                     </FormControl>
                     <FormLabel className="font-normal">Is superuser?</FormLabel>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="is_instructor"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormLabel className="font-normal">
+                      Workshop instructor?
+                    </FormLabel>
                   </FormItem>
                 )}
               />

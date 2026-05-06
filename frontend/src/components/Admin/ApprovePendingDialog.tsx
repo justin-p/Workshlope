@@ -58,7 +58,7 @@ export function ApprovePendingDialog({
 
   const { data: usersResponse, isLoading: usersLoading } = useQuery({
     queryKey: ["users"],
-    queryFn: () => UsersService.readUsers({ skip: 0, limit: 100 }),
+    queryFn: () => UsersService.readUsers({ skip: 0, limit: 500 }),
     enabled: open && mode === "link",
   })
 
