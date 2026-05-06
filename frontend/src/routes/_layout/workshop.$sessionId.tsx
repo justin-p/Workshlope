@@ -451,6 +451,7 @@ function WorkshopSessionPage() {
   const requiredAggregateRows =
     aggregatesQuery.data?.data.filter((r) => r.prerequisite.required_flag) ?? []
   const timerStatus = timerQuery.data?.status ?? "inactive"
+  const timerMode = timerQuery.data?.mode
   const timerElapsedSeconds = timerQuery.data?.elapsed_seconds
   const timerRemainingSeconds = timerQuery.data?.remaining_seconds
   const timerEvents = timerEventsQuery.data?.data ?? []
@@ -770,6 +771,7 @@ function WorkshopSessionPage() {
             data-testid="workshop-timer-status"
           >
             Timer: {timerStatus}
+            {timerMode ? ` (${timerMode})` : ""}
             {typeof timerRemainingSeconds === "number"
               ? ` (${formatTimerRemainingSeconds(timerRemainingSeconds)} left)`
               : typeof timerElapsedSeconds === "number"
