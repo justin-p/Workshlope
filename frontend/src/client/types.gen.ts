@@ -177,6 +177,37 @@ export type ValidationError = {
     };
 };
 
+export type WorkshopBadgeDefinitionCreate = {
+    slug: string;
+    title: string;
+    description?: (string | null);
+    points?: number;
+};
+
+export type WorkshopBadgeDefinitionPublic = {
+    id: string;
+    slug: string;
+    title: string;
+    description?: (string | null);
+    points: number;
+};
+
+export type WorkshopBadgeDefinitionsPublic = {
+    data: Array<WorkshopBadgeDefinitionPublic>;
+    count: number;
+};
+
+export type WorkshopBadgeGrantRequest = {
+    user_id: string;
+    badge_id: string;
+};
+
+export type WorkshopBadgeRevokeRequest = {
+    user_id: string;
+    badge_id: string;
+    reason?: (string | null);
+};
+
 /**
  * Lesson part metadata for workshop session screens (body omitted).
  */
@@ -342,6 +373,17 @@ export type WorkshopSessionCorePublic = {
 export type WorkshopSessionInstructorSeatRoleUpdate = {
     user_id: string;
     role: string;
+};
+
+export type WorkshopSessionLeaderboardPublic = {
+    data: Array<WorkshopSessionLeaderboardRowPublic>;
+    count: number;
+};
+
+export type WorkshopSessionLeaderboardRowPublic = {
+    user_id: string;
+    total_points: number;
+    badge_count: number;
 };
 
 /**
@@ -627,6 +669,34 @@ export type UtilsTestEmailData = {
 export type UtilsTestEmailResponse = (Message);
 
 export type UtilsHealthCheckResponse = (boolean);
+
+export type WorkshopBadgesReadWorkshopBadgesResponse = (WorkshopBadgeDefinitionsPublic);
+
+export type WorkshopBadgesCreateWorkshopBadgeData = {
+    requestBody: WorkshopBadgeDefinitionCreate;
+};
+
+export type WorkshopBadgesCreateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
+
+export type WorkshopBadgesGrantWorkshopBadgeData = {
+    requestBody: WorkshopBadgeGrantRequest;
+    sessionId: string;
+};
+
+export type WorkshopBadgesGrantWorkshopBadgeResponse = (Message);
+
+export type WorkshopBadgesRevokeWorkshopBadgeData = {
+    requestBody: WorkshopBadgeRevokeRequest;
+    sessionId: string;
+};
+
+export type WorkshopBadgesRevokeWorkshopBadgeResponse = (Message);
+
+export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData = {
+    sessionId: string;
+};
+
+export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse = (WorkshopSessionLeaderboardPublic);
 
 export type WorkshopLessonsCreateLessonPrerequisiteData = {
     lessonId: string;
