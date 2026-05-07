@@ -6,29 +6,46 @@
 
 Use this section after a pause or repo switch—do not rely on chat memory alone.
 
-**Maintenance rule:** When behavior or backlog changes materially, refresh **[Remaining work](#remaining-work-authoritative)**, **`Last synced`**, and—for any **future** stacked delivery—reuse **[PR slicing](#pr-slicing-and-branch-strategy-locked)** + **`gh pr checks --watch`** (see [babysitting policy](#pr-babysitting-policy-locked)).
+**Maintenance rule:** When behavior or backlog changes materially, refresh **[Remaining work](#remaining-work-authoritative)**, **[Deferred polish backlog](#deferred-polish-backlog-skip-log)**, and **`Last synced`**; for any **future** stacked delivery, reuse **[PR slicing](#pr-slicing-and-branch-strategy-locked)** + **`gh pr checks --watch`** (see [babysitting policy](#pr-babysitting-policy-locked)).
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-07** — Lesson follow-up stack is now fully landed on **`main`**: [#30](https://github.com/justin-p/testing/pull/30) merged directly and remaining lesson branches were merged into `main` in order (L2-L5), followed by plan/rules cleanup (`PLAN.md` rename + AGENTS policy consolidation). |
+| **Last synced** | **2026-05-07** — Lesson follow-up stack is now fully landed on **`main`**: [#30](https://github.com/justin-p/testing/pull/30) merged directly and remaining lesson branches were merged into `main` in order (L2-L5), followed by plan/rules cleanup (`PLAN.md` rename + AGENTS policy consolidation). In-flight local now extends instructor lesson-repo UX with manifest-audit metadata surfaced in repo list API/UI, a per-repo lesson/parts preview endpoint consumed by the sync card, installation-level direct settings links, backend installation-scoped repo list filtering, an app install CTA URL from installation metadata, health-focused repo filtering, server-backed synced-repo text search (`q`) wired to a dashboard filter input, functionality-first workshop-run readiness gates, workshop session detail lesson-source metadata for degraded repo health and missing lesson-part content availability, and automatic websocket reconnect attempts when `part_generation_stale` is received.
 | **Integration tip** | **`main`** |
-| **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** - core Lesson GitHub sync is shipped on `main`; remaining work is optional polish/ops follow-through (timer parity, realtime scale-out, dashboard/playwright breadth). Posture **`security-hardening-new-features`**. |
+| **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
 ### Remaining work (authoritative)
 
-**1. Lesson source pipeline** (core scope shipped on `main`; follow-ups are polish/ops only)
+**Priority rule:** until the app can run a real workshop end-to-end, do **functionality before polish/test expansion**. If you encounter non-blocking polish, record it in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and continue with blocking functionality.
+
+**1. Workshop-runnable functionality (blocking first)**
+
+- Validate the complete instructor-led flow in-product: create/prepare session, roster setup, trainee entry, live part progression, prerequisite gating behavior, completion/status updates, and session closeout.
+- Close blocking delivery gaps from **[Workshop HTTP vs realtime - delivery gap (audit)](#workshop-http-vs-realtime---delivery-gap-audit)** before adding new polish slices.
+- Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
+- Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
+
+**2. Lesson source pipeline hardening** (core scope shipped on `main`; follow-ups are polish/ops only)
 
 - **Progress (shipped on `main`):** [`lesson_manifest.py`](backend/app/services/lesson_manifest.py) + [`lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py) (**L1**). DB **`github_app_installation`** + FK on **`LessonRepo`** (**L2**). [`github_app_tokens.py`](backend/app/services/github_app_tokens.py) (**L3**). [`github_webhooks.py`](backend/app/api/routes/github_webhooks.py) — **`POST /api/v1/github/webhooks`** (**L4**). [`lesson_github_fetch.py`](backend/app/services/lesson_github_fetch.py) + [`workshop_lesson_repos.py`](backend/app/api/routes/workshop_lesson_repos.py) — **`POST /api/v1/workshop/lesson-repos/sync-from-github`** (**L5**). See **[Lesson source follow-up stack](#lesson-source-follow-up-stack)** for historical chain.
 - **GitHub App (still hardening vs [Locked decisions](#locked-decisions)):** **Shipped:** `POST /api/v1/github/webhooks` verifies `X-GitHub-Delivery` via **`github_webhook_delivery`** (idempotent replay) and applies **per-IP sliding-window throttle** (`GITHUB_WEBHOOK_MAX_REQUESTS_PER_MINUTE_PER_IP`, `GITHUB_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS`). **Shipped:** instructor-bound repo entitlement for `repository_selection="selected"` via **`github_installation_repository`** webhook-fed rows (`installation_repositories` add/remove) and optional **HTTP Date/skew** replay window (`GITHUB_WEBHOOK_MAX_CLOCK_SKEW_SECONDS`).
-- **Sync + models (remaining product work):** **Sync-time rewrite** of relative markdown / simple HTML asset URLs → **`raw.githubusercontent.com`** (+ strip ``<script>`` / ``<iframe>`` outside fenced blocks) via [`lesson_markdown_pipeline.py`](backend/app/services/lesson_markdown_pipeline.py); **`lesson_markdown_to_safe_html`** (CommonMark `html=false` + **nh3**) is now wired in session detail API and workshop SPA current-part rendering. **`LessonManifest`** SHA row if you want audit; instructor **Install/configure** UI.
-- **Instructor UX**: Repo list, Install/configure CTA (instructor-only — **[Product constraints](#product-constraints)**), Sync, health, parts preview — aligns with **[UI / UX](#ui--ux-specification)** IA; backend routes must catch up.
+- **Sync + models (remaining product work):** **Sync-time rewrite** of relative markdown / simple HTML asset URLs → **`raw.githubusercontent.com`** (+ strip ``<script>`` / ``<iframe>`` outside fenced blocks) via [`lesson_markdown_pipeline.py`](backend/app/services/lesson_markdown_pipeline.py); **`lesson_markdown_to_safe_html`** (CommonMark `html=false` + **nh3**) is now wired in session detail API and workshop SPA current-part rendering. **Shipped in-flight local:** `LessonManifest` SHA rows persisted + surfaced in lesson-repo list metadata (`manifest_count`, `last_manifest_synced_at`) for instructor sync health visibility.
+- **Instructor UX**: Repo list, Install/configure CTA (instructor-only — **[Product constraints](#product-constraints)**), Sync, health, parts preview — aligns with **[UI / UX](#ui--ux-specification)** IA. **Shipped in-flight local:** `GET /api/v1/workshop/lesson-repos/{lesson_repo_id}/preview` now returns lesson+part preview payloads and dashboard sync card can toggle per-repo parts previews.
 
-**2. Optional / polish (product + engineering)**
+**3. Optional / polish (product + engineering)**
 
 - Expose pacing/timer parity with **[REST sketch](#rest-sketch-under-apiv1)** timer routes if you want symmetry beyond current HTTP surface.
 - **[Realtime](#realtime)** multi-instance (**Redis**/shared broker) remains explicitly deferred ([Locked decisions](#locked-decisions) single-process path).
 - Richer dashboard cards / trainee–instructor **Playwright** breadth ([Testing](#testing)); deeper prerequisite roster analytics ([Workshop HTTP vs realtime](#workshop-http-vs-realtime--delivery-gap-audit)).
 - **Polish stop condition (loop guard):** once a slice has green targeted + full Playwright and at least one analytics/dashboard enhancement landed, pause further optional polish and switch to PR merge-readiness unless a concrete bug/regression is reported.
+
+### Deferred polish backlog (skip log)
+
+Record non-blocking polish items here when discovered during functional work, then continue with functionality-first delivery.
+
+| Date | Area | Polish item deferred | Why skipped now |
+| ---- | ---- | -------------------- | --------------- |
+| 2026-05-07 | Dashboard / workshop sync card | Expand broader UI/visual polish and additional non-blocking assertions around sync-card controls beyond the current behavior checks. | Functionality-first focus until workshop run flow is fully verified end-to-end. |
 
 ### Pause / resume checkpoint (handoff)
 
@@ -40,7 +57,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | **`main`** |
 | PR | Lesson follow-up stack [#30](https://github.com/justin-p/testing/pull/30)→[#34](https://github.com/justin-p/testing/pull/34) is merged; no open stack PR required for current state. |
-| Latest work | **Shipped on `main`:** session core, realtime/privacy, dashboards/workshops, prerequisites, pacing, badges + hardening, plus complete Lesson GitHub sync stack (manifests, installation persistence, app token flow, webhooks, sync-from-github API/UI). **In-flight local (unmerged):** expanded Playwright dashboard/workshops role-scope coverage, stabilized flaky workshop aggregate assertions, fixed stale-token `/login` redirect looping by validating `/me` before login-route redirect, added regression coverage that stale tokens are cleared, added instructor prerequisite-roster analytics assertions in workshop session E2E, added workshops-hub blocked prerequisite analytics summary card (sessions impacted + most-blocked session), added `lesson_manifest_sync` SHA audit rows persisted during repo sync (model + migration + service tests), and tightened delivery rules to require feature-branch + PR workflow by default (no implicit direct-to-`main`). [Remaining work](#remaining-work-authoritative) now tracks optional polish. |
+| Latest work | **Shipped on `main`:** session core, realtime/privacy, dashboards/workshops, prerequisites, pacing, badges + hardening, plus complete Lesson GitHub sync stack (manifests, installation persistence, app token flow, webhooks, sync-from-github API/UI). **In-flight local (unmerged):** expanded Playwright dashboard/workshops role-scope coverage, stabilized flaky workshop aggregate assertions, fixed stale-token `/login` redirect looping by validating `/me` before login-route redirect, added regression coverage that stale tokens are cleared, added instructor prerequisite-roster analytics assertions in workshop session E2E, added workshops-hub blocked prerequisite analytics summary card (sessions impacted + most-blocked session), added `lesson_manifest_sync` SHA audit rows persisted during repo sync (model + migration + service tests), surfaced repo-level manifest audit metadata in lesson-repo list API/UI (`manifest_count`, `last_manifest_synced_at`), added lesson-repo parts preview backend route (`GET /workshop/lesson-repos/{lesson_repo_id}/preview`) plus sync-card preview toggle UI, added installation settings deep links from API to sync-card installation options, added installation-scoped repo list filtering (`installationId`) in backend route + sync-card query behavior, added install-CTA app URL (`install_url`) in installations response and wired sync card CTA to prefer it, expanded health filtering from boolean unhealthy-only to explicit API+UI mode (`health=all\|healthy\|unhealthy`), added backend route coverage for installation + health filter behavior, added server-backed repo text filtering (`q`) to lesson-repo list API with dashboard synced-repo search input + backend route tests, added Playwright coverage for install-CTA preference behavior in dashboard routing spec, regenerated frontend OpenAPI client types after route schema expansion, and tightened delivery rules to require feature-branch + PR workflow by default (no implicit direct-to-`main`). [Remaining work](#remaining-work-authoritative) now tracks optional polish. |
 
 **Resume in this order:**
 
@@ -90,18 +107,31 @@ Merged into [`main`](https://github.com/justin-p/testing/tree/main) via **[#18](
 
 | Surface | Implemented today | Still 🔲 vs **REST sketch** (below, *REST sketch under /api/v1/*) |
 | ------- | ----------------- | ---------------------------------------------------------------- |
-| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove; **`PATCH …/sessions/{id}/participants/{user_id}`** instructor overrides (`live_status`/`joined_at`/`finished_at`); **`PATCH …/sessions/{id}`** — optional **`status`** (controlled transitions + realtime fanout on change), **`instructor_seat`** role updates, **`primary_instructor_user_id`** handoff (lead/co normalization), **`remove_instructor_user_id`** soft-remove with **409** when that would orphan a non-ended session; empty **422 `patch_requires_update`**; unknown seat **404**. **Lesson prerequisites** (`/workshop/lessons/{id}/prerequisites…`) ✅ for MVP slices. | Part-timer HTTP sketch (see below) still 🔲 |
+| **HTTP** | `POST …/sessions/{id}/enter`, `/start`, `/end`, `/ws-ticket`; **`GET …/sessions/`** list (`WorkshopSessionsPublic`); **`GET …/sessions/{id}`** scoped detail (**`WorkshopSessionPublicParticipant`** \| **`WorkshopSessionPublicInstructor`**); **`POST …/sessions/{id}/members`** role upsert; **`DELETE …/sessions/{id}/participants/{user_id}`** soft remove; **`PATCH …/sessions/{id}/participants/{user_id}`** instructor overrides (`live_status`/`joined_at`/`finished_at`); **`PATCH …/sessions/{id}`** — optional **`status`** (controlled transitions + realtime fanout on change), **`instructor_seat`** role updates, **`primary_instructor_user_id`** handoff (lead/co normalization), **`remove_instructor_user_id`** soft-remove with **409** when that would orphan a non-ended session; empty **422 `patch_requires_update`**; unknown seat **404**. **Lesson prerequisites** (`/workshop/lessons/{id}/prerequisites…`) ✅ for MVP slices. **Timer parity shipped:** `POST …/timer/start|pause|resume|stop`, `GET …/timer`, `GET …/timer/events`. | No blocking HTTP gaps in current MVP flow; keep multi-instance realtime explicitly deferred. |
 | **WebSocket** | `/{id}/ws` — `part.advance`, `session.pause` / `session.resume`, `participant.live_status`, … | Redis / multi-process hub (explicitly deferred) |
 
 **Shipped on `main` (summary):** list/detail + roster + session `PATCH`; prerequisites + pre-work UI (**banner, aggregates, mark complete**); pacing timer; badges + revoke/audit hardening. **Optional polish** — [Remaining work](#remaining-work-authoritative) §2.
 
 On every new HTTP route: regenerate **OpenAPI** + **`frontend/src/client`**.
 
+### Workshop run readiness checklist (functionality gate)
+
+Use this checklist as the source of truth before starting new polish work.
+
+| Capability | Owner surface | Status | Blocking notes |
+| ---------- | ------------- | ------ | -------------- |
+| Instructor can prepare a session roster and start live delivery | `workshop_sessions` HTTP + workshop route UI | ✅ | Keep validating role/seat transitions when touching session patch logic. |
+| Trainee can enter active session and receive realtime progression | `enter` / `ws-ticket` / `/{id}/ws` + workshop route | ✅ | Any regression in auth token handling or ws ticket issuance is P0; client now retries websocket connection when stale part generation is reported. |
+| Instructor can pause/resume/end room and advance parts | WebSocket actions + session status patch | ✅ | Preserve state transition guards and broadcasts. |
+| Instructor can run pacing timer with audit trail | Timer HTTP routes + timer events UI | ✅ | Countdown validation and status transition guards are covered server-side. |
+| Prerequisite gating can block/unblock trainee progression | lesson prerequisite routes + workshop UI banners/analytics | ✅ | Treat inconsistent gate state between HTTP and WS as blocking. |
+| Lesson source sync can keep workshop content available | lesson repo sync API/UI + manifest pipeline | 🟨 | Session detail now surfaces repo health/last sync plus `lesson_content_available` + `lesson_content_issue`; workshop UI shows degraded-source fallback and blocking no-parts banner. Continue treating missing lessons/parts after sync as blocking. |
+
 ### Next actions (suggested order)
 
 1. **`git checkout main && git pull`.**
-2. **Ship [Remaining work](#remaining-work-authoritative) §1** — GitHub App + manifest-driven lesson sync (largest MVP gap vs spec).
-3. **Polish** per §2; **`/python-tdd-with-uv`**, OpenAPI + `frontend/src/client` regen, Playwright for each behavioral change.
+2. **Ship [Remaining work](#remaining-work-authoritative) §1 first** - prioritize workshop-runnable blocking functionality over polish.
+3. **Then ship §2 and §3** as needed; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** when encountered.
 4. **Large feature?** Optionally reuse stacked PR model in [PR slicing](#pr-slicing-and-branch-strategy-locked) and extend the archived [stack table](#github-pr-stack-archived-collapsed-chain--historical-reference).
 5. **Local E2E:** [playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md) — standard workflow includes **`scripts/e2e-backend-reset.sh`** (and host runs typically pick it up again via **`globalSetup`** unless you opt out — see skill). **CI** is the merge gate for green.
 
@@ -109,7 +139,7 @@ On every new HTTP route: regenerate **OpenAPI** + **`frontend/src/client`**.
 
 ### Backlog tracking
 
-**Shipped vs backlog** lives in **[Remaining work](#remaining-work-authoritative)** and the tracker table above; keep both in sync when scope changes.
+**Shipped vs backlog** lives in **[Remaining work](#remaining-work-authoritative)**, **[Deferred polish backlog](#deferred-polish-backlog-skip-log)**, and the tracker table above; keep all three in sync when scope changes.
 
 ## Template code anchors
 
