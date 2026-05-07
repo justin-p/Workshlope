@@ -91,15 +91,15 @@ class Settings(BaseSettings):
     GITHUB_BRIDGE_ISSUER: str = "authjs"
     USER_REGISTRATION_ENABLED: bool = True
 
-    # GitHub App (lesson repo sync — separate from OAuth login app)
+    # GitHub App (lesson repo sync - separate from OAuth login app)
     GITHUB_APP_ID: str | None = None
     GITHUB_APP_SLUG: str | None = None
     GITHUB_APP_INSTALL_URL: str | None = None
     GITHUB_APP_PRIVATE_KEY: str | None = None
-    GITHUB_WEBHOOK_SECRET: str | None = None
-    GITHUB_WEBHOOK_MAX_REQUESTS_PER_MINUTE_PER_IP: int = 240
-    GITHUB_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS: int = 60
-    GITHUB_WEBHOOK_MAX_CLOCK_SKEW_SECONDS: int = 300
+    GITHUB_INSTALLATION_POLL_ENABLED: bool = False
+    GITHUB_INSTALLATION_POLL_INTERVAL_SECONDS: int = 300
+    GITHUB_INSTALLATION_POLL_REFRESH_REPOSITORIES: bool = True
+    GITHUB_INSTALLATION_POLL_SHUTDOWN_TIMEOUT_SECONDS: int = 10
 
     @computed_field  # type: ignore[prop-decorator]
     @property

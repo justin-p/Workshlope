@@ -148,6 +148,40 @@ export const GitHubBridgeRequestSchema = {
     title: 'GitHubBridgeRequest'
 } as const;
 
+export const GithubInstallationAccessibleRepositoriesPublicSchema = {
+    properties: {
+        installation_id: {
+            type: 'integer',
+            title: 'Installation Id'
+        },
+        repository_selection: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Repository Selection'
+        },
+        full_names: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Full Names'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['installation_id', 'full_names', 'count'],
+    title: 'GithubInstallationAccessibleRepositoriesPublic'
+} as const;
+
 export const GithubInstallationListItemPublicSchema = {
     properties: {
         installation_id: {
@@ -237,6 +271,81 @@ export const GithubInstallationListPublicSchema = {
     type: 'object',
     required: ['data', 'count'],
     title: 'GithubInstallationListPublic'
+} as const;
+
+export const GithubInstallationRefreshBodySchema = {
+    properties: {
+        include_repositories: {
+            type: 'boolean',
+            title: 'Include Repositories',
+            default: false
+        }
+    },
+    type: 'object',
+    title: 'GithubInstallationRefreshBody'
+} as const;
+
+export const GithubInstallationRefreshPublicSchema = {
+    properties: {
+        installations_refreshed: {
+            type: 'integer',
+            title: 'Installations Refreshed'
+        },
+        installations_created: {
+            type: 'integer',
+            title: 'Installations Created'
+        },
+        installations_updated: {
+            type: 'integer',
+            title: 'Installations Updated'
+        },
+        repositories_refreshed: {
+            type: 'integer',
+            title: 'Repositories Refreshed'
+        }
+    },
+    type: 'object',
+    required: ['installations_refreshed', 'installations_created', 'installations_updated', 'repositories_refreshed'],
+    title: 'GithubInstallationRefreshPublic'
+} as const;
+
+export const GithubInstallationRepositoriesRefreshPublicSchema = {
+    properties: {
+        installation_id: {
+            type: 'integer',
+            title: 'Installation Id'
+        },
+        repository_selection: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Repository Selection'
+        },
+        repositories_total: {
+            type: 'integer',
+            title: 'Repositories Total'
+        },
+        added: {
+            type: 'integer',
+            title: 'Added'
+        },
+        removed: {
+            type: 'integer',
+            title: 'Removed'
+        },
+        unchanged: {
+            type: 'integer',
+            title: 'Unchanged'
+        }
+    },
+    type: 'object',
+    required: ['installation_id', 'repositories_total', 'added', 'removed', 'unchanged'],
+    title: 'GithubInstallationRepositoriesRefreshPublic'
 } as const;
 
 export const HTTPValidationErrorSchema = {

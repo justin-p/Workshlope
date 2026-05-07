@@ -39,6 +39,13 @@ export type GitHubBridgeRequest = {
     bridge_token: string;
 };
 
+export type GithubInstallationAccessibleRepositoriesPublic = {
+    installation_id: number;
+    repository_selection?: (string | null);
+    full_names: Array<(string)>;
+    count: number;
+};
+
 export type GithubInstallationListItemPublic = {
     installation_id: number;
     account_login: string;
@@ -55,6 +62,26 @@ export type GithubInstallationListPublic = {
     data: Array<GithubInstallationListItemPublic>;
     count: number;
     install_url?: (string | null);
+};
+
+export type GithubInstallationRefreshBody = {
+    include_repositories?: boolean;
+};
+
+export type GithubInstallationRefreshPublic = {
+    installations_refreshed: number;
+    installations_created: number;
+    installations_updated: number;
+    repositories_refreshed: number;
+};
+
+export type GithubInstallationRepositoriesRefreshPublic = {
+    installation_id: number;
+    repository_selection?: (string | null);
+    repositories_total: number;
+    added: number;
+    removed: number;
+    unchanged: number;
 };
 
 export type HTTPValidationError = {
@@ -574,10 +601,6 @@ export type WorkshopWsTicket = {
     expires_at: string;
 };
 
-export type GithubIntegrationGithubWebhookResponse = ({
-    [key: string]: unknown;
-});
-
 export type ItemsReadItemsData = {
     limit?: number;
     skip?: number;
@@ -795,6 +818,24 @@ export type WorkshopLessonReposReadGithubInstallationsData = {
 };
 
 export type WorkshopLessonReposReadGithubInstallationsResponse = (GithubInstallationListPublic);
+
+export type WorkshopLessonReposRefreshGithubInstallationsData = {
+    requestBody: GithubInstallationRefreshBody;
+};
+
+export type WorkshopLessonReposRefreshGithubInstallationsResponse = (GithubInstallationRefreshPublic);
+
+export type WorkshopLessonReposRefreshGithubInstallationRepositoriesData = {
+    installationId: number;
+};
+
+export type WorkshopLessonReposRefreshGithubInstallationRepositoriesResponse = (GithubInstallationRepositoriesRefreshPublic);
+
+export type WorkshopLessonReposReadGithubInstallationAccessibleRepositoriesData = {
+    installationId: number;
+};
+
+export type WorkshopLessonReposReadGithubInstallationAccessibleRepositoriesResponse = (GithubInstallationAccessibleRepositoriesPublic);
 
 export type WorkshopLessonReposReadLessonRepoPreviewData = {
     lessonRepoId: string;
