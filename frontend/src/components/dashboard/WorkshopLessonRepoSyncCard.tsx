@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { ApiError, WorkshopLessonReposService } from "@/client"
 import { Button } from "@/components/ui/button"
@@ -101,6 +101,24 @@ export function WorkshopLessonRepoSyncCard() {
     installationIdValid &&
     Number.isFinite(installationIdInt) &&
     !syncMutation.isPending
+
+  const selectedInstallation = useMemo(() => {
+    if (!Number.isFinite(installationIdInt)) return null
+    return (
+      installationsQuery.data?.data.find(
+        (inst) => inst.installation_id === installationIdInt,
+      ) ?? null
+    )
+  }, [installationIdInt, installationsQuery.data?.data])
+
+  const visibleSyncedRepos = useMemo(() => {
+    const rows = reposQuery.data?.data ?? []
+    if (!selectedInstallation) return rows
+    return rows.filter(
+      (repo) =>
+        repo.github_installation_id === selectedInstallation.installation_id,
+    )
+  }, [reposQuery.data?.data, selectedInstallation])
 
   const onSubmit = () => {
     if (!canSubmit) return
@@ -217,11 +235,53 @@ export function WorkshopLessonRepoSyncCard() {
                     setErrorDetail(null)
                   }}
                 >
-                  {inst.account_login}#{inst.installation_id}
-                  {inst.suspended ? " (suspended)" : ""}
+                  {inst.account_login}#{inst.installation_id} ·{" "}
+                  {inst.repository_selection ?? "unknown"}
+                  {inst.suspended ? " · suspended" : ""}
                 </Button>
               ))}
             </div>
+          </div>
+        ) : null}
+        {selectedInstallation ? (
+          <div
+            className="space-y-1"
+            data-testid="workshop-selected-installation-meta"
+          >
+            <p className="text-xs text-muted-foreground">
+              Selected installation:{" "}
+              <span className="font-medium text-foreground">
+                {selectedInstallation.account_login}#
+                {selectedInstallation.installation_id}
+              </span>{" "}
+              ({selectedInstallation.repository_selection ?? "unknown"} access)
+            </p>
+            {selectedInstallation.repository_selection === "selected" ? (
+              selectedInstallation.entitled_repositories.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedInstallation.entitled_repositories.map((repo) => (
+                    <Button
+                      key={repo}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        setFullName(repo)
+                        setErrorDetail(null)
+                      }}
+                    >
+                      {repo}
+                    </Button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  This installation is set to selected repositories but
+                  currently has no entitled repos in app state.
+                </p>
+              )
+            ) : null}
           </div>
         ) : null}
         {recentRepos.length > 0 ? (
@@ -287,9 +347,13 @@ export function WorkshopLessonRepoSyncCard() {
             <p className="text-xs text-muted-foreground">
               No lesson repositories synced yet.
             </p>
+          ) : visibleSyncedRepos.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No synced repositories for the selected installation.
+            </p>
           ) : (
             <ul className="divide-y rounded-md border text-xs">
-              {reposQuery.data?.data.map((repo) => (
+              {visibleSyncedRepos.map((repo) => (
                 <li
                   key={repo.lesson_repo_id}
                   className="px-2 py-2 flex items-center justify-between gap-3"
