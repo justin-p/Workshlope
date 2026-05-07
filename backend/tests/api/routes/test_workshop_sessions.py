@@ -201,6 +201,7 @@ def test_http_start_scheduled_then_ws_ticket_allowed(
     session_row.status = "scheduled"
     db.add(session_row)
     db.commit()
+    _add_two_parts_to_session_lesson(db, session_row)
 
     instructor_email = f"instr-start-{uuid.uuid4()}@example.com"
     inst_headers = authentication_token_from_email(
@@ -244,6 +245,36 @@ def test_http_start_scheduled_then_ws_ticket_allowed(
         headers=p_headers,
     )
     assert ticket.status_code == 200
+
+
+def test_http_start_rejected_when_lesson_content_unavailable(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_scheduled_session(db)
+
+    instructor_email = f"instr-start-blocked-{uuid.uuid4()}@example.com"
+    inst_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    inst_user = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert inst_user is not None
+    inst_user.is_instructor = True
+    db.add(inst_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=inst_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    start = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/start",
+        headers=inst_headers,
+    )
+    assert start.status_code == 409
+    assert start.json()["detail"] == "lesson_content_unavailable:no_parts_synced"
 
 
 def test_http_second_start_rejected(client: TestClient, db: Session) -> None:
