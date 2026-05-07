@@ -6,7 +6,10 @@ alwaysApply: true
 # Branch and PR workflow
 
 - For implementation work, never stay on `main`; create/use a feature branch first.
-- Before committing, verify current branch is not `main` or `master`.
+- One branch must map to one feature slice only. Do not mix unrelated features in one branch.
+- Use branch format `<type>/<scope>/<slice-slug>` (example: `feat/workshop/repo-health-filter`).
+- Reject ambiguous multi-feature branch names (contains `+`, `,`, `_and_`, or `-and-`).
+- Before committing, verify current branch is not a protected default branch (`main`/`master`).
 - After completing a slice, push branch and open/update a PR.
 - If a PR supersedes another open PR, cross-link both and close the superseded one.
 - Keep `PLAN.md` synchronized in the same pass whenever behavior/backlog changes materially.

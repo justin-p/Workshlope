@@ -4,7 +4,7 @@
     "beforeShellExecution": [
       {
         "command": ".cursor/hooks/git-branch-pr-guard.sh",
-        "matcher": "^(git\\s+(commit|push)\\b|gh\\s+pr\\s+create\\b)",
+        "matcher": "^(git\\s+(commit|push)\\b|gh\\s+pr\\s+(create|edit)\\b)",
         "failClosed": true
       },
       {

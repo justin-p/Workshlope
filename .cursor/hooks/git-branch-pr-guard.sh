@@ -38,6 +38,16 @@ if [[ "${current_branch}" == "main" || "${current_branch}" == "master" ]]; then
   is_protected_branch=1
 fi
 
+is_invalid_scope_branch=0
+if [[ "${current_branch}" != "main" && "${current_branch}" != "master" ]]; then
+  if [[ ! "${current_branch}" =~ ^(feat|fix|chore|docs|test|refactor)/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$ ]]; then
+    is_invalid_scope_branch=1
+  fi
+  if [[ "${current_branch}" == *"+"* || "${current_branch}" == *","* || "${current_branch}" == *"_and_"* || "${current_branch}" == *"-and-"* ]]; then
+    is_invalid_scope_branch=1
+  fi
+fi
+
 if [[ "${is_protected_branch}" -eq 1 ]]; then
   case "${event_command}" in
     git\ commit*|git\ push*|gh\ pr\ create*)
@@ -50,5 +60,16 @@ EOF
       ;;
   esac
 fi
+
+case "${event_command}" in
+  git\ commit*|git\ push*|gh\ pr\ create*)
+    if [[ "${is_invalid_scope_branch}" -eq 1 && "${ALLOW_MULTI_SCOPE_BRANCH:-0}" != "1" ]]; then
+      cat <<'EOF'
+{"permission":"ask","user_message":"Branch scope guard: use a single-slice branch name formatted as <type>/<scope>/<slice-slug> (e.g., feat/workshop/repo-health-filter). Ambiguous or multi-scope branch names are blocked to prevent combining unrelated features.","agent_message":"Blocked by branch scope guard: branch name is not a valid single-slice scope branch."}
+EOF
+      exit 0
+    fi
+    ;;
+esac
 
 echo '{"permission":"allow"}'

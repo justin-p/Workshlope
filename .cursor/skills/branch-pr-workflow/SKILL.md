@@ -18,22 +18,28 @@ git checkout main
 git pull
 ```
 
-2. Create/switch to a feature branch before edits:
+1. Create/switch to a feature branch before edits:
 
 ```bash
-git checkout -b <feature-branch>
+git checkout -b <type>/<scope>/<slice-slug>
 ```
 
-3. Implement, validate, and sync `PLAN.md` for meaningful changes.
+Rules:
 
-4. Commit on the feature branch only:
+- one branch = one feature slice only
+- no branch names with `+`, `,`, `_and_`, or `-and-`
+- if new unrelated work appears, open a new branch/PR instead of appending to current branch
+
+1. Implement, validate, and sync `PLAN.md` for meaningful changes.
+
+2. Commit on the feature branch only:
 
 ```bash
 git add <targeted-files>
 git commit -m "<message>"
 ```
 
-5. Push and open PR:
+1. Push and open PR:
 
 ```bash
 git push -u origin <feature-branch>
@@ -53,3 +59,4 @@ If a new PR supersedes an older open PR:
 - never commit on `main` unless user explicitly approves
 - never push to `main` unless user explicitly approves
 - never leave overlapping active PRs without supersession notes
+- never bundle unrelated features on one branch

@@ -60,8 +60,11 @@ This project is indexed by GitNexus as **testing** (4234 symbols, 6377 relations
 
 - Treat `PLAN.md` as the detailed delivery map; keep `AGENTS.md` as execution rules and safety checks.
 - Plan-sync is mandatory: whenever code/tests/docs state changes materially, update `PLAN.md` in the same working pass (at minimum `Last synced`, `Latest work`, and/or `Testing` bullets as applicable) before asking to continue or before commit.
+- One branch = one feature slice. Never combine unrelated features/workstreams on a single branch, even if they touch nearby files.
 - Branch + PR workflow is mandatory for delivery work unless the user explicitly approves direct-to-`main`:
   - before editing, ensure current branch is not `main`; if on `main`, create/switch to a feature branch first,
+  - branch names must encode one scope and one slice slug using `<type>/<scope>/<slice-slug>` (example: `feat/workshop/repo-health-filter`),
+  - branch names must not include multi-scope separators like `+`, `,`, `_and_`, or `-and-`,
   - open a PR for each completed slice and share the PR URL,
   - do not merge to `main` locally without explicit user approval.
 - Required skills by default for code changes:
@@ -85,10 +88,12 @@ Run this checklist for every non-trivial delivery slice:
 
 1. **Start from `main` and branch first**
    - `git checkout main && git pull`
-   - `git checkout -b <feature-branch>`
+   - `git checkout -b <type>/<scope>/<slice-slug>`
+   - confirm branch represents exactly one planned slice (no piggyback work)
 2. **Implement + validate + sync plan**
    - run targeted tests/lint for touched scope
    - update `PLAN.md` in the same pass for meaningful behavior/backlog changes
+   - if another feature request appears mid-slice, stop and open a separate branch/PR for it
 3. **Commit on feature branch only**
    - never commit on `main` unless user explicitly approves
 4. **Push and open PR**
