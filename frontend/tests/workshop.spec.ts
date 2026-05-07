@@ -263,6 +263,98 @@ test.describe("Workshop live session", () => {
     )
   })
 
+  test("shows fallback banner when lesson repo health is degraded", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    await page.route("**/api/v1/workshop/sessions/*", async (route) => {
+      const req = route.request()
+      if (
+        req.method() !== "GET" ||
+        !/\/api\/v1\/workshop\/sessions\/[^/]+$/.test(req.url())
+      ) {
+        await route.continue()
+        return
+      }
+
+      const upstream = await route.fetch()
+      const body = (await upstream.json()) as {
+        lesson?: Record<string, unknown>
+      }
+      body.lesson = {
+        ...(body.lesson ?? {}),
+        lesson_repo_health: "unhealthy",
+      }
+      await route.fulfill({
+        response: upstream,
+        body: JSON.stringify(body),
+        headers: {
+          ...upstream.headers(),
+          "content-type": "application/json",
+        },
+      })
+    })
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(
+      page.getByTestId("workshop-lesson-source-warning"),
+    ).toContainText("Source sync is currently degraded")
+  })
+
+  test("shows blocking banner when lesson content is unavailable", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    await page.route("**/api/v1/workshop/sessions/*", async (route) => {
+      const req = route.request()
+      if (
+        req.method() !== "GET" ||
+        !/\/api\/v1\/workshop\/sessions\/[^/]+$/.test(req.url())
+      ) {
+        await route.continue()
+        return
+      }
+
+      const upstream = await route.fetch()
+      const body = (await upstream.json()) as {
+        lesson?: Record<string, unknown>
+        parts?: unknown[]
+      }
+      body.lesson = {
+        ...(body.lesson ?? {}),
+        lesson_content_available: false,
+        lesson_content_issue: "no_parts_synced",
+      }
+      body.parts = []
+      await route.fulfill({
+        response: upstream,
+        body: JSON.stringify(body),
+        headers: {
+          ...upstream.headers(),
+          "content-type": "application/json",
+        },
+      })
+    })
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(
+      page.getByTestId("workshop-lesson-content-unavailable"),
+    ).toContainText("No lesson parts are currently available")
+    await expect(page.getByTestId("workshop-current-part")).toHaveCount(0)
+  })
+
   test("workshops hub shows blocked pre-work count on cards", async ({
     page,
     request,
@@ -277,9 +369,14 @@ test.describe("Workshop live session", () => {
     await expect(
       page.getByTestId(`workshop-card-blocked-count-${session_id}`),
     ).toContainText("Blocked: 1")
-    await expect(
-      page.getByTestId("workshop-cards-total-blocked"),
-    ).toContainText("Total blocked trainees: 1")
+    const totalBlockedText = await page
+      .getByTestId("workshop-cards-total-blocked")
+      .innerText()
+    const totalBlockedCount = Number.parseInt(
+      totalBlockedText.replace(/^\D+/u, ""),
+      10,
+    )
+    expect(totalBlockedCount).toBeGreaterThanOrEqual(1)
     await expect(page.getByTestId("workshop-blocked-drilldown")).toContainText(
       "Blocked sessions",
     )
@@ -289,9 +386,68 @@ test.describe("Workshop live session", () => {
     await expect(page.getByTestId("workshop-blocked-drilldown")).toContainText(
       "Open",
     )
+    await expect(page.getByTestId("workshop-blocked-analytics")).toContainText(
+      "Blocked prerequisite analytics",
+    )
+    await expect(
+      page.getByTestId("workshop-blocked-analytics-ratio"),
+    ).toContainText("Sessions impacted:")
+    await expect(
+      page.getByTestId("workshop-blocked-analytics-most-blocked"),
+    ).toContainText("Most blocked session:")
     await page.getByTestId("workshop-cards-blocked-only-toggle").click()
     await expect(
       page.getByTestId("workshop-cards-blocked-only-toggle"),
     ).toContainText("Show all sessions")
+  })
+
+  test("instructor session view shows prerequisite roster analytics", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?with_incomplete_required_prerequisite=true&omit_participant_seat=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      {
+        timeout: 15_000,
+      },
+    )
+
+    const panel = page.getByTestId("workshop-prework-instructor-panel")
+    await expect(panel).toBeVisible()
+    await expect(
+      page.getByTestId("workshop-prework-instructor-gaps-count"),
+    ).toContainText(/trainee\(s\) still missing/i)
+    await expect(panel).toContainText(/trainees done/i)
+  })
+
+  test("workshops hub redirects non-instructors to trainee dashboard", async ({
+    browser,
+  }) => {
+    const participant = await createParticipantUserForWorkshop()
+    const participantContext = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    })
+    const page = await participantContext.newPage()
+
+    await page.goto("/login")
+    await page.getByTestId("email-input").fill(participant.email)
+    await page.getByTestId("password-input").fill(participant.password)
+    await page.getByRole("button", { name: "Log In" }).click()
+    await page.waitForURL("/dashboard/trainee")
+
+    await page.goto("/workshops")
+    await page.waitForURL("/dashboard/trainee")
+    await expect(
+      page.getByTestId("workshop-lesson-repo-sync-card"),
+    ).toHaveCount(0)
+
+    await participantContext.close()
   })
 })

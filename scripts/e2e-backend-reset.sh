@@ -21,6 +21,10 @@ bind_failure_hint() {
 }
 
 docker compose --env-file .env.local down -v --remove-orphans
+
+# Build all Docker images before starting services.
+docker compose --env-file .env.local build
+
 # Mailcatcher is required for reset-password specs (recovery email).
 if ! USER_REGISTRATION_ENABLED=true \
   docker compose --env-file .env.local up -d mailcatcher frontend; then

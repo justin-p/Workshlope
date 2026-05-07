@@ -13,6 +13,7 @@ from app.models import (
     GithubAppInstallation,
     GithubInstallationRepository,
     Lesson,
+    LessonManifestSync,
     LessonPart,
     LessonRepo,
     User,
@@ -630,6 +631,14 @@ def test_read_lesson_repos_lists_counts_and_health(client: TestClient) -> None:
                 body_md="# two",
             )
         )
+        session.add(
+            LessonManifestSync(
+                repo_id=repo.id,
+                lesson_slug=lesson.slug,
+                manifest_repo_path="lessons/demo/lesson.manifest.yaml",
+                manifest_sha256="a" * 64,
+            )
+        )
         session.commit()
 
     headers = get_superuser_token_headers(client)
@@ -644,6 +653,8 @@ def test_read_lesson_repos_lists_counts_and_health(client: TestClient) -> None:
     assert row["health"] == "healthy"
     assert row["lesson_count"] >= 1
     assert row["part_count"] >= 2
+    assert row["manifest_count"] >= 1
+    assert row["last_manifest_synced_at"] is not None
 
 
 def test_read_github_installations_lists_entitlements(client: TestClient) -> None:
@@ -684,3 +695,306 @@ def test_read_github_installations_lists_entitlements(client: TestClient) -> Non
     assert row["repository_selection"] == "selected"
     assert row["entitled_repositories_count"] >= 1
     assert len(row["entitled_repositories"]) >= 1
+    assert row["installation_settings_url"].endswith(f"/{install_id}")
+    assert (
+        payload["install_url"] == "https://github.com/apps/lesson-bot/installations/new"
+    )
+
+
+def test_read_lesson_repo_preview_returns_lessons_and_parts(client: TestClient) -> None:
+    install_id = 911_000_000 + (uuid.uuid4().int % 1_000_000)
+    repo_id: uuid.UUID | None = None
+    repo_full_name: str | None = None
+    lesson_slug: str | None = None
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_id,
+                account_id=1,
+                account_login="trainer",
+                account_type="User",
+                target_type="User",
+                repository_selection="all",
+                app_slug="x",
+                suspended_at=None,
+            ),
+        )
+        repo = LessonRepo(
+            full_name=f"preview/repo-{uuid.uuid4()}",
+            default_branch="main",
+            health="healthy",
+            github_installation_id=install_id,
+        )
+        session.add(repo)
+        session.flush()
+        repo_id = repo.id
+        repo_full_name = repo.full_name
+        lesson = Lesson(
+            repo_id=repo.id,
+            slug=f"preview-lesson-{uuid.uuid4()}",
+            title="Preview Lesson",
+            lesson_sync_generation=1,
+        )
+        session.add(lesson)
+        session.flush()
+        lesson_slug = lesson.slug
+        session.add(
+            LessonPart(
+                lesson_id=lesson.id,
+                ordering=0,
+                slug=f"part-a-{uuid.uuid4()}",
+                title="Part A",
+                path="a.md",
+                body_md="# A",
+            )
+        )
+        session.add(
+            LessonPart(
+                lesson_id=lesson.id,
+                ordering=1,
+                slug=f"part-b-{uuid.uuid4()}",
+                title="Part B",
+                path="b.md",
+                body_md="# B",
+            )
+        )
+        session.commit()
+
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos/{repo_id}/preview",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["lesson_repo_id"] == str(repo_id)
+    assert payload["full_name"] == repo_full_name
+    assert len(payload["lessons"]) == 1
+    lesson_payload = payload["lessons"][0]
+    assert lesson_payload["lesson_slug"] == lesson_slug
+    assert len(lesson_payload["parts"]) == 2
+    assert lesson_payload["parts"][0]["ordering"] == 0
+    assert lesson_payload["parts"][0]["path"] == "a.md"
+
+
+def test_read_lesson_repo_preview_returns_404_unknown_repo(client: TestClient) -> None:
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos/{uuid.uuid4()}/preview",
+        headers=headers,
+    )
+    assert response.status_code == 404
+
+
+def test_read_lesson_repos_can_filter_by_installation_id(client: TestClient) -> None:
+    install_a = 912_000_000 + (uuid.uuid4().int % 1_000_000)
+    install_b = 913_000_000 + (uuid.uuid4().int % 1_000_000)
+    repo_a = f"filter-a/repo-{uuid.uuid4()}"
+    repo_b = f"filter-b/repo-{uuid.uuid4()}"
+
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_a,
+                account_id=11,
+                account_login="acct-a",
+                account_type="Organization",
+                target_type="Organization",
+                repository_selection="all",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            )
+        )
+        session.add(
+            GithubAppInstallation(
+                id=install_b,
+                account_id=12,
+                account_login="acct-b",
+                account_type="Organization",
+                target_type="Organization",
+                repository_selection="all",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            )
+        )
+        session.add(
+            LessonRepo(
+                full_name=repo_a,
+                default_branch="main",
+                health="healthy",
+                github_installation_id=install_a,
+            )
+        )
+        session.add(
+            LessonRepo(
+                full_name=repo_b,
+                default_branch="main",
+                health="healthy",
+                github_installation_id=install_b,
+            )
+        )
+        session.commit()
+
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos?installation_id={install_a}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    names = {row["full_name"] for row in payload["data"]}
+    assert repo_a in names
+    assert repo_b not in names
+
+
+def test_read_lesson_repos_can_filter_unhealthy_only(client: TestClient) -> None:
+    install_id = 914_000_000 + (uuid.uuid4().int % 1_000_000)
+    healthy_repo = f"health-healthy/repo-{uuid.uuid4()}"
+    unhealthy_repo = f"health-unhealthy/repo-{uuid.uuid4()}"
+
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_id,
+                account_id=13,
+                account_login="acct-health",
+                account_type="Organization",
+                target_type="Organization",
+                repository_selection="all",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            )
+        )
+        session.add(
+            LessonRepo(
+                full_name=healthy_repo,
+                default_branch="main",
+                health="healthy",
+                github_installation_id=install_id,
+            )
+        )
+        session.add(
+            LessonRepo(
+                full_name=unhealthy_repo,
+                default_branch="main",
+                health="degraded",
+                github_installation_id=install_id,
+            )
+        )
+        session.commit()
+
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos?health=unhealthy",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    names = {row["full_name"] for row in payload["data"]}
+    assert unhealthy_repo in names
+    assert healthy_repo not in names
+
+
+def test_read_lesson_repos_can_filter_healthy_only(client: TestClient) -> None:
+    install_id = 915_000_000 + (uuid.uuid4().int % 1_000_000)
+    healthy_repo = f"health-only-healthy/repo-{uuid.uuid4()}"
+    unhealthy_repo = f"health-only-unhealthy/repo-{uuid.uuid4()}"
+
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_id,
+                account_id=14,
+                account_login="acct-health-only",
+                account_type="Organization",
+                target_type="Organization",
+                repository_selection="all",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            )
+        )
+        session.add(
+            LessonRepo(
+                full_name=healthy_repo,
+                default_branch="main",
+                health="healthy",
+                github_installation_id=install_id,
+            )
+        )
+        session.add(
+            LessonRepo(
+                full_name=unhealthy_repo,
+                default_branch="main",
+                health="degraded",
+                github_installation_id=install_id,
+            )
+        )
+        session.commit()
+
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos?health=healthy",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    names = {row["full_name"] for row in payload["data"]}
+    assert healthy_repo in names
+    assert unhealthy_repo not in names
+
+
+def test_read_lesson_repos_rejects_invalid_health_filter(client: TestClient) -> None:
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos?health=broken",
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+
+def test_read_lesson_repos_can_filter_by_query(client: TestClient) -> None:
+    install_id = 916_000_000 + (uuid.uuid4().int % 1_000_000)
+    matching_repo = f"query-filter/workshop-{uuid.uuid4()}"
+    other_repo = f"query-filter/other-{uuid.uuid4()}"
+
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_id,
+                account_id=15,
+                account_login="acct-query",
+                account_type="Organization",
+                target_type="Organization",
+                repository_selection="all",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            )
+        )
+        session.add(
+            LessonRepo(
+                full_name=matching_repo,
+                default_branch="main",
+                health="healthy",
+                github_installation_id=install_id,
+            )
+        )
+        session.add(
+            LessonRepo(
+                full_name=other_repo,
+                default_branch="main",
+                health="healthy",
+                github_installation_id=install_id,
+            )
+        )
+        session.commit()
+
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos?q=workshop",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    names = {row["full_name"] for row in payload["data"]}
+    assert matching_repo in names
+    assert other_repo not in names

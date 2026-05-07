@@ -198,10 +198,14 @@ export const GithubInstallationListItemPublicSchema = {
             },
             type: 'array',
             title: 'Entitled Repositories'
+        },
+        installation_settings_url: {
+            type: 'string',
+            title: 'Installation Settings Url'
         }
     },
     type: 'object',
-    required: ['installation_id', 'account_login', 'account_type', 'suspended', 'entitled_repositories_count', 'entitled_repositories'],
+    required: ['installation_id', 'account_login', 'account_type', 'suspended', 'entitled_repositories_count', 'entitled_repositories', 'installation_settings_url'],
     title: 'GithubInstallationListItemPublic'
 } as const;
 
@@ -217,6 +221,17 @@ export const GithubInstallationListPublicSchema = {
         count: {
             type: 'integer',
             title: 'Count'
+        },
+        install_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Install Url'
         }
     },
     type: 'object',
@@ -459,10 +474,26 @@ export const LessonRepoListItemPublicSchema = {
         part_count: {
             type: 'integer',
             title: 'Part Count'
+        },
+        manifest_count: {
+            type: 'integer',
+            title: 'Manifest Count'
+        },
+        last_manifest_synced_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Manifest Synced At'
         }
     },
     type: 'object',
-    required: ['lesson_repo_id', 'full_name', 'default_branch', 'health', 'lesson_count', 'part_count'],
+    required: ['lesson_repo_id', 'full_name', 'default_branch', 'health', 'lesson_count', 'part_count', 'manifest_count'],
     title: 'LessonRepoListItemPublic'
 } as const;
 
@@ -483,6 +514,90 @@ export const LessonRepoListPublicSchema = {
     type: 'object',
     required: ['data', 'count'],
     title: 'LessonRepoListPublic'
+} as const;
+
+export const LessonRepoPreviewLessonPublicSchema = {
+    properties: {
+        lesson_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Id'
+        },
+        lesson_slug: {
+            type: 'string',
+            title: 'Lesson Slug'
+        },
+        lesson_title: {
+            type: 'string',
+            title: 'Lesson Title'
+        },
+        parts: {
+            items: {
+                '$ref': '#/components/schemas/LessonRepoPreviewPartPublic'
+            },
+            type: 'array',
+            title: 'Parts'
+        }
+    },
+    type: 'object',
+    required: ['lesson_id', 'lesson_slug', 'lesson_title', 'parts'],
+    title: 'LessonRepoPreviewLessonPublic'
+} as const;
+
+export const LessonRepoPreviewPartPublicSchema = {
+    properties: {
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        ordering: {
+            type: 'integer',
+            title: 'Ordering'
+        },
+        path: {
+            type: 'string',
+            title: 'Path'
+        }
+    },
+    type: 'object',
+    required: ['slug', 'title', 'ordering', 'path'],
+    title: 'LessonRepoPreviewPartPublic'
+} as const;
+
+export const LessonRepoPreviewPublicSchema = {
+    properties: {
+        lesson_repo_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Repo Id'
+        },
+        full_name: {
+            type: 'string',
+            title: 'Full Name'
+        },
+        default_branch: {
+            type: 'string',
+            title: 'Default Branch'
+        },
+        health: {
+            type: 'string',
+            title: 'Health'
+        },
+        lessons: {
+            items: {
+                '$ref': '#/components/schemas/LessonRepoPreviewLessonPublic'
+            },
+            type: 'array',
+            title: 'Lessons'
+        }
+    },
+    type: 'object',
+    required: ['lesson_repo_id', 'full_name', 'default_branch', 'health', 'lessons'],
+    title: 'LessonRepoPreviewPublic'
 } as const;
 
 export const MessageSchema = {
@@ -693,6 +808,11 @@ export const PrivateUserCreateSchema = {
         is_verified: {
             type: 'boolean',
             title: 'Is Verified',
+            default: false
+        },
+        is_instructor: {
+            type: 'boolean',
+            title: 'Is Instructor',
             default: false
         }
     },
@@ -1654,6 +1774,39 @@ export const WorkshopLessonSummaryPublicSchema = {
         slug: {
             type: 'string',
             title: 'Slug'
+        },
+        lesson_repo_health: {
+            type: 'string',
+            title: 'Lesson Repo Health',
+            default: 'healthy'
+        },
+        lesson_repo_last_synced_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Lesson Repo Last Synced At'
+        },
+        lesson_content_available: {
+            type: 'boolean',
+            title: 'Lesson Content Available',
+            default: true
+        },
+        lesson_content_issue: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Lesson Content Issue'
         }
     },
     type: 'object',

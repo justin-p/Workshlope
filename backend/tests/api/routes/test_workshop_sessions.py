@@ -1981,6 +1981,58 @@ def test_get_workshop_session_detail_participant_view(
     assert len(body["parts"]) == 2
     assert body["parts"][0]["body_html"] == "<h1>Part 0</h1>\n"
     assert body["session"]["id"] == str(session_row.id)
+    assert body["lesson"]["lesson_repo_health"] == "healthy"
+
+
+def test_get_workshop_session_detail_includes_lesson_repo_health_metadata(
+    client: TestClient, db: Session
+) -> None:
+    iso_email = f"detail-repo-health-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+
+    session_row = _create_live_session(db)
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    repo = db.get(LessonRepo, lesson.repo_id)
+    assert repo is not None
+    repo.health = "unhealthy"
+    db.add(repo)
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=user.id))
+    db.commit()
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["lesson"]["lesson_repo_health"] == "unhealthy"
+    assert "lesson_repo_last_synced_at" in body["lesson"]
+
+
+def test_get_workshop_session_detail_flags_missing_lesson_parts(
+    client: TestClient, db: Session
+) -> None:
+    iso_email = f"detail-no-parts-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+
+    session_row = _create_live_session(db)
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=user.id))
+    db.commit()
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["lesson"]["lesson_content_available"] is False
+    assert body["lesson"]["lesson_content_issue"] == "no_parts_synced"
+    assert body["parts"] == []
 
 
 def test_get_workshop_session_detail_instructor_roster(

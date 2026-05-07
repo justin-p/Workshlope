@@ -18,6 +18,29 @@ const COPY_ID_FEEDBACK_MS = 1500
 const AUTOFILL_FEEDBACK_MS = 2000
 const FRESH_AGE_MS = 60_000
 const AGING_AGE_MS = 5 * 60_000
+type RepoHealthFilter = "all" | "healthy" | "unhealthy"
+
+type LessonRepoPreviewPart = {
+  slug: string
+  title: string
+  ordering: number
+  path: string
+}
+
+type LessonRepoPreviewLesson = {
+  lesson_id: string
+  lesson_slug: string
+  lesson_title: string
+  parts: LessonRepoPreviewPart[]
+}
+
+type LessonRepoPreview = {
+  lesson_repo_id: string
+  full_name: string
+  default_branch: string
+  health: string
+  lessons: LessonRepoPreviewLesson[]
+}
 
 function formatSyncTimestamp(iso: string | null | undefined): string {
   if (!iso) return "never synced"
@@ -41,6 +64,20 @@ export function WorkshopLessonRepoSyncCard() {
   >(null)
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null)
   const [autofillHint, setAutofillHint] = useState<string | null>(null)
+  const [previewByRepoId, setPreviewByRepoId] = useState<
+    Record<string, LessonRepoPreview | undefined>
+  >({})
+  const [expandedPreviewRepoIds, setExpandedPreviewRepoIds] = useState<
+    Record<string, boolean>
+  >({})
+  const [previewLoadingRepoId, setPreviewLoadingRepoId] = useState<
+    string | null
+  >(null)
+  const [previewErrorByRepoId, setPreviewErrorByRepoId] = useState<
+    Record<string, string | undefined>
+  >({})
+  const [healthFilter, setHealthFilter] = useState<RepoHealthFilter>("all")
+  const [repoSearch, setRepoSearch] = useState("")
 
   useEffect(() => {
     try {
@@ -91,24 +128,6 @@ export function WorkshopLessonRepoSyncCard() {
       setErrorDetail(e instanceof Error ? e.message : "Sync request failed")
     },
   })
-
-  const reposQuery = useQuery({
-    queryKey: ["workshopLessonRepos"],
-    queryFn: () =>
-      WorkshopLessonReposService.readLessonRepos({
-        skip: 0,
-        limit: 20,
-      }),
-  })
-  const installationsQuery = useQuery({
-    queryKey: ["workshopGithubInstallations"],
-    queryFn: () =>
-      WorkshopLessonReposService.readGithubInstallations({
-        skip: 0,
-        limit: 50,
-      }),
-  })
-
   const normalizedRepo = fullName.trim()
   const repoFormatValid =
     normalizedRepo.length === 0 || OWNER_REPO_RE.test(normalizedRepo)
@@ -119,6 +138,37 @@ export function WorkshopLessonRepoSyncCard() {
   const showRepoValidation = normalizedRepo.length > 0 && !repoFormatValid
   const showInstallationValidation =
     installationId.length > 0 && !installationIdValid
+
+  const reposQuery = useQuery({
+    queryKey: [
+      "workshopLessonRepos",
+      installationIdInt,
+      healthFilter,
+      repoSearch,
+    ],
+    queryFn: () =>
+      WorkshopLessonReposService.readLessonRepos({
+        skip: 0,
+        limit: 20,
+        installationId:
+          Number.isFinite(installationIdInt) && installationIdInt > 0
+            ? installationIdInt
+            : undefined,
+        health: healthFilter,
+        q: repoSearch.trim() || undefined,
+      }),
+  })
+  const installationsQuery = useQuery({
+    queryKey: ["workshopGithubInstallations"],
+    queryFn: () =>
+      WorkshopLessonReposService.readGithubInstallations({
+        skip: 0,
+        limit: 50,
+      }),
+  })
+  const installCtaHref =
+    installationsQuery.data?.install_url ??
+    "https://github.com/settings/installations"
 
   const canSubmit =
     normalizedRepo.length > 0 &&
@@ -136,14 +186,10 @@ export function WorkshopLessonRepoSyncCard() {
     )
   }, [installationIdInt, installationsQuery.data?.data])
 
-  const visibleSyncedRepos = useMemo(() => {
-    const rows = reposQuery.data?.data ?? []
-    if (!selectedInstallation) return rows
-    return rows.filter(
-      (repo) =>
-        repo.github_installation_id === selectedInstallation.installation_id,
-    )
-  }, [reposQuery.data?.data, selectedInstallation])
+  const visibleSyncedRepos = useMemo(
+    () => reposQuery.data?.data ?? [],
+    [reposQuery.data?.data],
+  )
 
   const isRefreshingData =
     reposQuery.isFetching || installationsQuery.isFetching
@@ -223,6 +269,61 @@ export function WorkshopLessonRepoSyncCard() {
     setAutofillHint(null)
   }
 
+  const loadRepoPreview = async (repoId: string) => {
+    const apiBase = (import.meta.env.VITE_API_URL as string | undefined)?.trim()
+    const baseUrl =
+      apiBase && apiBase.length > 0 ? apiBase : window.location.origin
+    const token = localStorage.getItem("access_token")
+    setPreviewLoadingRepoId(repoId)
+    setPreviewErrorByRepoId((prev) => ({ ...prev, [repoId]: undefined }))
+    try {
+      const response = await fetch(
+        `${baseUrl}/api/v1/workshop/lesson-repos/${repoId}/preview`,
+        {
+          method: "GET",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        },
+      )
+      const body = (await response.json()) as
+        | LessonRepoPreview
+        | { detail?: string }
+      if (!response.ok) {
+        const detail =
+          typeof body === "object" && body && "detail" in body
+            ? (body.detail ?? "Could not load preview")
+            : "Could not load preview"
+        setPreviewErrorByRepoId((prev) => ({ ...prev, [repoId]: detail }))
+        return
+      }
+      setPreviewByRepoId((prev) => ({
+        ...prev,
+        [repoId]: body as LessonRepoPreview,
+      }))
+      setExpandedPreviewRepoIds((prev) => ({ ...prev, [repoId]: true }))
+    } catch {
+      setPreviewErrorByRepoId((prev) => ({
+        ...prev,
+        [repoId]: "Could not load preview",
+      }))
+    } finally {
+      setPreviewLoadingRepoId((current) =>
+        current === repoId ? null : current,
+      )
+    }
+  }
+
+  const toggleRepoPreview = async (repoId: string) => {
+    if (expandedPreviewRepoIds[repoId]) {
+      setExpandedPreviewRepoIds((prev) => ({ ...prev, [repoId]: false }))
+      return
+    }
+    if (previewByRepoId[repoId]) {
+      setExpandedPreviewRepoIds((prev) => ({ ...prev, [repoId]: true }))
+      return
+    }
+    await loadRepoPreview(repoId)
+  }
+
   return (
     <Card data-testid="workshop-lesson-repo-sync-card">
       <CardHeader>
@@ -236,7 +337,7 @@ export function WorkshopLessonRepoSyncCard() {
         <p className="text-xs text-muted-foreground">
           Need to install or adjust repository access first? Open{" "}
           <a
-            href="https://github.com/settings/installations"
+            href={installCtaHref}
             target="_blank"
             rel="noreferrer noopener"
             className="underline text-primary"
@@ -383,6 +484,14 @@ export function WorkshopLessonRepoSyncCard() {
                       ? "Copied"
                       : "Copy ID"}
                   </Button>
+                  <a
+                    href={inst.installation_settings_url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-xs text-primary underline"
+                  >
+                    Open settings
+                  </a>
                 </div>
               ))}
             </div>
@@ -498,6 +607,34 @@ export function WorkshopLessonRepoSyncCard() {
           >
             Clear inputs
           </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() =>
+              setHealthFilter((prev) => {
+                if (prev === "all") return "unhealthy"
+                if (prev === "unhealthy") return "healthy"
+                return "all"
+              })
+            }
+            disabled={isBusy}
+            data-testid="workshop-sync-unhealthy-toggle"
+          >
+            {healthFilter === "all"
+              ? "Show unhealthy only"
+              : healthFilter === "unhealthy"
+                ? "Show healthy only"
+                : "Show all repos"}
+          </Button>
+          <Input
+            value={repoSearch}
+            onChange={(event) => setRepoSearch(event.target.value)}
+            placeholder="Filter synced repos..."
+            className="h-7 w-[220px] text-xs"
+            data-testid="workshop-sync-repo-search"
+          />
         </div>
         {errorDetail ? (
           <p
@@ -563,10 +700,15 @@ export function WorkshopLessonRepoSyncCard() {
                     <p className="font-medium truncate">{repo.full_name}</p>
                     <p className="text-muted-foreground truncate">
                       {repo.default_branch} · {repo.lesson_count} lesson(s) ·{" "}
-                      {repo.part_count} part(s)
+                      {repo.part_count} part(s) · {repo.manifest_count ?? 0}{" "}
+                      manifest(s)
                     </p>
                     <p className="text-muted-foreground truncate">
                       Last sync: {formatSyncTimestamp(repo.last_synced_at)}
+                    </p>
+                    <p className="text-muted-foreground truncate">
+                      Last manifest sync:{" "}
+                      {formatSyncTimestamp(repo.last_manifest_synced_at)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -610,11 +752,79 @@ export function WorkshopLessonRepoSyncCard() {
                     >
                       {repo.health}
                     </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() =>
+                        void toggleRepoPreview(repo.lesson_repo_id)
+                      }
+                      disabled={previewLoadingRepoId === repo.lesson_repo_id}
+                      data-testid="workshop-repo-preview-toggle"
+                    >
+                      {previewLoadingRepoId === repo.lesson_repo_id
+                        ? "Loading..."
+                        : expandedPreviewRepoIds[repo.lesson_repo_id]
+                          ? "Hide parts"
+                          : "Preview parts"}
+                    </Button>
                   </div>
                 </li>
               ))}
             </ul>
           )}
+          {visibleSyncedRepos.map((repo) => {
+            if (!expandedPreviewRepoIds[repo.lesson_repo_id]) return null
+            const preview = previewByRepoId[repo.lesson_repo_id]
+            const previewError = previewErrorByRepoId[repo.lesson_repo_id]
+            return (
+              <div
+                key={`${repo.lesson_repo_id}-preview`}
+                className="rounded-md border bg-muted/20 p-2 text-xs"
+                data-testid="workshop-repo-preview-panel"
+              >
+                <p className="font-medium">
+                  Parts preview for <code>{repo.full_name}</code>
+                </p>
+                {previewError ? (
+                  <p className="text-destructive">{previewError}</p>
+                ) : preview ? (
+                  preview.lessons.length > 0 ? (
+                    <ul className="mt-1 space-y-1">
+                      {preview.lessons.map((lesson) => (
+                        <li key={lesson.lesson_id}>
+                          <p className="font-medium">
+                            {lesson.lesson_title} ({lesson.lesson_slug})
+                          </p>
+                          {lesson.parts.length > 0 ? (
+                            <p className="text-muted-foreground">
+                              {lesson.parts
+                                .map(
+                                  (part) =>
+                                    `${part.ordering + 1}. ${part.title}`,
+                                )
+                                .join(" | ")}
+                            </p>
+                          ) : (
+                            <p className="text-muted-foreground">
+                              No parts in lesson.
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      No lessons synced yet.
+                    </p>
+                  )
+                ) : (
+                  <p className="text-muted-foreground">Preview not loaded.</p>
+                )}
+              </div>
+            )
+          })}
         </div>
       </CardContent>
     </Card>

@@ -39,7 +39,7 @@ function formatEventTimestamp(iso: string | null | undefined): string {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
-/** Decode JWT payload segment (no verification — UI routing only). */
+/** Decode JWT payload segment (no verification - UI routing only). */
 function decodeJwtPayloadJson(
   rawToken: string,
 ): Record<string, unknown> | null {
@@ -290,6 +290,8 @@ function WorkshopSessionPage() {
   )
   const wsRef = useRef<WebSocket | null>(null)
   const wsSessionReadyRef = useRef(false)
+  const wsStaleReconnectAttemptsRef = useRef(0)
+  const [_wsReconnectNonce, setWsReconnectNonce] = useState(0)
 
   useEffect(() => {
     if (!UUID_V4_RE.test(sessionId)) {
@@ -307,6 +309,7 @@ function WorkshopSessionPage() {
       setRoomStatus("live")
       setLastAckEvent("")
       wsSessionReadyRef.current = false
+      let reconnectingBecauseStaleGeneration = false
       try {
         const ticketRes =
           await createWorkshopWsTicketWithOptionalEnter(sessionId)
@@ -341,6 +344,23 @@ function WorkshopSessionPage() {
               type?: string
               role?: string
               status?: string
+              detail?: string
+            }
+            if (
+              msg.type === "error" &&
+              msg.detail === "part_generation_stale" &&
+              wsStaleReconnectAttemptsRef.current < 2
+            ) {
+              reconnectingBecauseStaleGeneration = true
+              wsStaleReconnectAttemptsRef.current += 1
+              setPhase("ws_connecting")
+              setErrorDetail(
+                "Session content changed. Reconnecting realtime...",
+              )
+              wsSessionReadyRef.current = false
+              ws.close()
+              setWsReconnectNonce((value) => value + 1)
+              return
             }
             if (typeof msg.type === "string" && msg.type.endsWith(".ack")) {
               setLastAckEvent(raw)
@@ -349,6 +369,7 @@ function WorkshopSessionPage() {
               if (msg.role === "participant" || msg.role === "instructor") {
                 setConnectedRole(msg.role)
               }
+              wsStaleReconnectAttemptsRef.current = 0
               wsSessionReadyRef.current = true
               setPhase("ready")
             }
@@ -372,6 +393,9 @@ function WorkshopSessionPage() {
         ws.onclose = () => {
           if (cancelled) return
           wsRef.current = null
+          if (reconnectingBecauseStaleGeneration) {
+            return
+          }
           if (!wsSessionReadyRef.current) {
             setPhase("error")
             setErrorDetail(
@@ -460,6 +484,13 @@ function WorkshopSessionPage() {
   const instructorBlockedTraineesCount = gapsQuery.data?.count ?? 0
   const currentPartIndex = detailQuery.data?.session.current_part_index ?? 0
   const currentPart = detailQuery.data?.parts[currentPartIndex] ?? null
+  const lessonRepoHealth =
+    detailQuery.data?.lesson.lesson_repo_health ?? "healthy"
+  const showLessonSourceWarning = lessonRepoHealth !== "healthy"
+  const lessonContentAvailable =
+    detailQuery.data?.lesson.lesson_content_available ?? true
+  const lessonContentIssue =
+    detailQuery.data?.lesson.lesson_content_issue ?? null
 
   return (
     <div className="space-y-4">
@@ -475,6 +506,32 @@ function WorkshopSessionPage() {
           </>
         ) : null}
       </p>
+      {showLessonSourceWarning ? (
+        <Alert
+          variant="default"
+          data-testid="workshop-lesson-source-warning"
+          className="border-amber-500/50 bg-amber-500/10"
+        >
+          <AlertTitle>Lesson source unavailable</AlertTitle>
+          <AlertDescription>
+            Source sync is currently degraded; workshop is using last synced
+            lesson content.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {!lessonContentAvailable ? (
+        <Alert
+          variant="destructive"
+          data-testid="workshop-lesson-content-unavailable"
+        >
+          <AlertTitle>Lesson content unavailable</AlertTitle>
+          <AlertDescription>
+            No lesson parts are currently available for this session.
+            {lessonContentIssue ? ` (${lessonContentIssue})` : ""} Sync lesson
+            content before running this workshop.
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {detailView === "participant" ? (
         <p
           className="text-xs text-muted-foreground"
@@ -553,7 +610,7 @@ function WorkshopSessionPage() {
                       className="shrink-0"
                       disabled={completePrerequisiteMutation.isPending}
                       data-testid="workshop-prework-mark-complete"
-                      aria-label={`Mark “${p.title}” complete`}
+                      aria-label={`Mark "${p.title}" complete`}
                       onClick={() =>
                         completePrerequisiteMutation.mutate({
                           lessonId,
@@ -613,7 +670,7 @@ function WorkshopSessionPage() {
                       {r.roster_count === 0 ? (
                         <span className="italic">
                           {" "}
-                          — nobody on the roster yet
+                          - nobody on the roster yet
                         </span>
                       ) : null}
                     </li>

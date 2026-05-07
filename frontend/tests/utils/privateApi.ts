@@ -5,9 +5,11 @@ import { OpenAPI, PrivateService } from "../../src/client"
 export const createUser = async ({
   email,
   password,
+  is_instructor = false,
 }: {
   email: string
   password: string
+  is_instructor?: boolean
 }) => {
   OpenAPI.BASE = process.env.VITE_API_URL?.trim() || "http://localhost:8000"
   return await PrivateService.createUser({
@@ -16,6 +18,7 @@ export const createUser = async ({
       password,
       is_verified: true,
       full_name: "Test User",
+      is_instructor,
     },
   })
 }
