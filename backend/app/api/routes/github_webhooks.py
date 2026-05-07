@@ -3,9 +3,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import threading
 import time
 from collections import defaultdict, deque
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -22,6 +25,7 @@ from app.models import (
 )
 
 router = APIRouter(prefix="/github", tags=["github-integration"])
+logger = logging.getLogger(__name__)
 
 _RATE_LOCK = threading.Lock()
 _RATE_BUCKETS: dict[str, deque[float]] = defaultdict(deque)
@@ -63,6 +67,32 @@ def _enforce_github_webhook_rate_limit(client_host: str | None) -> None:
                 detail="Webhook rate limit exceeded",
             )
         bucket.append(now)
+
+
+def _enforce_github_webhook_clock_skew(date_header: str | None) -> None:
+    """Optional replay hardening: reject Date values too far from server clock."""
+    max_skew = int(settings.GITHUB_WEBHOOK_MAX_CLOCK_SKEW_SECONDS)
+    if max_skew <= 0 or not date_header:
+        return
+    try:
+        header_dt = parsedate_to_datetime(date_header)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Date header",
+        ) from exc
+    if header_dt.tzinfo is None:
+        header_dt = header_dt.replace(tzinfo=timezone.utc)
+    skew = abs(
+        (
+            datetime.now(timezone.utc) - header_dt.astimezone(timezone.utc)
+        ).total_seconds()
+    )
+    if skew > max_skew:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Webhook Date outside allowed skew window",
+        )
 
 
 def _reserve_delivery_idempotent(
@@ -202,6 +232,7 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
     raw = await request.body()
     client_host = request.client.host if request.client else None
     _enforce_github_webhook_rate_limit(client_host)
+    _enforce_github_webhook_clock_skew(request.headers.get("date"))
 
     sig_header = request.headers.get("x-hub-signature-256")
 
@@ -231,9 +262,21 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
         delivery_id=delivery_id,
         github_event=github_event,
     ):
+        logger.info(
+            "github_webhook idempotent replay ignored",
+            extra={
+                "event": github_event,
+                "delivery_id": delivery_id,
+                "client_host": client_host,
+            },
+        )
         return {"ok": True, "idempotent": True}
 
     if github_event == "ping":
+        logger.info(
+            "github_webhook ping accepted",
+            extra={"event": github_event, "delivery_id": delivery_id},
+        )
         session.commit()
         return {"ok": True}
 
@@ -269,6 +312,17 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
                 ):
                     removed_count += 1
         session.commit()
+        logger.info(
+            "github_webhook installation_repositories processed",
+            extra={
+                "event": github_event,
+                "action": action,
+                "installation_id": inst_id,
+                "repositories_added": added_count,
+                "repositories_removed": removed_count,
+                "delivery_id": delivery_id,
+            },
+        )
         return {
             "ok": True,
             "action": action,
@@ -277,6 +331,10 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
         }
 
     if github_event != "installation":
+        logger.info(
+            "github_webhook ignored event",
+            extra={"event": github_event, "delivery_id": delivery_id},
+        )
         session.commit()
         return {"ignored": github_event}
 
@@ -295,6 +353,15 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
         if row is not None:
             session.delete(row)
         session.commit()
+        logger.info(
+            "github_webhook installation deleted",
+            extra={
+                "event": github_event,
+                "action": installation_action,
+                "installation_id": inst_id,
+                "delivery_id": delivery_id,
+            },
+        )
         return {"ok": True}
 
     if installation_action == "suspend":
@@ -304,6 +371,15 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
             row.updated_at = row.suspended_at
             session.add(row)
         session.commit()
+        logger.info(
+            "github_webhook installation suspended",
+            extra={
+                "event": github_event,
+                "action": installation_action,
+                "installation_id": inst_id,
+                "delivery_id": delivery_id,
+            },
+        )
         return {"ok": True, "action": installation_action}
 
     if installation_action == "unsuspend":
@@ -313,12 +389,39 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
             row.updated_at = get_datetime_utc()
             session.add(row)
         session.commit()
+        logger.info(
+            "github_webhook installation unsuspended",
+            extra={
+                "event": github_event,
+                "action": installation_action,
+                "installation_id": inst_id,
+                "delivery_id": delivery_id,
+            },
+        )
         return {"ok": True, "action": installation_action}
 
     if installation_action in {"created", "new_permissions_accepted"}:
         _upsert_installation_from_payload(session=session, installation=installation)
         session.commit()
+        logger.info(
+            "github_webhook installation upserted",
+            extra={
+                "event": github_event,
+                "action": installation_action,
+                "installation_id": inst_id,
+                "delivery_id": delivery_id,
+            },
+        )
         return {"ok": True, "action": installation_action}
 
     session.commit()
+    logger.info(
+        "github_webhook installation unknown action",
+        extra={
+            "event": github_event,
+            "action": installation_action,
+            "installation_id": inst_id,
+            "delivery_id": delivery_id,
+        },
+    )
     return {"ok": True, "unknown_action": installation_action}

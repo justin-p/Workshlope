@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
@@ -26,6 +27,7 @@ from app.services.lesson_repo_sync import (
 )
 
 router = APIRouter(prefix="/workshop/lesson-repos", tags=["workshop-lesson-repos"])
+logger = logging.getLogger(__name__)
 
 
 def _require_lesson_github_editor(current_user: User) -> None:
@@ -95,6 +97,14 @@ def sync_lesson_repo_from_github(
 ) -> LessonRepoGithubSyncPublic:
     """Pull ``lessons/`` content from GitHub using an installation token and upsert DB rows."""
     _require_lesson_github_editor(current_user)
+    logger.info(
+        "lesson_repo_sync requested",
+        extra={
+            "full_name": body.full_name,
+            "installation_id": body.installation_id,
+            "actor_user_id": str(current_user.id),
+        },
+    )
 
     inst = session.get(GithubAppInstallation, body.installation_id)
     if inst is None:
@@ -121,6 +131,15 @@ def sync_lesson_repo_from_github(
             installation_id=body.installation_id,
         )
     except GithubAppTokenError as exc:
+        logger.warning(
+            "lesson_repo_sync token mint failed",
+            extra={
+                "full_name": body.full_name,
+                "installation_id": body.installation_id,
+                "actor_user_id": str(current_user.id),
+                "error": str(exc),
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
@@ -133,6 +152,15 @@ def sync_lesson_repo_from_github(
             default_branch=None,
         )
     except GithubContentsFetchError as exc:
+        logger.warning(
+            "lesson_repo_sync github fetch failed",
+            extra={
+                "full_name": body.full_name,
+                "installation_id": body.installation_id,
+                "actor_user_id": str(current_user.id),
+                "error": str(exc),
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -165,12 +193,32 @@ def sync_lesson_repo_from_github(
             path_to_content=path_map,
         )
     except LessonRepoSyncError as exc:
+        logger.warning(
+            "lesson_repo_sync apply failed",
+            extra={
+                "full_name": body.full_name,
+                "installation_id": body.installation_id,
+                "actor_user_id": str(current_user.id),
+                "error": str(exc),
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         ) from exc
 
     session.refresh(lesson_repo)
+    logger.info(
+        "lesson_repo_sync completed",
+        extra={
+            "full_name": lesson_repo.full_name,
+            "installation_id": body.installation_id,
+            "actor_user_id": str(current_user.id),
+            "lessons_synced": synced,
+            "health": lesson_repo.health,
+            "default_branch": lesson_repo.default_branch,
+        },
+    )
     return LessonRepoGithubSyncPublic(
         lesson_repo_id=lesson_repo.id,
         lessons_synced=synced,

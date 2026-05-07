@@ -681,3 +681,46 @@ def test_github_webhooks_installation_repositories_unknown_installation_noop(
         },
     )
     assert response.status_code == 200
+
+
+def test_github_webhooks_logs_installation_repositories_summary(
+    monkeypatch, client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    secret = "test-webhook-secret"
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_SECRET", secret, raising=False)
+    installation_id = 222_333
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=installation_id,
+                account_id=1,
+                account_login="trainer",
+                account_type="User",
+                target_type="User",
+                repository_selection="selected",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            ),
+        )
+        session.commit()
+
+    payload = {
+        "action": "added",
+        "installation": {"id": installation_id},
+        "repositories_added": [{"full_name": "acme/repo-z"}],
+    }
+    raw = json.dumps(payload).encode("utf-8")
+    with caplog.at_level("INFO"):
+        response = client.post(
+            f"{settings.API_V1_STR}/github/webhooks",
+            content=raw,
+            headers={
+                "X-GitHub-Event": "installation_repositories",
+                "X-Hub-Signature-256": _sign(raw, secret),
+                "Content-Type": "application/json",
+            },
+        )
+    assert response.status_code == 200
+    assert any(
+        "installation_repositories processed" in rec.message for rec in caplog.records
+    )
