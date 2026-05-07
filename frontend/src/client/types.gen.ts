@@ -229,6 +229,7 @@ export type WorkshopLessonPartBrief = {
     ordering: number;
     slug: string;
     title: string;
+    body_html?: (string | null);
 };
 
 /**

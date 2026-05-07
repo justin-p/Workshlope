@@ -1043,6 +1043,17 @@ export const WorkshopLessonPartBriefSchema = {
         title: {
             type: 'string',
             title: 'Title'
+        },
+        body_html: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Body Html'
         }
     },
     type: 'object',

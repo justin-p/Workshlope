@@ -1979,6 +1979,7 @@ def test_get_workshop_session_detail_participant_view(
     assert "self" in body
     assert body["self"]["live_status"] == "busy"
     assert len(body["parts"]) == 2
+    assert body["parts"][0]["body_html"] == "<h1>Part 0</h1>\n"
     assert body["session"]["id"] == str(session_row.id)
 
 
@@ -2024,6 +2025,40 @@ def test_get_workshop_session_detail_instructor_roster(
     assert train_email in emails
     ins_emails = {i["email"] for i in body["instructors"]}
     assert inst_email in ins_emails
+
+
+def test_get_workshop_session_detail_part_html_is_sanitized(
+    client: TestClient, db: Session
+) -> None:
+    iso_email = f"detail-sanitize-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+    session_row = _create_live_session(db)
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    db.add(
+        LessonPart(
+            lesson_id=lesson.id,
+            ordering=0,
+            slug=f"part-x-{uuid.uuid4()}",
+            title="Part X",
+            path="x.md",
+            body_md="<script>alert(1)</script>**safe**",
+        )
+    )
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=user.id))
+    db.commit()
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    html = body["parts"][0]["body_html"]
+    assert "<script>" not in html
+    assert "<strong>safe</strong>" in html
 
 
 def test_get_workshop_session_detail_forbidden(client: TestClient, db: Session) -> None:

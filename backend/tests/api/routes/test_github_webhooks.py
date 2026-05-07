@@ -3,6 +3,8 @@
 import hashlib
 import hmac
 import json
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,6 +18,7 @@ from app.core.config import settings
 from app.core.db import engine
 from app.models import (
     GithubAppInstallation,
+    GithubInstallationRepository,
     GithubWebhookDelivery,
     get_datetime_utc,
 )
@@ -493,6 +496,70 @@ def test_github_webhooks_rate_limit_by_client_ip(
     assert _ping("3").status_code == 429
 
 
+def test_github_webhooks_rejects_invalid_date_header_when_skew_check_enabled(
+    monkeypatch, client: TestClient
+) -> None:
+    secret = "test-webhook-secret"
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_SECRET", secret, raising=False)
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_MAX_CLOCK_SKEW_SECONDS", 300)
+    raw = b"{}"
+    response = client.post(
+        f"{settings.API_V1_STR}/github/webhooks",
+        content=raw,
+        headers={
+            "Date": "not-a-date",
+            "X-GitHub-Event": "ping",
+            "X-Hub-Signature-256": _sign(raw, secret),
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid Date header"
+
+
+def test_github_webhooks_rejects_old_date_header_when_skew_exceeded(
+    monkeypatch, client: TestClient
+) -> None:
+    secret = "test-webhook-secret"
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_SECRET", secret, raising=False)
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_MAX_CLOCK_SKEW_SECONDS", 300)
+    raw = b"{}"
+    old_date = format_datetime(datetime.now(timezone.utc) - timedelta(hours=2))
+    response = client.post(
+        f"{settings.API_V1_STR}/github/webhooks",
+        content=raw,
+        headers={
+            "Date": old_date,
+            "X-GitHub-Event": "ping",
+            "X-Hub-Signature-256": _sign(raw, secret),
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Webhook Date outside allowed skew window"
+
+
+def test_github_webhooks_accepts_valid_date_header_within_skew(
+    monkeypatch, client: TestClient
+) -> None:
+    secret = "test-webhook-secret"
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_SECRET", secret, raising=False)
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_MAX_CLOCK_SKEW_SECONDS", 300)
+    raw = b"{}"
+    near_now = format_datetime(datetime.now(timezone.utc) - timedelta(seconds=20))
+    response = client.post(
+        f"{settings.API_V1_STR}/github/webhooks",
+        content=raw,
+        headers={
+            "Date": near_now,
+            "X-GitHub-Event": "ping",
+            "X-Hub-Signature-256": _sign(raw, secret),
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 200
+
+
 def test_github_webhooks_suspend_missing_row_safe(
     monkeypatch, client: TestClient
 ) -> None:
@@ -505,6 +572,110 @@ def test_github_webhooks_suspend_missing_row_safe(
         content=raw,
         headers={
             "X-GitHub-Event": "installation",
+            "X-Hub-Signature-256": _sign(raw, secret),
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 200
+
+
+def test_github_webhooks_installation_repositories_add_and_remove(
+    monkeypatch, client: TestClient
+) -> None:
+    secret = "test-webhook-secret"
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_SECRET", secret, raising=False)
+    installation_id = 123_321
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=installation_id,
+                account_id=1,
+                account_login="trainer",
+                account_type="User",
+                target_type="User",
+                repository_selection="selected",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            ),
+        )
+        session.commit()
+
+    payload_add = {
+        "action": "added",
+        "installation": {"id": installation_id},
+        "repositories_added": [
+            {"full_name": "acme/repo-a"},
+            {"name": "repo-b", "owner": {"login": "acme"}},
+        ],
+        "repositories_removed": [],
+    }
+    raw_add = json.dumps(payload_add).encode("utf-8")
+    resp_add = client.post(
+        f"{settings.API_V1_STR}/github/webhooks",
+        content=raw_add,
+        headers={
+            "X-GitHub-Event": "installation_repositories",
+            "X-Hub-Signature-256": _sign(raw_add, secret),
+            "Content-Type": "application/json",
+        },
+    )
+    assert resp_add.status_code == 200
+    assert resp_add.json()["repositories_added"] == 2
+
+    with Session(engine) as session:
+        repos = session.exec(
+            select(GithubInstallationRepository).where(
+                GithubInstallationRepository.installation_id == installation_id
+            )
+        ).all()
+        names = {r.full_name for r in repos}
+        assert names == {"acme/repo-a", "acme/repo-b"}
+
+    payload_remove = {
+        "action": "removed",
+        "installation": {"id": installation_id},
+        "repositories_added": [],
+        "repositories_removed": [{"full_name": "acme/repo-a"}],
+    }
+    raw_remove = json.dumps(payload_remove).encode("utf-8")
+    resp_remove = client.post(
+        f"{settings.API_V1_STR}/github/webhooks",
+        content=raw_remove,
+        headers={
+            "X-GitHub-Event": "installation_repositories",
+            "X-Hub-Signature-256": _sign(raw_remove, secret),
+            "Content-Type": "application/json",
+        },
+    )
+    assert resp_remove.status_code == 200
+    assert resp_remove.json()["repositories_removed"] == 1
+
+    with Session(engine) as session:
+        repos = session.exec(
+            select(GithubInstallationRepository).where(
+                GithubInstallationRepository.installation_id == installation_id
+            )
+        ).all()
+        names = {r.full_name for r in repos}
+        assert names == {"acme/repo-b"}
+
+
+def test_github_webhooks_installation_repositories_unknown_installation_noop(
+    monkeypatch, client: TestClient
+) -> None:
+    secret = "test-webhook-secret"
+    monkeypatch.setattr(settings, "GITHUB_WEBHOOK_SECRET", secret, raising=False)
+    payload = {
+        "action": "added",
+        "installation": {"id": 989_898_989},
+        "repositories_added": [{"full_name": "acme/missing"}],
+    }
+    raw = json.dumps(payload).encode("utf-8")
+    response = client.post(
+        f"{settings.API_V1_STR}/github/webhooks",
+        content=raw,
+        headers={
+            "X-GitHub-Event": "installation_repositories",
             "X-Hub-Signature-256": _sign(raw, secret),
             "Content-Type": "application/json",
         },

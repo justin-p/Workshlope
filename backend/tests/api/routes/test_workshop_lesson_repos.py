@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.db import engine
 from app.models import (
     GithubAppInstallation,
+    GithubInstallationRepository,
     LessonRepo,
     User,
     get_datetime_utc,
@@ -438,3 +439,95 @@ def test_sync_from_github_allows_instructor_not_only_superuser(
         if repo is not None:
             session.delete(repo)
             session.commit()
+
+
+def test_sync_from_github_selected_installation_requires_repo_entitlement(
+    client: TestClient,
+) -> None:
+    install_id = 906_000_000 + (uuid.uuid4().int % 1_000_000)
+    full_name = f"selected-block/repo-{uuid.uuid4()}"
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_id,
+                account_id=1,
+                account_login="trainer",
+                account_type="User",
+                target_type="User",
+                repository_selection="selected",
+                app_slug="x",
+                suspended_at=None,
+            ),
+        )
+        session.commit()
+
+    mocked_token = InstallationAccessToken(token="mock-github-token", expires_at=None)
+    headers = get_superuser_token_headers(client)
+    with (
+        patch(
+            "app.api.routes.workshop_lesson_repos.mint_installation_access_token",
+            return_value=mocked_token,
+        ),
+        patch(
+            "app.api.routes.workshop_lesson_repos.fetch_lesson_repo_path_map_from_github",
+            return_value=(_tree(), "main"),
+        ),
+    ):
+        response = client.post(
+            f"{settings.API_V1_STR}/workshop/lesson-repos/sync-from-github",
+            headers=headers,
+            json={"full_name": full_name, "installation_id": install_id},
+        )
+    assert response.status_code == 403
+
+    with Session(engine) as session:
+        inst = session.get(GithubAppInstallation, install_id)
+        if inst is not None:
+            session.delete(inst)
+            session.commit()
+
+
+def test_sync_from_github_selected_installation_allows_entitled_repo(
+    client: TestClient,
+) -> None:
+    install_id = 907_000_000 + (uuid.uuid4().int % 1_000_000)
+    full_name = f"selected-allow/repo-{uuid.uuid4()}"
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_id,
+                account_id=1,
+                account_login="trainer",
+                account_type="User",
+                target_type="User",
+                repository_selection="selected",
+                app_slug="x",
+                suspended_at=None,
+            ),
+        )
+        session.add(
+            GithubInstallationRepository(
+                installation_id=install_id,
+                full_name=full_name,
+            ),
+        )
+        session.commit()
+
+    mocked_token = InstallationAccessToken(token="mock-github-token", expires_at=None)
+    headers = get_superuser_token_headers(client)
+    with (
+        patch(
+            "app.api.routes.workshop_lesson_repos.mint_installation_access_token",
+            return_value=mocked_token,
+        ),
+        patch(
+            "app.api.routes.workshop_lesson_repos.fetch_lesson_repo_path_map_from_github",
+            return_value=(_tree(), "main"),
+        ),
+    ):
+        response = client.post(
+            f"{settings.API_V1_STR}/workshop/lesson-repos/sync-from-github",
+            headers=headers,
+            json={"full_name": full_name, "installation_id": install_id},
+        )
+    assert response.status_code == 200

@@ -2,11 +2,16 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
-from sqlmodel import select
+from sqlmodel import Session, select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
-from app.models import GithubAppInstallation, LessonRepo, User
+from app.models import (
+    GithubAppInstallation,
+    GithubInstallationRepository,
+    LessonRepo,
+    User,
+)
 from app.services.github_app_tokens import (
     GithubAppTokenError,
     mint_installation_access_token,
@@ -56,6 +61,31 @@ class LessonRepoGithubSyncPublic(BaseModel):
     default_branch: str
 
 
+def _require_installation_repo_entitlement(
+    *,
+    session: Session,
+    installation: GithubAppInstallation,
+    full_name: str,
+) -> None:
+    if installation.repository_selection != "selected":
+        return
+    entitled = session.exec(
+        select(GithubInstallationRepository).where(
+            GithubInstallationRepository.installation_id == installation.id,
+            GithubInstallationRepository.full_name == full_name,
+        ),
+    ).first()
+    if entitled is not None:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "Installation is not entitled to this repository; "
+            "grant repository access in GitHub App settings and retry"
+        ),
+    )
+
+
 @router.post("/sync-from-github", response_model=LessonRepoGithubSyncPublic)
 def sync_lesson_repo_from_github(
     *,
@@ -79,6 +109,11 @@ def sync_lesson_repo_from_github(
             status_code=status.HTTP_409_CONFLICT,
             detail="Installation is suspended",
         )
+    _require_installation_repo_entitlement(
+        session=session,
+        installation=inst,
+        full_name=body.full_name,
+    )
 
     try:
         installation_token = mint_installation_access_token(

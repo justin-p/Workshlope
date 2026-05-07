@@ -10,11 +10,16 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.deps import SessionDep
 from app.core.config import settings
-from app.models import GithubAppInstallation, GithubWebhookDelivery, get_datetime_utc
+from app.models import (
+    GithubAppInstallation,
+    GithubInstallationRepository,
+    GithubWebhookDelivery,
+    get_datetime_utc,
+)
 
 router = APIRouter(prefix="/github", tags=["github-integration"])
 
@@ -126,6 +131,65 @@ def _upsert_installation_from_payload(
     session.add(row)
 
 
+def _normalize_repo_full_name(repo_payload: dict[str, Any]) -> str:
+    owner_raw = repo_payload.get("owner")
+    owner: dict[str, Any] = owner_raw if isinstance(owner_raw, dict) else {}
+    owner_login = str(owner.get("login") or "").strip()
+    repo_name = str(repo_payload.get("name") or "").strip()
+    if owner_login and repo_name:
+        return f"{owner_login}/{repo_name}"
+    full_name = str(repo_payload.get("full_name") or "").strip().strip("/")
+    return full_name
+
+
+def _upsert_installation_repository(
+    *,
+    session: Session,
+    installation_id: int,
+    repository_payload: dict[str, Any],
+) -> bool:
+    full_name = _normalize_repo_full_name(repository_payload)
+    if not full_name or "/" not in full_name:
+        return False
+    row = session.exec(
+        select(GithubInstallationRepository).where(
+            GithubInstallationRepository.installation_id == installation_id,
+            GithubInstallationRepository.full_name == full_name,
+        ),
+    ).first()
+    if row is not None:
+        return True
+    session.add(
+        GithubInstallationRepository(
+            installation_id=installation_id,
+            full_name=full_name,
+            created_at=get_datetime_utc(),
+        ),
+    )
+    return True
+
+
+def _delete_installation_repository(
+    *,
+    session: Session,
+    installation_id: int,
+    repository_payload: dict[str, Any],
+) -> bool:
+    full_name = _normalize_repo_full_name(repository_payload)
+    if not full_name or "/" not in full_name:
+        return False
+    row = session.exec(
+        select(GithubInstallationRepository).where(
+            GithubInstallationRepository.installation_id == installation_id,
+            GithubInstallationRepository.full_name == full_name,
+        ),
+    ).first()
+    if row is None:
+        return False
+    session.delete(row)
+    return True
+
+
 @router.post("/webhooks")
 async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any]:
     """GitHub App webhook entrypoint (installation lifecycle MVP)."""
@@ -173,11 +237,50 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
         session.commit()
         return {"ok": True}
 
+    if github_event == "installation_repositories":
+        action = str(payload.get("action") or "")
+        installation = payload.get("installation") or {}
+        inst_id_raw = installation.get("id")
+        if inst_id_raw is None:
+            session.commit()
+            return {"ok": True}
+        inst_id = int(inst_id_raw)
+        if session.get(GithubAppInstallation, inst_id) is None:
+            session.commit()
+            return {"ok": True}
+        repos_added = payload.get("repositories_added") or []
+        repos_removed = payload.get("repositories_removed") or []
+        added_count = 0
+        removed_count = 0
+        if isinstance(repos_added, list):
+            for repo in repos_added:
+                if isinstance(repo, dict) and _upsert_installation_repository(
+                    session=session,
+                    installation_id=inst_id,
+                    repository_payload=repo,
+                ):
+                    added_count += 1
+        if isinstance(repos_removed, list):
+            for repo in repos_removed:
+                if isinstance(repo, dict) and _delete_installation_repository(
+                    session=session,
+                    installation_id=inst_id,
+                    repository_payload=repo,
+                ):
+                    removed_count += 1
+        session.commit()
+        return {
+            "ok": True,
+            "action": action,
+            "repositories_added": added_count,
+            "repositories_removed": removed_count,
+        }
+
     if github_event != "installation":
         session.commit()
         return {"ignored": github_event}
 
-    action = payload.get("action")
+    installation_action = payload.get("action")
     installation = payload.get("installation") or {}
 
     inst_id_raw = installation.get("id")
@@ -187,35 +290,35 @@ async def github_webhook(request: Request, session: SessionDep) -> dict[str, Any
 
     inst_id = int(inst_id_raw)
 
-    if action == "deleted":
+    if installation_action == "deleted":
         row = session.get(GithubAppInstallation, inst_id)
         if row is not None:
             session.delete(row)
         session.commit()
         return {"ok": True}
 
-    if action == "suspend":
+    if installation_action == "suspend":
         row = session.get(GithubAppInstallation, inst_id)
         if row is not None:
             row.suspended_at = get_datetime_utc()
             row.updated_at = row.suspended_at
             session.add(row)
         session.commit()
-        return {"ok": True, "action": action}
+        return {"ok": True, "action": installation_action}
 
-    if action == "unsuspend":
+    if installation_action == "unsuspend":
         row = session.get(GithubAppInstallation, inst_id)
         if row is not None:
             row.suspended_at = None
             row.updated_at = get_datetime_utc()
             session.add(row)
         session.commit()
-        return {"ok": True, "action": action}
+        return {"ok": True, "action": installation_action}
 
-    if action in {"created", "new_permissions_accepted"}:
+    if installation_action in {"created", "new_permissions_accepted"}:
         _upsert_installation_from_payload(session=session, installation=installation)
         session.commit()
-        return {"ok": True, "action": action}
+        return {"ok": True, "action": installation_action}
 
     session.commit()
-    return {"ok": True, "unknown_action": action}
+    return {"ok": True, "unknown_action": installation_action}
