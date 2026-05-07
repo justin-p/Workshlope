@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import ConfigDict, EmailStr
-from sqlalchemy import DateTime, UniqueConstraint
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -115,6 +115,35 @@ class ItemsPublic(SQLModel):
 # ---------------------------------------------------------------------------
 
 
+class GithubAppInstallation(SQLModel, table=True):
+    """GitHub App installation as reported by installation webhooks."""
+
+    __tablename__ = "github_app_installation"
+
+    id: int = Field(
+        sa_column=Column(BigInteger(), primary_key=True, autoincrement=False)
+    )
+    account_id: int = Field(sa_column=Column(BigInteger(), nullable=False))
+    account_login: str = Field(max_length=255, index=True)
+    account_type: str = Field(max_length=64)
+    target_type: str = Field(max_length=64)
+    repository_selection: str | None = Field(default=None, max_length=64)
+    app_slug: str | None = Field(default=None, max_length=255)
+    suspended_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    lesson_repos: list["LessonRepo"] = Relationship(back_populates="installation")
+
+
 class LessonRepo(SQLModel, table=True):
     __tablename__ = "lesson_repo"
 
@@ -125,6 +154,17 @@ class LessonRepo(SQLModel, table=True):
     last_synced_at: datetime | None = Field(
         default=None,
         sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    github_installation_id: int | None = Field(
+        default=None,
+        sa_column=Column(
+            BigInteger,
+            ForeignKey("github_app_installation.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
+    installation: GithubAppInstallation | None = Relationship(
+        back_populates="lesson_repos",
     )
     lessons: list["Lesson"] = Relationship(back_populates="repo", cascade_delete=True)
 

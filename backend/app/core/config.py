@@ -91,6 +91,11 @@ class Settings(BaseSettings):
     GITHUB_BRIDGE_ISSUER: str = "authjs"
     USER_REGISTRATION_ENABLED: bool = True
 
+    # GitHub App (lesson repo sync — separate from OAuth login app)
+    GITHUB_APP_ID: str | None = None
+    GITHUB_APP_PRIVATE_KEY: str | None = None
+    GITHUB_WEBHOOK_SECRET: str | None = None
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def emails_enabled(self) -> bool:
