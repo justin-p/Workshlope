@@ -792,6 +792,32 @@ Stacked chains are optional; one **successful** archive is in [GitHub PR stack](
 - Base branch: `main`
 - PRs are strictly stacked (`ws-02` targets `ws-01`, `ws-03` targets `ws-02`, and so on).
 - Each PR must remain reviewable and testable against its immediate base branch.
+- **Critical merge rule:** a PR merged into a non-`main` base does **not** land on `main`. Never assume stacked child PR merges automatically propagate to `main`.
+
+### Stacked merge runbook (required)
+
+Use one of these two strategies; do not mix them implicitly:
+
+1. **Retarget-and-merge strategy (GitHub-first):**
+   - Merge the base PR into `main` (e.g. L1).
+   - Retarget the next PR base to `main` (or update stack so its base is now merged).
+   - Re-run checks, then merge.
+   - Repeat until the stack tip.
+2. **Branch-chain merge strategy (git-first):**
+   - Checkout `main`, pull latest.
+   - Merge remaining stack branches into `main` in order using explicit merge commits (`--no-ff`).
+   - Push `main`.
+
+**Never do:** merge child PRs while their base is a feature branch and then stop; that leaves commits off `main`.
+
+**Mandatory verification after any stacked merge sequence:**
+
+- Confirm each relevant PR's `baseRefName` and merge target:
+  - `gh pr view <n> --json number,baseRefName,headRefName,state,mergedAt`
+- Confirm `main` contains the stack tip:
+  - `git checkout main && git pull`
+  - `git rev-list --count main..<stack-tip-branch>` must be `0`
+  - `git log --oneline --decorate -n 20` should show expected merge commits.
 
 ### Branch/PR chain
 
