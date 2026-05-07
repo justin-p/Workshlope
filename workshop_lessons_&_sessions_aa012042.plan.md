@@ -10,9 +10,9 @@ Use this section after a pause or repo switch—do not rely on chat memory alone
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-06** — Workshop stack merged to **`main`** via **[#18](https://github.com/justin-p/testing/pull/18)** (tip **`5761292`** or later); nested [#19](https://github.com/justin-p/testing/pull/19)–[#23](https://github.com/justin-p/testing/pull/23), [#26](https://github.com/justin-p/testing/pull/26), [#27](https://github.com/justin-p/testing/pull/27), [#29](https://github.com/justin-p/testing/pull/29); [#28](https://github.com/justin-p/testing/pull/28) closed. Integration branches **`ws-01…ws-06`** may still exist remotely for archaeology. |
+| **Last synced** | **2026-05-07** — Workshop stack remains merged to **`main`** via **[#18](https://github.com/justin-p/testing/pull/18)** (+ nested [#19](https://github.com/justin-p/testing/pull/19)–[#23](https://github.com/justin-p/testing/pull/23), [#26](https://github.com/justin-p/testing/pull/26), [#27](https://github.com/justin-p/testing/pull/27), [#29](https://github.com/justin-p/testing/pull/29)); current in-flight lesson follow-up is **[#34](https://github.com/justin-p/testing/pull/34)** on `ws-lesson-05-lesson-repo-sync-http` with additional instructor UX polish commits (`0336269`, `810b486`, `812bf26`). |
 | **Integration tip** | **`main`** |
-| **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** - **Lesson GitHub sync**: backend previously tracked on **`ws-lesson-01`…`ws-lesson-05`** ([map](#lesson-source-follow-up-stack)); merge posture follows stacked PRs to **`main`**. Lesson GitHub sync backend hardening + instructor Install/configure UI are now in place; remaining work is optional polish/ops follow-through. Posture **`security-hardening-new-features`**. |
+| **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** - **Lesson GitHub sync**: backend tracked on **`ws-lesson-01`…`ws-lesson-05`** ([map](#lesson-source-follow-up-stack)); merge posture follows stacked PRs to **`main`**. Functional blockers are closed; current work is optional polish/ops follow-through (card ergonomics, observability, and merge sequencing through #30→#34). Posture **`security-hardening-new-features`**. |
 
 ### Remaining work (authoritative)
 
@@ -827,7 +827,7 @@ flowchart LR
   l4 --> l5["L5 sync HTTP"]
 ```
 
-**Still deferred vs full §1:** no functional blockers; follow-up is refinement (richer install UX copy, repository picker ergonomics, and observability polish). Core controls are in place: webhook **delivery ledger + IP throttle + Date-skew guard**, **`installation_repositories` entitlement checks**, sync-time **relative → `raw.githubusercontent.com` rewrite**, and **API/UI part HTML rendering**.
+**Still deferred vs full §1:** no functional blockers; follow-up is refinement/ops. Recent `ws-lesson-05` polish shipped on branch/PR #34: selected-installation repo filtering, one-click **Use installation + repo**, **Copy ID** with feedback, per-row **last sync** timestamp, and post-sync cache refresh hint. Core controls are in place: webhook **delivery ledger + IP throttle + Date-skew guard**, **`installation_repositories` entitlement checks**, sync-time **relative → `raw.githubusercontent.com` rewrite**, and **API/UI part HTML rendering**.
 
 ### PR scope guardrails
 
