@@ -491,6 +491,15 @@ function WorkshopSessionPage() {
     detailQuery.data?.lesson.lesson_content_available ?? true
   const lessonContentIssue =
     detailQuery.data?.lesson.lesson_content_issue ?? null
+  const canRunLiveDelivery = lessonContentAvailable
+  const lessonContentIssueHint =
+    lessonContentIssue === "lesson_missing"
+      ? "This session is linked to a lesson record that no longer exists."
+      : lessonContentIssue === "lesson_repo_missing"
+        ? "The lesson source repository record is missing."
+        : lessonContentIssue === "no_parts_synced"
+          ? "No lesson parts are currently synced for this lesson."
+          : null
 
   return (
     <div className="space-y-4">
@@ -526,9 +535,10 @@ function WorkshopSessionPage() {
         >
           <AlertTitle>Lesson content unavailable</AlertTitle>
           <AlertDescription>
-            No lesson parts are currently available for this session.
-            {lessonContentIssue ? ` (${lessonContentIssue})` : ""} Sync lesson
-            content before running this workshop.
+            {lessonContentIssueHint ??
+              "No lesson parts are currently available for this session."}{" "}
+            {lessonContentIssue ? `(${lessonContentIssue}) ` : ""}
+            Sync lesson content before running this workshop.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -730,7 +740,9 @@ function WorkshopSessionPage() {
             type="button"
             variant="secondary"
             size="sm"
-            disabled={phase !== "ready" || roomStatus !== "live"}
+            disabled={
+              phase !== "ready" || roomStatus !== "live" || !canRunLiveDelivery
+            }
             onClick={() => sendLiveStatus("busy")}
           >
             Mark busy
@@ -739,7 +751,9 @@ function WorkshopSessionPage() {
             type="button"
             variant="secondary"
             size="sm"
-            disabled={phase !== "ready" || roomStatus !== "live"}
+            disabled={
+              phase !== "ready" || roomStatus !== "live" || !canRunLiveDelivery
+            }
             onClick={() => sendLiveStatus("done")}
           >
             Mark done
@@ -754,7 +768,9 @@ function WorkshopSessionPage() {
             variant="secondary"
             size="sm"
             data-testid="workshop-instructor-pause"
-            disabled={!instructorReady || roomStatus !== "live"}
+            disabled={
+              !instructorReady || roomStatus !== "live" || !canRunLiveDelivery
+            }
             onClick={() => sendWsJson({ type: "session.pause" })}
           >
             Pause room
@@ -764,7 +780,9 @@ function WorkshopSessionPage() {
             variant="secondary"
             size="sm"
             data-testid="workshop-instructor-resume"
-            disabled={!instructorReady || roomStatus !== "paused"}
+            disabled={
+              !instructorReady || roomStatus !== "paused" || !canRunLiveDelivery
+            }
             onClick={() => sendWsJson({ type: "session.resume" })}
           >
             Resume room
@@ -774,7 +792,9 @@ function WorkshopSessionPage() {
             variant="secondary"
             size="sm"
             data-testid="workshop-instructor-advance"
-            disabled={!instructorReady || roomStatus !== "live"}
+            disabled={
+              !instructorReady || roomStatus !== "live" || !canRunLiveDelivery
+            }
             onClick={() => sendWsJson({ type: "part.advance", part_index: 1 })}
           >
             Advance to part 1
@@ -787,6 +807,7 @@ function WorkshopSessionPage() {
             disabled={
               !instructorReady ||
               timerStatus !== "inactive" ||
+              !canRunLiveDelivery ||
               startTimerMutation.isPending
             }
             onClick={() => startTimerMutation.mutate()}
@@ -801,6 +822,7 @@ function WorkshopSessionPage() {
             disabled={
               !instructorReady ||
               timerStatus !== "running" ||
+              !canRunLiveDelivery ||
               pauseTimerMutation.isPending
             }
             onClick={() => pauseTimerMutation.mutate()}
@@ -815,6 +837,7 @@ function WorkshopSessionPage() {
             disabled={
               !instructorReady ||
               timerStatus !== "paused" ||
+              !canRunLiveDelivery ||
               resumeTimerMutation.isPending
             }
             onClick={() => resumeTimerMutation.mutate()}
@@ -829,6 +852,7 @@ function WorkshopSessionPage() {
             disabled={
               !instructorReady ||
               timerStatus === "inactive" ||
+              !canRunLiveDelivery ||
               stopTimerMutation.isPending
             }
             onClick={() => stopTimerMutation.mutate()}
@@ -840,7 +864,9 @@ function WorkshopSessionPage() {
             variant="destructive"
             size="sm"
             data-testid="workshop-instructor-end"
-            disabled={!instructorReady || roomStatus === "ended"}
+            disabled={
+              !instructorReady || roomStatus === "ended" || !canRunLiveDelivery
+            }
             onClick={() => void endSession()}
           >
             End session
