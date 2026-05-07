@@ -150,6 +150,16 @@ export function WorkshopLessonRepoSyncCard() {
     if (ageMs < 5 * 60_000) return "aging"
     return "stale"
   }, [lastRefreshedAt])
+  const statusMessage = useMemo(() => {
+    if (syncMutation.isPending) return "Sync in progress..."
+    if (isRefreshingData)
+      return "Refreshing installation and repository lists..."
+    if (errorDetail) return `Sync failed: ${errorDetail}`
+    if (syncMutation.data) {
+      return `Last sync succeeded for ${syncMutation.data.full_name}.`
+    }
+    return "Ready to sync from GitHub."
+  }, [errorDetail, isRefreshingData, syncMutation.data, syncMutation.isPending])
 
   useEffect(() => {
     if (
@@ -230,6 +240,9 @@ export function WorkshopLessonRepoSyncCard() {
           </a>
           .
         </p>
+        <p className="text-xs text-muted-foreground" aria-live="polite">
+          {statusMessage}
+        </p>
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="space-y-1">
             <label
@@ -302,6 +315,23 @@ export function WorkshopLessonRepoSyncCard() {
               <p className="text-xs text-muted-foreground">
                 Known installations: {installationsQuery.data?.count}
               </p>
+            ) : null}
+            {installationsQuery.isError ? (
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-destructive">
+                  Could not load installations.
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => void installationsQuery.refetch()}
+                  disabled={isBusy}
+                >
+                  Retry
+                </Button>
+              </div>
             ) : null}
           </div>
         </div>
@@ -494,9 +524,21 @@ export function WorkshopLessonRepoSyncCard() {
               Loading repositories…
             </p>
           ) : reposQuery.isError ? (
-            <p className="text-xs text-destructive">
-              Could not load repositories list.
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-destructive">
+                Could not load repositories list.
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => void reposQuery.refetch()}
+                disabled={isBusy}
+              >
+                Retry
+              </Button>
+            </div>
           ) : (reposQuery.data?.count ?? 0) === 0 ? (
             <p className="text-xs text-muted-foreground">
               No lesson repositories synced yet.
