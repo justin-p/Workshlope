@@ -179,6 +179,7 @@ export type OAuthAccountPublic = {
     provider: string;
     provider_account_id: string;
     provider_login?: (string | null);
+    avatar_url?: (string | null);
     linked_at?: (string | null);
 };
 

@@ -28,6 +28,7 @@ from app.models import (
     LessonPrerequisite,
     LessonRepo,
     Message,
+    OAuthAccount,
     SessionInstructor,
     User,
     UserPrerequisiteCompletion,
@@ -848,6 +849,20 @@ def _workshop_session_detail_shared(
     return core, lesson_summary, parts
 
 
+def _github_avatar_urls_for_roster_users(
+    session_db: Session, *, user_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, str | None]:
+    if not user_ids:
+        return {}
+    rows = session_db.exec(
+        select(OAuthAccount.user_id, OAuthAccount.avatar_url).where(
+            OAuthAccount.provider == "github",
+            col(OAuthAccount.user_id).in_(user_ids),
+        )
+    ).all()
+    return dict(rows)
+
+
 @router.get(
     "/{session_id}",
     response_model=WorkshopSessionPublicParticipant | WorkshopSessionPublicInstructor,
@@ -913,20 +928,6 @@ def read_workshop_session_detail(
         )
     ).all()
     participants_out = sorted(p_pairs, key=lambda pair: str(pair[1].email))
-    participants_public = [
-        WorkshopRosterParticipantRowPublic(
-            user_id=user.id,
-            email=str(user.email),
-            full_name=user.full_name,
-            avatar_url=None,
-            invited_at=seat.invited_at,
-            joined_at=seat.joined_at,
-            finished_at=seat.finished_at,
-            live_status=seat.live_status,
-        )
-        for seat, user in participants_out
-    ]
-
     i_pairs = session.exec(
         select(SessionInstructor, User)
         .join(User, col(SessionInstructor.user_id) == User.id)
@@ -935,13 +936,32 @@ def read_workshop_session_detail(
             col(SessionInstructor.removed_at).is_(None),
         )
     ).all()
+    roster_user_ids = {user.id for _, user in participants_out}
     instructors_out = sorted(i_pairs, key=lambda pair: str(pair[1].email))
+    roster_user_ids |= {user.id for _, user in instructors_out}
+    avatars_by_user_id = _github_avatar_urls_for_roster_users(
+        session, user_ids=roster_user_ids
+    )
+    participants_public = [
+        WorkshopRosterParticipantRowPublic(
+            user_id=user.id,
+            email=str(user.email),
+            full_name=user.full_name,
+            avatar_url=avatars_by_user_id.get(user.id),
+            invited_at=seat.invited_at,
+            joined_at=seat.joined_at,
+            finished_at=seat.finished_at,
+            live_status=seat.live_status,
+        )
+        for seat, user in participants_out
+    ]
+
     instructors_public = [
         WorkshopRosterInstructorRowPublic(
             user_id=user.id,
             email=str(user.email),
             full_name=user.full_name,
-            avatar_url=None,
+            avatar_url=avatars_by_user_id.get(user.id),
             role=seat.role,
             assigned_at=seat.assigned_at,
         )

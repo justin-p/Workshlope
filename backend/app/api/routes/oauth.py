@@ -92,6 +92,12 @@ def bridge_login(*, session: SessionDep, body: GitHubBridgeRequest) -> Any:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User is not active",
             )
+        crud.sync_linked_github_oauth_from_bridge_claims(
+            session=session,
+            account=account,
+            provider_login=provider_login,
+            avatar_url=avatar_url,
+        )
         return BridgeResponse(
             status="signed_in",
             access_token=_issue_access_token(user.id),
@@ -210,6 +216,7 @@ def approve_pending_login(
         provider=pending.provider,
         provider_account_id=pending.provider_account_id,
         provider_login=pending.provider_login,
+        avatar_url=pending.avatar_url,
         linked_by_user_id=current_user.id,
     )
     crud.delete_pending_github_login(session=session, pending=pending)

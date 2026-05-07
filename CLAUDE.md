@@ -58,7 +58,7 @@ This project is indexed by GitNexus as **testing** (4234 symbols, 6377 relations
 ## Change Delivery Guardrails
 
 - Treat `PLAN.md` as the detailed delivery map; keep `AGENTS.md` as execution rules and safety checks.
-- Plan-sync is mandatory: whenever code/tests/docs state changes materially, update `PLAN.md` in the same working pass (at minimum `Last synced`, `Latest work`, and/or `Testing` bullets as applicable) before asking to continue or before commit.
+- Plan-sync is mandatory: whenever code/tests/docs state changes materially, update `PLAN.md` in the same working pass (at minimum `Last synced`, `Branch`/`PR`, and/or `Testing` bullets as applicable) before asking to continue or before commit.
 - Branch + PR workflow is mandatory for delivery work unless the user explicitly approves direct-to-`main`:
   - before editing, ensure current branch is not `main`; if on `main`, create/switch to a feature branch first,
   - open a PR for each completed slice and share the PR URL,

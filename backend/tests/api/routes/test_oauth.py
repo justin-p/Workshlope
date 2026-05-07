@@ -129,6 +129,32 @@ class TestBridgeLinkedFlow:
         )
         assert decoded["sub"] == str(user.id)
 
+    def test_linked_bridge_refreshes_stored_github_avatar(
+        self, client: TestClient, db: Session
+    ) -> None:
+        user = _create_active_user(db)
+        crud.create_oauth_account(
+            session=db,
+            user_id=user.id,
+            provider="github",
+            provider_account_id="789",
+            provider_login="carol",
+            avatar_url="https://old.example/old.png",
+        )
+        token = _bridge_token(
+            provider_account_id="789",
+            provider_login="carol-next",
+            avatar_url="https://new.example/new.png",
+        )
+        r = client.post(f"{API}/oauth/github/bridge", json={"bridge_token": token})
+        assert r.status_code == 200
+        account = crud.get_oauth_account(
+            session=db, provider="github", provider_account_id="789"
+        )
+        assert account is not None
+        assert account.avatar_url == "https://new.example/new.png"
+        assert account.provider_login == "carol-next"
+
     def test_linked_inactive_user_denied(self, client: TestClient, db: Session) -> None:
         user = _create_active_user(db, is_active=False)
         crud.create_oauth_account(
@@ -267,6 +293,7 @@ class TestAdminApproveLinkExisting:
             provider_account_id="300",
             provider_login="bob",
             email=user.email,
+            avatar_url="https://pending.example/a.png",
         )
         pending_id = pending.id
         r = client.post(
@@ -279,6 +306,7 @@ class TestAdminApproveLinkExisting:
         assert body["user_id"] == str(user.id)
         assert body["provider_account_id"] == "300"
         assert body["provider_login"] == "bob"
+        assert body["avatar_url"] == "https://pending.example/a.png"
         db.expire_all()
         assert (
             crud.get_pending_github_login_by_id(session=db, pending_id=pending_id)

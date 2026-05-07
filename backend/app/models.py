@@ -813,6 +813,7 @@ class OAuthAccount(SQLModel, table=True):
     provider: str = Field(max_length=32, index=True)
     provider_account_id: str = Field(max_length=255)
     provider_login: str | None = Field(default=None, max_length=255)
+    avatar_url: str | None = Field(default=None, max_length=512)
     linked_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
@@ -830,6 +831,7 @@ class OAuthAccountPublic(SQLModel):
     provider: str
     provider_account_id: str
     provider_login: str | None = None
+    avatar_url: str | None = None
     linked_at: datetime | None = None
 
 
