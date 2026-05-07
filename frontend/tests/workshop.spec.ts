@@ -294,6 +294,15 @@ test.describe("Workshop live session", () => {
     await expect(page.getByTestId("workshop-blocked-drilldown")).toContainText(
       "Open",
     )
+    await expect(page.getByTestId("workshop-blocked-analytics")).toContainText(
+      "Blocked prerequisite analytics",
+    )
+    await expect(
+      page.getByTestId("workshop-blocked-analytics-ratio"),
+    ).toContainText("Sessions impacted:")
+    await expect(
+      page.getByTestId("workshop-blocked-analytics-most-blocked"),
+    ).toContainText("Most blocked session:")
     await page.getByTestId("workshop-cards-blocked-only-toggle").click()
     await expect(
       page.getByTestId("workshop-cards-blocked-only-toggle"),
