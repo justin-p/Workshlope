@@ -2035,6 +2035,82 @@ def test_get_workshop_session_detail_flags_missing_lesson_parts(
     assert body["parts"] == []
 
 
+def test_get_workshop_session_detail_handles_missing_lesson_row(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    iso_email = f"detail-lesson-missing-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+
+    session_row = _create_live_session(db)
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=user.id))
+    db.commit()
+
+    original_get = Session.get
+
+    def patched_get(
+        self: Session, entity: object, ident: object, *args: object, **kwargs: object
+    ):  # type: ignore[no-untyped-def]
+        if entity is Lesson and ident == session_row.lesson_id:
+            return None
+        return original_get(self, entity, ident, *args, **kwargs)
+
+    monkeypatch.setattr(Session, "get", patched_get)
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["lesson"]["id"] == str(session_row.lesson_id)
+    assert body["lesson"]["title"] == "Lesson unavailable"
+    assert body["lesson"]["lesson_repo_health"] == "unhealthy"
+    assert body["lesson"]["lesson_content_available"] is False
+    assert body["lesson"]["lesson_content_issue"] == "lesson_missing"
+    assert body["parts"] == []
+
+
+def test_get_workshop_session_detail_handles_missing_lesson_repo_row(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    iso_email = f"detail-repo-missing-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+
+    session_row = _create_live_session(db)
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=user.id))
+    db.commit()
+
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    original_get = Session.get
+
+    def patched_get(
+        self: Session, entity: object, ident: object, *args: object, **kwargs: object
+    ):  # type: ignore[no-untyped-def]
+        if entity is LessonRepo and ident == lesson.repo_id:
+            return None
+        return original_get(self, entity, ident, *args, **kwargs)
+
+    monkeypatch.setattr(Session, "get", patched_get)
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["lesson"]["id"] == str(lesson.id)
+    assert body["lesson"]["slug"] == lesson.slug
+    assert body["lesson"]["lesson_repo_health"] == "unhealthy"
+    assert body["lesson"]["lesson_content_available"] is False
+    assert body["lesson"]["lesson_content_issue"] == "lesson_repo_missing"
+    assert body["parts"] == []
+
+
 def test_get_workshop_session_detail_instructor_roster(
     client: TestClient, db: Session
 ) -> None:

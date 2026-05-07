@@ -754,16 +754,25 @@ def _workshop_session_detail_shared(
 ]:
     lesson = session.get(Lesson, workshop_row.lesson_id)
     if lesson is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="session_lesson_missing",
+        core = WorkshopSessionCorePublic(
+            id=workshop_row.id,
+            status=workshop_row.status,
+            current_part_index=workshop_row.current_part_index,
+            current_part_slug=workshop_row.current_part_slug,
+            part_generation=workshop_row.part_generation,
+            created_at=workshop_row.created_at,
         )
-
-    lesson_repo = session.get(LessonRepo, lesson.repo_id)
-    if lesson_repo is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="session_lesson_repo_missing",
+        return (
+            core,
+            WorkshopLessonSummaryPublic(
+                id=workshop_row.lesson_id,
+                title="Lesson unavailable",
+                slug="lesson-unavailable",
+                lesson_repo_health="unhealthy",
+                lesson_content_available=False,
+                lesson_content_issue="lesson_missing",
+            ),
+            [],
         )
 
     core = WorkshopSessionCorePublic(
@@ -774,6 +783,21 @@ def _workshop_session_detail_shared(
         part_generation=workshop_row.part_generation,
         created_at=workshop_row.created_at,
     )
+    lesson_repo = session.get(LessonRepo, lesson.repo_id)
+    if lesson_repo is None:
+        return (
+            core,
+            WorkshopLessonSummaryPublic(
+                id=lesson.id,
+                title=lesson.title,
+                slug=lesson.slug,
+                lesson_repo_health="unhealthy",
+                lesson_content_available=False,
+                lesson_content_issue="lesson_repo_missing",
+            ),
+            [],
+        )
+
     lesson_summary = WorkshopLessonSummaryPublic(
         id=lesson.id,
         title=lesson.title,
