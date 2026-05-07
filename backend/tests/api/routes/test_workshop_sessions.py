@@ -282,6 +282,7 @@ def test_http_second_start_rejected(client: TestClient, db: Session) -> None:
     session_row.status = "scheduled"
     db.add(session_row)
     db.commit()
+    _add_two_parts_to_session_lesson(db, session_row)
     instructor_email = f"i2-{uuid.uuid4()}@example.com"
     i_headers = authentication_token_from_email(
         client=client, email=instructor_email, db=db
