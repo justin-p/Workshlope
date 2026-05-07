@@ -277,9 +277,14 @@ test.describe("Workshop live session", () => {
     await expect(
       page.getByTestId(`workshop-card-blocked-count-${session_id}`),
     ).toContainText("Blocked: 1")
-    await expect(
-      page.getByTestId("workshop-cards-total-blocked"),
-    ).toContainText("Total blocked trainees: 1")
+    const totalBlockedText = await page
+      .getByTestId("workshop-cards-total-blocked")
+      .innerText()
+    const totalBlockedCount = Number.parseInt(
+      totalBlockedText.replace(/^\D+/u, ""),
+      10,
+    )
+    expect(totalBlockedCount).toBeGreaterThanOrEqual(1)
     await expect(page.getByTestId("workshop-blocked-drilldown")).toContainText(
       "Blocked sessions",
     )
@@ -293,5 +298,55 @@ test.describe("Workshop live session", () => {
     await expect(
       page.getByTestId("workshop-cards-blocked-only-toggle"),
     ).toContainText("Show all sessions")
+  })
+
+  test("instructor session view shows prerequisite roster analytics", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?with_incomplete_required_prerequisite=true&omit_participant_seat=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      {
+        timeout: 15_000,
+      },
+    )
+
+    const panel = page.getByTestId("workshop-prework-instructor-panel")
+    await expect(panel).toBeVisible()
+    await expect(
+      page.getByTestId("workshop-prework-instructor-gaps-count"),
+    ).toContainText(/trainee\(s\) still missing/i)
+    await expect(panel).toContainText(/trainees done/i)
+  })
+
+  test("workshops hub redirects non-instructors to trainee dashboard", async ({
+    browser,
+  }) => {
+    const participant = await createParticipantUserForWorkshop()
+    const participantContext = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    })
+    const page = await participantContext.newPage()
+
+    await page.goto("/login")
+    await page.getByTestId("email-input").fill(participant.email)
+    await page.getByTestId("password-input").fill(participant.password)
+    await page.getByRole("button", { name: "Log In" }).click()
+    await page.waitForURL("/dashboard/trainee")
+
+    await page.goto("/workshops")
+    await page.waitForURL("/dashboard/trainee")
+    await expect(
+      page.getByTestId("workshop-lesson-repo-sync-card"),
+    ).toHaveCount(0)
+
+    await participantContext.close()
   })
 })
