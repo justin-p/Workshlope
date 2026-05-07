@@ -166,9 +166,8 @@ export function WorkshopLessonRepoSyncCard() {
         limit: 50,
       }),
   })
-  const installCtaHref =
-    installationsQuery.data?.install_url ??
-    "https://github.com/settings/installations"
+  const installCtaHref = installationsQuery.data?.install_url ?? null
+  const hasInstallKickoff = Boolean(installCtaHref)
   const installationsCount = installationsQuery.data?.count ?? 0
   const hasAnyInstallations = installationsCount > 0
   const selectedInstallation = useMemo(() => {
@@ -183,7 +182,9 @@ export function WorkshopLessonRepoSyncCard() {
     selectedInstallation?.repository_selection === "selected" &&
     selectedInstallation.entitled_repositories.length === 0
   const blockingSetupHint = !hasAnyInstallations
-    ? "Install the GitHub App before syncing lesson repositories."
+    ? hasInstallKickoff
+      ? "Install the GitHub App before syncing lesson repositories."
+      : "GitHub App setup is not configured yet. Ask a platform admin to set GITHUB_APP_SLUG or GITHUB_APP_INSTALL_URL."
     : selectedInstallationNeedsGrant
       ? "Grant repository access for the selected installation before syncing."
       : null
@@ -352,16 +353,26 @@ export function WorkshopLessonRepoSyncCard() {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Need to install or adjust repository access first? Open{" "}
-          <a
-            href={installCtaHref}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="underline text-primary"
-          >
-            GitHub App installations
-          </a>
-          .
+          Need to install or adjust repository access first?{" "}
+          {installCtaHref ? (
+            <>
+              Open{" "}
+              <a
+                href={installCtaHref}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="underline text-primary"
+              >
+                GitHub App installations
+              </a>
+              .
+            </>
+          ) : (
+            <>
+              First create and configure the GitHub App, then return here to
+              install and grant repo access.
+            </>
+          )}
         </p>
         {!hasAnyInstallations ? (
           <div
@@ -369,18 +380,38 @@ export function WorkshopLessonRepoSyncCard() {
             data-testid="workshop-sync-install-prompt"
           >
             <p className="font-medium">GitHub App access required</p>
-            <p>
-              No installations were found yet. Install the GitHub App to connect
-              lesson repositories.
-            </p>
-            <a
-              href={installCtaHref}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="underline text-primary"
-            >
-              Install GitHub App
-            </a>
+            {installCtaHref ? (
+              <>
+                <p>
+                  No installations were found yet. Install the GitHub App to
+                  connect lesson repositories.
+                </p>
+                <a
+                  href={installCtaHref}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline text-primary"
+                >
+                  Install GitHub App
+                </a>
+              </>
+            ) : (
+              <>
+                <p>
+                  No install kickoff URL is configured. Platform admins should
+                  set <code>GITHUB_APP_SLUG</code> or{" "}
+                  <code>GITHUB_APP_INSTALL_URL</code> in backend env.
+                </p>
+                <a
+                  href="https://docs.github.com/en/apps/creating-github-apps"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline text-primary"
+                >
+                  Create a GitHub App
+                </a>
+              </>
+            )}
           </div>
         ) : null}
         <p className="text-xs text-muted-foreground" aria-live="polite">

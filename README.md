@@ -10,18 +10,18 @@ This repository now uses the [`fastapi/full-stack-fastapi-template`](https://git
 cp .env .env.local
 ```
 
-2. Edit `.env.local` and set secure values for:
+1. Edit `.env.local` and set secure values for:
    - `SECRET_KEY`
    - `FIRST_SUPERUSER_PASSWORD`
    - `POSTGRES_PASSWORD`
 
-3. Start the stack with your local env file:
+1. Start the stack with your local env file:
 
 ```bash
 docker compose --env-file .env.local up -d --build
 ```
 
-4. Open:
+1. Open:
    - Frontend: `http://localhost:5173`
    - API docs: `http://localhost:8000/docs`
    - Auth.js bridge health: `http://localhost:3001/api/bridge/health`
@@ -60,6 +60,34 @@ To run the bridge service locally, set the following in `.env.local`:
 - `authjs-service/.env` — `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
   `AUTH_SECRET`, `BRIDGE_SECRET` (= `GITHUB_BRIDGE_SECRET`),
   `FRONTEND_CALLBACK_URL=http://localhost:5173/auth/callback`.
+
+## GitHub App setup for lesson sync
+
+The workshop lesson sync card in `/workshops` supports app installation and
+repo-access prompts, but a platform admin must bootstrap the GitHub App first.
+
+1. Create/register the GitHub App in GitHub:
+   - [Creating GitHub Apps](https://docs.github.com/en/apps/creating-github-apps)
+2. Configure backend env in `.env.local`:
+   - Required for app auth/webhooks: `GITHUB_APP_ID`,
+     `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`
+   - Required for deterministic install kickoff link in UI (pick one):
+     - `GITHUB_APP_SLUG` (for example `lesson-bot`)
+     - `GITHUB_APP_INSTALL_URL` (full URL override)
+3. Rebuild/restart the stack:
+
+```bash
+docker compose --env-file .env.local up -d --build
+```
+
+Behavior in the workshop sync card:
+
+- If no installation exists and install URL is configured, the card shows
+  `Install GitHub App`.
+- If no installation exists and no install URL is configured, the card shows a
+  setup warning with `Create a GitHub App`.
+- If installation uses `selected` repos but none are entitled, the card blocks
+  sync and shows `Grant repository access`.
 
 ## Upstream template docs
 

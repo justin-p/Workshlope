@@ -386,6 +386,62 @@ test("instructor sync card prompts install and blocks sync when no installations
   await context.close()
 })
 
+test("instructor sync card explains app bootstrap when install URL is unavailable", async ({
+  browser,
+}) => {
+  const email = randomEmail()
+  const password = "changethis123"
+  await createUser({ email, password, is_instructor: true })
+
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  })
+  const page = await context.newPage()
+
+  await page.route("**/api/v1/workshop/lesson-repos/installations**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+      }),
+    }),
+  )
+  await page.route("**/api/v1/workshop/lesson-repos?**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+      }),
+    }),
+  )
+
+  await page.goto("/login")
+  await page.getByTestId("email-input").fill(email)
+  await page.getByTestId("password-input").fill(password)
+  await page.getByRole("button", { name: "Log In" }).click()
+  await page.waitForURL("/dashboard/instructor")
+
+  await page.goto("/workshops")
+  await page.waitForURL("/workshops")
+  await expect(page.getByTestId("workshop-sync-install-prompt")).toBeVisible()
+  await expect(
+    page.getByText("No install kickoff URL is configured."),
+  ).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: "Create a GitHub App" }),
+  ).toHaveAttribute(
+    "href",
+    "https://docs.github.com/en/apps/creating-github-apps",
+  )
+  await expect(page.getByTestId("workshop-sync-submit")).toBeDisabled()
+
+  await context.close()
+})
+
 test("selected installation without entitled repos prompts grant access and blocks sync", async ({
   browser,
 }) => {
