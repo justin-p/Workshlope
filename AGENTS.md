@@ -55,15 +55,23 @@ This project is indexed by GitNexus as **testing** (4234 symbols, 6377 relations
   - `git rev-list --count main..<stack-tip-branch>` must be `0`
   - `git log --oneline --decorate -n 20` must show expected merge commits.
 
-## Workshop Delivery Guardrails
+## Change Delivery Guardrails
 
 - Treat `workshop_lessons_&_sessions_aa012042.plan.md` as the detailed delivery map; keep `AGENTS.md` as execution rules and safety checks.
-- For stacked workshop slices, follow one merge path only:
+- Required skills by default for code changes:
+  - `/python-tdd-with-uv` for backend Python changes (RED -> GREEN -> REFACTOR via `uv run`).
+  - `/playwright-local-gate` for local Playwright validation on behavior/UI changes.
+  - `/babysitting-pr` for CI/review merge-readiness loops.
+- For stacked change slices, follow one merge path only:
   - retarget/rebase each PR toward `main`, or
   - merge remaining stack branches into `main` in order with explicit merge commits.
-- After merging any workshop stack, always run:
+- After merging any stacked branch set, always run:
   - `gh pr view <n> --json number,baseRefName,headRefName,state,mergedAt`
   - `git rev-list --count main..<stack-tip-branch>` (must be `0`)
+- For split workflows, enforce:
+  - approve split map before any branch/commit/push/PR work,
+  - stage only targeted files/hunks (no `git add .` / no `git add -A`),
+  - report resulting PR URLs and remaining working tree status.
 
 ## PR Babysitting Policy (Required)
 
@@ -73,3 +81,10 @@ This project is indexed by GitNexus as **testing** (4234 symbols, 6377 relations
   - `gh run view <run-id> --log-failed`
   - `gh pr checks --watch`
 - Do not merge with pending/failing checks unless the user explicitly requests an override.
+- Stop only when:
+  - all checks are green and mergeability is acceptable, or
+  - a blocker requires product/design input from the user.
+- Safety constraints:
+  - never force-push shared PR branches,
+  - never use destructive history/working-tree operations,
+  - never weaken tests just to make CI pass unless behavior change is explicitly approved.

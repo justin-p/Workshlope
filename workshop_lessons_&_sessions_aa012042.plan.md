@@ -152,26 +152,7 @@ On every new HTTP route: regenerate **OpenAPI** + **`frontend/src/client`**.
 
 ## Delivery methodology (locked)
 
-Apply `/python-tdd-with-uv` for all Python backend changes in this plan:
-
-- **TDD cycle required:** RED (one failing test) -> GREEN (minimum code) -> REFACTOR.
-- **One behavior at a time:** never implement a backend behavior without a failing test first.
-- **Execution command standard:** use `uv run` for Python commands; do not rely on manual venv activation.
-- **Test gate per slice:** run relevant tests after each slice (`uv run pytest ...`) before moving to the next slice.
-- **Dependency/tooling standard:** manage Python deps/test tools with `uv` (`pyproject.toml` + `uv.lock` kept in sync).
-- **Scope note:** this methodology is mandatory for backend Python code; frontend follows existing TS/Playwright workflow.
-- **E2E quality gate:** maintain full Playwright end-to-end coverage for implemented user journeys (instructor + trainee + admin paths where applicable).
-
-### Definition of Done per implementation slice
-
-- A single next behavior is defined and covered by a new failing test first (RED).
-- Minimal code is added to satisfy only that behavior (GREEN).
-- Relevant tests are run with `uv run pytest` and pass before proceeding.
-- Refactor is completed without behavior change (tests remain green).
-- Security/rbac/privacy assertions for that slice are included where applicable.
-- API slice changes include updated OpenAPI and regenerated TS client artifacts when contract changed.
-- New or changed user flows have corresponding Playwright E2E coverage (happy path + key permission/privacy guards).
-- Critical role/privacy/security behavior is validated in E2E before the slice is considered complete.
+Execution methodology and Definition of Done policy are maintained in `AGENTS.md` (canonical source for TDD, test gates, Playwright expectations, and merge readiness workflow). Keep this plan focused on workshop scope/state and roadmap tracking.
 - Docs/plan check: update affected plan/testing notes if scope or constraints evolved.
 
 ## Locked decisions
@@ -789,35 +770,7 @@ Stacked chains are optional; one **successful** archive is in [GitHub PR stack](
 
 ### Stack model
 
-- Base branch: `main`
-- PRs are strictly stacked (`ws-02` targets `ws-01`, `ws-03` targets `ws-02`, and so on).
-- Each PR must remain reviewable and testable against its immediate base branch.
-- **Critical merge rule:** a PR merged into a non-`main` base does **not** land on `main`. Never assume stacked child PR merges automatically propagate to `main`.
-
-### Stacked merge runbook (required)
-
-Use one of these two strategies; do not mix them implicitly:
-
-1. **Retarget-and-merge strategy (GitHub-first):**
-   - Merge the base PR into `main` (e.g. L1).
-   - Retarget the next PR base to `main` (or update stack so its base is now merged).
-   - Re-run checks, then merge.
-   - Repeat until the stack tip.
-2. **Branch-chain merge strategy (git-first):**
-   - Checkout `main`, pull latest.
-   - Merge remaining stack branches into `main` in order using explicit merge commits (`--no-ff`).
-   - Push `main`.
-
-**Never do:** merge child PRs while their base is a feature branch and then stop; that leaves commits off `main`.
-
-**Mandatory verification after any stacked merge sequence:**
-
-- Confirm each relevant PR's `baseRefName` and merge target:
-  - `gh pr view <n> --json number,baseRefName,headRefName,state,mergedAt`
-- Confirm `main` contains the stack tip:
-  - `git checkout main && git pull`
-  - `git rev-list --count main..<stack-tip-branch>` must be `0`
-  - `git log --oneline --decorate -n 20` should show expected merge commits.
+Execution policy for stacked PR merges is maintained in `AGENTS.md` (see **Stacked PR Merge Safeguard**, **Workshop Delivery Guardrails**, and **PR Babysitting Policy**). This plan tracks branch/PR mapping and project state; use `AGENTS.md` as the operational source of truth.
 
 ### Branch/PR chain
 
@@ -855,19 +808,9 @@ flowchart LR
 
 **Still deferred vs full §1:** no functional blockers; follow-up is refinement/ops. Recent `ws-lesson-05` polish shipped on branch/PR #34: selected-installation repo filtering, one-click **Use installation + repo**, **Copy ID** with feedback, per-row **last sync** timestamp, and post-sync cache refresh hint. Core controls are in place: webhook **delivery ledger + IP throttle + Date-skew guard**, **`installation_repositories` entitlement checks**, sync-time **relative → `raw.githubusercontent.com` rewrite**, and **API/UI part HTML rendering**.
 
-### PR scope guardrails
+### PR scope and quality policy
 
-- Keep changes inside the active slice; avoid cross-slice drift unless required by dependency.
-- Apply security-by-default inside each feature PR (do not defer core controls).
-- Update OpenAPI/TS client only in PRs that change API contracts.
-- Add/adjust Playwright coverage in the same PR as user-facing behavior changes.
-
-### Merge/quality gates per PR
-
-- Backend Python changes follow `/python-tdd-with-uv` (RED -> GREEN -> REFACTOR).
-- Targeted `uv run pytest` and relevant Playwright specs pass for the slice.
-- No known role/privacy regressions in trainee-facing API/WS payloads.
-- PR cannot merge until `/babysitting-pr` loop confirms green checks and merge-ready status.
+Follow `AGENTS.md` for enforceable PR scope, testing, merge, and CI babysitting rules. Keep this plan focused on workshop roadmap/state and branch history.
 
 ### Stacked dependency graph
 
@@ -884,41 +827,13 @@ flowchart TD
 ```
 *(PR06–PR09 numbers above merged as part of the collapsed stack; **`main`** is the integration tip.)*
 
-### `/split-to-prs` readiness checklist
+### `/split-to-prs` and babysitting
 
-- Approve the split map before any branch/commit/push/PR operations.
-- Save a recoverable backup ref before moving work between slices.
-- Stage only named files/hunks for each slice (`no git add .` / `no git add -A`).
-- Report PR titles/URLs and remaining working-tree status after execution; if you recreate a stacked chain, update the archival **[GitHub PR stack](#github-pr-stack-archived-collapsed-chain--historical-reference)** table (or successor doc).
+`/split-to-prs` execution is governed by `AGENTS.md`. After any split/stack work, update this plan's branch/PR tables and current checkpoint so delivery state remains accurate.
 
 ## PR babysitting policy (locked)
 
-Workshop stack PRs (**[#18](https://github.com/justin-p/testing/pull/18)** … **[#23](https://github.com/justin-p/testing/pull/23)**) are merged — **still apply** **`gh pr checks` → fix → push** for **every PR to `main`** (single-PR deliveries or future stacks).
-
-### Execution loop
-
-- Loop model: `check -> fix -> push -> re-check`.
-- Commands used during loop:
-  - `gh pr view --json number,title,state,mergeable,reviewDecision,statusCheckRollup,comments,reviews`
-  - `gh pr checks`
-  - `gh run view <run-id> --log-failed`
-  - `gh pr checks --watch`
-- Loop is **unlimited** until one of the stop conditions is met.
-
-### Stop conditions
-
-- All checks pass, review/conflict status is acceptable, and PR is merge-ready.
-- A blocker needs product/design clarification; escalate to user and pause automated fixing.
-
-### Safeguards
-
-- Never force-push to shared PR branches.
-- Never use destructive git operations (no hard reset/clean/history rewrite).
-- Do not weaken tests/assertions merely to make CI pass unless behavior change is intentional and approved.
-
-### Testing flow note
-
-CI-failure triage and remediation is part of the normal per-PR execution flow, not a final end-of-project phase.
+Execution loop, stop conditions, and safety constraints are maintained in `AGENTS.md` (canonical workflow policy). Use this plan only to track project/stack state and PR mapping.
 
 ---
 
