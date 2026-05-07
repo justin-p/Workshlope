@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useMemo, useState } from "react"
 
 import { ApiError, WorkshopLessonReposService } from "@/client"
@@ -23,10 +23,14 @@ function formatSyncTimestamp(iso: string | null | undefined): string {
 }
 
 export function WorkshopLessonRepoSyncCard() {
+  const queryClient = useQueryClient()
   const [fullName, setFullName] = useState("")
   const [installationId, setInstallationId] = useState("")
   const [recentRepos, setRecentRepos] = useState<string[]>([])
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
+  const [copiedInstallationId, setCopiedInstallationId] = useState<
+    number | null
+  >(null)
 
   useEffect(() => {
     try {
@@ -48,7 +52,7 @@ export function WorkshopLessonRepoSyncCard() {
       WorkshopLessonReposService.syncLessonRepoFromGithub({
         requestBody: payload,
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
       setErrorDetail(null)
       const normalized = fullName.trim()
       if (OWNER_REPO_RE.test(normalized)) {
@@ -63,6 +67,12 @@ export function WorkshopLessonRepoSyncCard() {
           // Ignore localStorage write failures in private/locked contexts.
         }
       }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["workshopLessonRepos"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopGithubInstallations"],
+        }),
+      ])
     },
     onError: (e: unknown) => {
       if (e instanceof ApiError) {
@@ -147,6 +157,12 @@ export function WorkshopLessonRepoSyncCard() {
   const copyInstallationId = async (value: number) => {
     try {
       await navigator.clipboard.writeText(String(value))
+      setCopiedInstallationId(value)
+      setTimeout(() => {
+        setCopiedInstallationId((current) =>
+          current === value ? null : current,
+        )
+      }, 1500)
     } catch {
       // Ignore clipboard write failures silently.
     }
@@ -276,7 +292,9 @@ export function WorkshopLessonRepoSyncCard() {
                     }
                     title="Copy installation ID"
                   >
-                    Copy ID
+                    {copiedInstallationId === inst.installation_id
+                      ? "Copied"
+                      : "Copy ID"}
                   </Button>
                 </div>
               ))}
