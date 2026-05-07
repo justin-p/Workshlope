@@ -31,6 +31,7 @@ export function WorkshopLessonRepoSyncCard() {
   const [copiedInstallationId, setCopiedInstallationId] = useState<
     number | null
   >(null)
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null)
 
   useEffect(() => {
     try {
@@ -73,6 +74,7 @@ export function WorkshopLessonRepoSyncCard() {
           queryKey: ["workshopGithubInstallations"],
         }),
       ])
+      setLastRefreshedAt(new Date())
     },
     onError: (e: unknown) => {
       if (e instanceof ApiError) {
@@ -384,6 +386,11 @@ export function WorkshopLessonRepoSyncCard() {
               {syncMutation.data.full_name}
             </span>
           ) : null}
+          {lastRefreshedAt ? (
+            <span className="text-xs text-muted-foreground">
+              Refreshed {lastRefreshedAt.toLocaleTimeString()}
+            </span>
+          ) : null}
         </div>
         {errorDetail ? (
           <p
@@ -429,6 +436,10 @@ export function WorkshopLessonRepoSyncCard() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {/*
+                      Keep "Use" aligned with current filter context to avoid
+                      accidental cross-installation prefills.
+                    */}
                     <Button
                       type="button"
                       variant="outline"
@@ -440,7 +451,19 @@ export function WorkshopLessonRepoSyncCard() {
                           repo.full_name,
                         )
                       }
-                      disabled={!repo.github_installation_id}
+                      disabled={
+                        !repo.github_installation_id ||
+                        (selectedInstallation !== null &&
+                          repo.github_installation_id !==
+                            selectedInstallation.installation_id)
+                      }
+                      title={
+                        selectedInstallation !== null &&
+                        repo.github_installation_id !==
+                          selectedInstallation.installation_id
+                          ? "Repo belongs to a different installation"
+                          : undefined
+                      }
                     >
                       Use
                     </Button>
