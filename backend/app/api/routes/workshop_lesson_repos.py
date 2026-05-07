@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import datetime
+from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
@@ -12,6 +13,7 @@ from app.models import (
     GithubAppInstallation,
     GithubInstallationRepository,
     Lesson,
+    LessonManifestSync,
     LessonPart,
     LessonRepo,
     User,
@@ -75,11 +77,41 @@ class LessonRepoListItemPublic(BaseModel):
     last_synced_at: datetime | None = None
     lesson_count: int
     part_count: int
+    manifest_count: int
+    last_manifest_synced_at: datetime | None = None
 
 
 class LessonRepoListPublic(BaseModel):
     data: list[LessonRepoListItemPublic]
     count: int
+
+
+class LessonRepoHealthFilter(str):
+    ALL = "all"
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+
+
+class LessonRepoPreviewPartPublic(BaseModel):
+    slug: str
+    title: str
+    ordering: int
+    path: str
+
+
+class LessonRepoPreviewLessonPublic(BaseModel):
+    lesson_id: uuid.UUID
+    lesson_slug: str
+    lesson_title: str
+    parts: list[LessonRepoPreviewPartPublic]
+
+
+class LessonRepoPreviewPublic(BaseModel):
+    lesson_repo_id: uuid.UUID
+    full_name: str
+    default_branch: str
+    health: str
+    lessons: list[LessonRepoPreviewLessonPublic]
 
 
 class GithubInstallationListItemPublic(BaseModel):
@@ -91,11 +123,13 @@ class GithubInstallationListItemPublic(BaseModel):
     suspended: bool
     entitled_repositories_count: int
     entitled_repositories: list[str]
+    installation_settings_url: str
 
 
 class GithubInstallationListPublic(BaseModel):
     data: list[GithubInstallationListItemPublic]
     count: int
+    install_url: str | None = None
 
 
 def _require_installation_repo_entitlement(
@@ -123,6 +157,15 @@ def _require_installation_repo_entitlement(
     )
 
 
+def _resolve_github_app_install_url(
+    installations: list[GithubAppInstallation],
+) -> str | None:
+    for installation in installations:
+        if installation.app_slug:
+            return f"https://github.com/apps/{installation.app_slug}/installations/new"
+    return None
+
+
 @router.get("", response_model=LessonRepoListPublic)
 def read_lesson_repos(
     *,
@@ -130,24 +173,67 @@ def read_lesson_repos(
     current_user: CurrentUser,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
+    installation_id: int | None = Query(default=None, gt=0),
+    health: str = Query(default=LessonRepoHealthFilter.ALL),
+    q: str | None = Query(default=None, min_length=1, max_length=255),
 ) -> LessonRepoListPublic:
     """List lesson repos with health + lesson/part counts for instructor tooling."""
     _require_lesson_github_editor(current_user)
 
-    rows = session.exec(
-        select(
-            LessonRepo,
-            func.count(col(Lesson.id)).label("lesson_count"),
-            func.count(col(LessonPart.id)).label("part_count"),
+    list_stmt = (
+        cast(
+            Any,
+            select(
+                LessonRepo,
+                func.count(func.distinct(col(Lesson.id))).label("lesson_count"),
+                func.count(func.distinct(col(LessonPart.id))).label("part_count"),
+                func.count(func.distinct(col(LessonManifestSync.id))).label(
+                    "manifest_count"
+                ),
+            ).add_columns(
+                func.max(col(LessonManifestSync.synced_at)).label(
+                    "last_manifest_synced_at"
+                )
+            ),
         )
         .outerjoin(Lesson, col(Lesson.repo_id) == col(LessonRepo.id))
         .outerjoin(LessonPart, col(LessonPart.lesson_id) == col(Lesson.id))
-        .group_by(col(LessonRepo.id))
+        .outerjoin(
+            LessonManifestSync, col(LessonManifestSync.repo_id) == col(LessonRepo.id)
+        )
+    )
+    count_stmt = select(func.count()).select_from(LessonRepo)
+    if installation_id is not None:
+        list_stmt = list_stmt.where(
+            LessonRepo.github_installation_id == installation_id
+        )
+        count_stmt = count_stmt.where(
+            LessonRepo.github_installation_id == installation_id
+        )
+    if health == LessonRepoHealthFilter.HEALTHY:
+        list_stmt = list_stmt.where(LessonRepo.health == "healthy")
+        count_stmt = count_stmt.where(LessonRepo.health == "healthy")
+    elif health == LessonRepoHealthFilter.UNHEALTHY:
+        list_stmt = list_stmt.where(LessonRepo.health != "healthy")
+        count_stmt = count_stmt.where(LessonRepo.health != "healthy")
+    elif health != LessonRepoHealthFilter.ALL:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="health must be one of: all, healthy, unhealthy",
+        )
+    if q is not None:
+        needle = q.strip()
+        if needle:
+            query_filter = col(LessonRepo.full_name).ilike(f"%{needle}%")
+            list_stmt = list_stmt.where(query_filter)
+            count_stmt = count_stmt.where(query_filter)
+    rows = session.exec(
+        list_stmt.group_by(col(LessonRepo.id))
         .order_by(col(LessonRepo.full_name))
         .offset(skip)
-        .limit(limit),
+        .limit(limit)
     ).all()
-    total = session.exec(select(func.count()).select_from(LessonRepo)).one()
+    total = session.exec(count_stmt).one()
 
     data = [
         LessonRepoListItemPublic(
@@ -159,8 +245,10 @@ def read_lesson_repos(
             last_synced_at=repo.last_synced_at,
             lesson_count=int(lesson_count or 0),
             part_count=int(part_count or 0),
+            manifest_count=int(manifest_count or 0),
+            last_manifest_synced_at=last_manifest_synced_at,
         )
-        for repo, lesson_count, part_count in rows
+        for repo, lesson_count, part_count, manifest_count, last_manifest_synced_at in rows
     ]
     return LessonRepoListPublic(data=data, count=int(total))
 
@@ -225,10 +313,72 @@ def read_github_installations(
             suspended=inst.suspended_at is not None,
             entitled_repositories_count=int(entitled_count or 0),
             entitled_repositories=entitled_by_installation.get(inst.id, []),
+            installation_settings_url=(
+                f"https://github.com/settings/installations/{inst.id}"
+            ),
         )
         for inst, entitled_count in rows
     ]
-    return GithubInstallationListPublic(data=data, count=int(total))
+    return GithubInstallationListPublic(
+        data=data,
+        count=int(total),
+        install_url=_resolve_github_app_install_url([inst for inst, _count in rows]),
+    )
+
+
+@router.get("/{lesson_repo_id}/preview", response_model=LessonRepoPreviewPublic)
+def read_lesson_repo_preview(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    lesson_repo_id: uuid.UUID,
+) -> LessonRepoPreviewPublic:
+    """Return lesson + part preview rows for one synced lesson repository."""
+    _require_lesson_github_editor(current_user)
+    lesson_repo = session.get(LessonRepo, lesson_repo_id)
+    if lesson_repo is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson repo not found",
+        )
+
+    lesson_rows = session.exec(
+        select(Lesson)
+        .where(Lesson.repo_id == lesson_repo_id)
+        .order_by(col(Lesson.title), col(Lesson.slug)),
+    ).all()
+
+    lessons: list[LessonRepoPreviewLessonPublic] = []
+    for lesson in lesson_rows:
+        part_rows = session.exec(
+            select(LessonPart)
+            .where(LessonPart.lesson_id == lesson.id)
+            .order_by(col(LessonPart.ordering), col(LessonPart.slug)),
+        ).all()
+        lessons.append(
+            LessonRepoPreviewLessonPublic(
+                lesson_id=lesson.id,
+                lesson_slug=lesson.slug,
+                lesson_title=lesson.title,
+                parts=[
+                    LessonRepoPreviewPartPublic(
+                        slug=part.slug,
+                        title=part.title,
+                        ordering=int(part.ordering),
+                        path=part.path,
+                    )
+                    for part in part_rows
+                ],
+            )
+        )
+
+    return LessonRepoPreviewPublic(
+        lesson_repo_id=lesson_repo.id,
+        full_name=lesson_repo.full_name,
+        default_branch=lesson_repo.default_branch,
+        health=lesson_repo.health,
+        lessons=lessons,
+    )
 
 
 @router.post("/sync-from-github", response_model=LessonRepoGithubSyncPublic)

@@ -26,6 +26,7 @@ from app.models import (
     Lesson,
     LessonPart,
     LessonPrerequisite,
+    LessonRepo,
     Message,
     SessionInstructor,
     User,
@@ -758,6 +759,13 @@ def _workshop_session_detail_shared(
             detail="session_lesson_missing",
         )
 
+    lesson_repo = session.get(LessonRepo, lesson.repo_id)
+    if lesson_repo is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="session_lesson_repo_missing",
+        )
+
     core = WorkshopSessionCorePublic(
         id=workshop_row.id,
         status=workshop_row.status,
@@ -770,6 +778,8 @@ def _workshop_session_detail_shared(
         id=lesson.id,
         title=lesson.title,
         slug=lesson.slug,
+        lesson_repo_health=lesson_repo.health,
+        lesson_repo_last_synced_at=lesson_repo.last_synced_at,
     )
     part_rows = session.exec(
         select(LessonPart)
@@ -786,6 +796,9 @@ def _workshop_session_detail_shared(
         )
         for row in part_rows
     ]
+    if len(parts) == 0:
+        lesson_summary.lesson_content_available = False
+        lesson_summary.lesson_content_issue = "no_parts_synced"
     return core, lesson_summary, parts
 
 

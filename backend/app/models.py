@@ -717,6 +717,10 @@ class WorkshopLessonSummaryPublic(SQLModel):
     id: uuid.UUID
     title: str
     slug: str
+    lesson_repo_health: str = "healthy"
+    lesson_repo_last_synced_at: datetime | None = None
+    lesson_content_available: bool = True
+    lesson_content_issue: str | None = None
 
 
 class WorkshopParticipantSelfPublic(SQLModel):

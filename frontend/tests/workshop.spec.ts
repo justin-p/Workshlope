@@ -263,6 +263,98 @@ test.describe("Workshop live session", () => {
     )
   })
 
+  test("shows fallback banner when lesson repo health is degraded", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    await page.route("**/api/v1/workshop/sessions/*", async (route) => {
+      const req = route.request()
+      if (
+        req.method() !== "GET" ||
+        !/\/api\/v1\/workshop\/sessions\/[^/]+$/.test(req.url())
+      ) {
+        await route.continue()
+        return
+      }
+
+      const upstream = await route.fetch()
+      const body = (await upstream.json()) as {
+        lesson?: Record<string, unknown>
+      }
+      body.lesson = {
+        ...(body.lesson ?? {}),
+        lesson_repo_health: "unhealthy",
+      }
+      await route.fulfill({
+        response: upstream,
+        body: JSON.stringify(body),
+        headers: {
+          ...upstream.headers(),
+          "content-type": "application/json",
+        },
+      })
+    })
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(
+      page.getByTestId("workshop-lesson-source-warning"),
+    ).toContainText("Source sync is currently degraded")
+  })
+
+  test("shows blocking banner when lesson content is unavailable", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    await page.route("**/api/v1/workshop/sessions/*", async (route) => {
+      const req = route.request()
+      if (
+        req.method() !== "GET" ||
+        !/\/api\/v1\/workshop\/sessions\/[^/]+$/.test(req.url())
+      ) {
+        await route.continue()
+        return
+      }
+
+      const upstream = await route.fetch()
+      const body = (await upstream.json()) as {
+        lesson?: Record<string, unknown>
+        parts?: unknown[]
+      }
+      body.lesson = {
+        ...(body.lesson ?? {}),
+        lesson_content_available: false,
+        lesson_content_issue: "no_parts_synced",
+      }
+      body.parts = []
+      await route.fulfill({
+        response: upstream,
+        body: JSON.stringify(body),
+        headers: {
+          ...upstream.headers(),
+          "content-type": "application/json",
+        },
+      })
+    })
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(
+      page.getByTestId("workshop-lesson-content-unavailable"),
+    ).toContainText("No lesson parts are currently available")
+    await expect(page.getByTestId("workshop-current-part")).toHaveCount(0)
+  })
+
   test("workshops hub shows blocked pre-work count on cards", async ({
     page,
     request,

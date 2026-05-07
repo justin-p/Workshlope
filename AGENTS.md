@@ -13,6 +13,7 @@ This project is indexed by GitNexus as **testing** (4234 symbols, 6377 relations
 - When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
 
+
 ## Never Do
 
 - NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
@@ -77,6 +78,24 @@ This project is indexed by GitNexus as **testing** (4234 symbols, 6377 relations
   - approve split map before any branch/commit/push/PR work,
   - stage only targeted files/hunks (no `git add .` / no `git add -A`),
   - report resulting PR URLs and remaining working tree status.
+
+## Branch/Commit/PR Checklist (Required)
+
+Run this checklist for every non-trivial delivery slice:
+
+1. **Start from `main` and branch first**
+   - `git checkout main && git pull`
+   - `git checkout -b <feature-branch>`
+2. **Implement + validate + sync plan**
+   - run targeted tests/lint for touched scope
+   - update `PLAN.md` in the same pass for meaningful behavior/backlog changes
+3. **Commit on feature branch only**
+   - never commit on `main` unless user explicitly approves
+4. **Push and open PR**
+   - `git push -u origin <feature-branch>`
+   - `gh pr create ...`
+5. **Keep one active review target**
+   - if a newer PR supersedes an older one, cross-link and close the superseded PR
 
 ## PR Babysitting Policy (Required)
 
