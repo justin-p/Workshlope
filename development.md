@@ -240,6 +240,39 @@ hitting GitHub. The Playwright tests in
   - `GET    /api/v1/oauth/github/users/{user_id}/status`
   - `DELETE /api/v1/oauth/github/users/{user_id}/link` — unlink.
 
+## GitHub App lesson sync (private-safe polling model)
+
+Lesson repo synchronization uses GitHub App tokens with polling, not inbound
+webhooks. This works for local/private deployments that are not reachable from
+the public internet.
+
+Set these backend values in `.env.local`:
+
+- Required: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`
+  - **`GITHUB_APP_PRIVATE_KEY` is created in the GitHub UI, not copied from the App ID page.** In **Settings → Developer settings → GitHub Apps** (user or org), open your app → **Private keys** → **Generate a private key**. GitHub downloads a `.pem` file; the full secret is only available at download time. Paste that PEM into `GITHUB_APP_PRIVATE_KEY` (single line with `\n` for newlines is typical for `.env`). See [Managing private keys for GitHub Apps](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-github-apps/managing-private-keys-for-github-apps).
+- Optional install UX hints (README has the full checklist); briefly:
+  - **`GITHUB_APP_SLUG`**: the short name GitHub puts in URLs like `https://github.com/apps/<slug>/installations/new`. Find it on the app page under **Developer settings → GitHub Apps** (not the numeric **App ID**). The backend uses it to derive `install_url` when **`GITHUB_APP_INSTALL_URL`** is unset and no refreshed installation row has `app_slug` yet (for example before the first install).
+  - **`GITHUB_APP_INSTALL_URL`**: optional full URL for the Install link; when set it overrides slug-based URLs.
+- Optional periodic poller:
+  - `GITHUB_INSTALLATION_POLL_ENABLED=true`
+  - `GITHUB_INSTALLATION_POLL_INTERVAL_SECONDS=300`
+  - `GITHUB_INSTALLATION_POLL_REFRESH_REPOSITORIES=true`
+
+GitHub App page values to set locally:
+
+- Homepage URL: `http://localhost:5173`
+- Callback URL: `http://localhost:3001/api/auth/callback/github`
+- Setup URL (recommended): `http://localhost:5173/workshops`
+- Webhooks: disabled (no webhook URL/secret required in polling mode)
+- Repository permissions: `Contents` read-only, `Metadata` read-only
+
+Manual refresh endpoints used by the dashboard sync card:
+
+- `POST /api/v1/workshop/lesson-repos/installations/refresh`
+- `POST /api/v1/workshop/lesson-repos/installations/{installation_id}/repositories/refresh`
+
+The workshops UI prefills the installation ID when the installations list returns rows (still refresh after installing on GitHub).
+
 ## URLs
 
 The production or staging URLs would use these same paths, but with your own domain.

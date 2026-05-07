@@ -10,18 +10,18 @@ This repository now uses the [`fastapi/full-stack-fastapi-template`](https://git
 cp .env .env.local
 ```
 
-2. Edit `.env.local` and set secure values for:
+1. Edit `.env.local` and set secure values for:
    - `SECRET_KEY`
    - `FIRST_SUPERUSER_PASSWORD`
    - `POSTGRES_PASSWORD`
 
-3. Start the stack with your local env file:
+1. Start the stack with your local env file:
 
 ```bash
 docker compose --env-file .env.local up -d --build
 ```
 
-4. Open:
+1. Open:
    - Frontend: `http://localhost:5173`
    - API docs: `http://localhost:8000/docs`
    - Auth.js bridge health: `http://localhost:3001/api/bridge/health`
@@ -60,6 +60,75 @@ To run the bridge service locally, set the following in `.env.local`:
 - `authjs-service/.env` — `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
   `AUTH_SECRET`, `BRIDGE_SECRET` (= `GITHUB_BRIDGE_SECRET`),
   `FRONTEND_CALLBACK_URL=http://localhost:5173/auth/callback`.
+
+## GitHub App setup for lesson sync
+
+The workshop lesson sync card in `/workshops` supports app installation and
+repo-access prompts, but a platform admin must bootstrap the GitHub App first.
+The app now uses a private-safe sync model: manual refresh actions in the UI
+plus backend periodic polling.
+
+### GitHub App page checklist (local)
+
+Use this checklist when creating/editing the GitHub App:
+
+- **General**
+  - Homepage URL: `http://localhost:5173`
+- **Identifying and authorizing users**
+  - Callback URL: `http://localhost:3001/api/auth/callback/github`
+  - `Request user authorization (OAuth) during installation`: leave **off** for lesson-sync installs.
+  - `Enable Device Flow`: **off**.
+- **Post installation**
+  - Setup URL: `http://localhost:5173/workshops` (recommended).
+  - `Redirect on update`: optional (usually off for local).
+- **Webhook**
+  - Leave webhook inactive/empty for this project.
+  - Do **not** configure webhook URL/secret; sync uses polling now.
+- **Permissions**
+  - Repository permissions:
+    - `Contents`: **Read-only**
+    - `Metadata`: **Read-only** (GitHub may mark this mandatory)
+  - Keep unrelated repository permissions (`Actions`, `Administration`, etc.) as **No access** unless explicitly needed.
+- **Subscribe to events**
+  - None required for lesson sync in polling mode.
+
+1. Create/register the GitHub App in GitHub:
+   - [Creating GitHub Apps](https://docs.github.com/en/apps/creating-github-apps)
+2. **Obtain App ID and private key (GitHub UI).** GitHub never shows the PEM again after generation; you must use the Developer settings screens:
+   - Open **GitHub → Settings → Developer settings → GitHub Apps** (for a personal app) **or** your org’s **Settings → Developer settings → GitHub Apps**.
+   - Select your app. Note **App ID** at the top of the app page; set `GITHUB_APP_ID` to that numeric value.
+   - In the **Private keys** section, click **Generate a private key**. GitHub downloads a `.pem` file **once**; store it securely. If you lose it, generate a new key and revoke the old one in the same UI.
+   - Put the PEM into `.env.local` as `GITHUB_APP_PRIVATE_KEY`:
+     - **Option A:** paste the whole file contents (including `-----BEGIN RSA PRIVATE KEY-----` / `END` lines) on one line with newlines escaped as `\n`.
+     - **Option B:** use a `.env`-compatible multiline value if your loader supports it; the backend normalizes `\n` in the string.
+   - See also: [Managing private keys for GitHub Apps](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-github-apps/managing-private-keys-for-github-apps).
+3. Configure backend env in `.env.local`:
+   - Required for app auth/polling: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`
+   - Required for deterministic install kickoff link in UI (pick one):
+     - `GITHUB_APP_SLUG` (for example `lesson-bot`)
+     - `GITHUB_APP_INSTALL_URL` (full URL override)
+
+   **`GITHUB_APP_SLUG`:** This is the short name part in your GitHub App’s URL (not the numeric ID). You can see it on your app page in GitHub settings. Set `GITHUB_APP_SLUG` if you want users to see the "Install GitHub App" link before your first installation. You don’t need to set it if you set `GITHUB_APP_INSTALL_URL` or if all installations already have their slug stored.
+
+   - Optional periodic polling controls:
+     - `GITHUB_INSTALLATION_POLL_ENABLED=true`
+     - `GITHUB_INSTALLATION_POLL_INTERVAL_SECONDS=300`
+     - `GITHUB_INSTALLATION_POLL_REFRESH_REPOSITORIES=true`
+4. Rebuild/restart the stack:
+
+```bash
+docker compose --env-file .env.local up -d --build
+```
+
+Behavior in the workshop sync card:
+
+- If no installation exists and install URL is configured, the card shows
+  `Install GitHub App`.
+- If no installation exists and no install URL is configured, the card shows a
+  setup warning with `Create a GitHub App`.
+- If installation uses `selected` repos but none are entitled, the card blocks
+  sync and shows `Grant repository access`.
+- If installations exist but the Installation ID box is blank, it is prefilled from the API (`GET …/installations`; use **Refresh lists** after a new GitHub App install).
 
 ## Upstream template docs
 

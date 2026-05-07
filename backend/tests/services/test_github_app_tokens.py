@@ -40,6 +40,21 @@ def test_create_github_app_jwt_payload_uses_app_id_as_iss() -> None:
     assert enc.call_args[1]["algorithm"] == "RS256"
 
 
+def test_create_github_app_jwt_raises_github_app_token_error_when_rs256_missing() -> (
+    None
+):
+    settings = _settings_with_pem()
+    with patch.object(
+        github_app_tokens.jwt,
+        "encode",
+        side_effect=NotImplementedError(
+            "Algorithm 'RS256' could not be found. Do you have cryptography installed?"
+        ),
+    ):
+        with pytest.raises(GithubAppTokenError, match="cryptography"):
+            create_github_app_jwt(settings=settings)
+
+
 def test_mint_installation_access_token_parses_response() -> None:
     settings = _settings_with_pem()
     fake_response = MagicMock()

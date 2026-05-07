@@ -212,6 +212,20 @@ test("instructor sync card shows installation settings link and repo parts previ
     }),
   )
   await page.route(
+    "**/api/v1/workshop/lesson-repos/installations/123456/accessible-repositories**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          installation_id: 123456,
+          repository_selection: "selected",
+          full_names: ["acme-org/workshop-lessons"],
+          count: 1,
+        }),
+      }),
+  )
+  await page.route(
     "**/api/v1/workshop/lesson-repos/11111111-1111-4111-8111-111111111111/preview",
     (route) =>
       route.fulfill({
@@ -255,9 +269,11 @@ test("instructor sync card shows installation settings link and repo parts previ
 
   await page.goto("/workshops")
   await page.waitForURL("/workshops")
-  await expect(page.getByTestId("workshop-lesson-repo-sync-card")).toBeVisible()
+  await page.waitForLoadState("networkidle")
+  const syncCard = page.getByTestId("workshop-lesson-repo-sync-card")
+  await expect(syncCard).toBeVisible()
   await expect(
-    page.getByRole("link", { name: "Open settings" }),
+    syncCard.getByRole("link", { name: "Open installation on GitHub" }),
   ).toHaveAttribute("href", "https://github.com/settings/installations/123456")
 
   await page.getByTestId("workshop-repo-preview-toggle").click()
@@ -316,13 +332,363 @@ test("instructor sync card install CTA prefers app install URL from API", async 
 
   await page.goto("/workshops")
   await page.waitForURL("/workshops")
-  await expect(page.getByTestId("workshop-lesson-repo-sync-card")).toBeVisible()
+  await page.waitForLoadState("networkidle")
+  const syncCard = page.getByTestId("workshop-lesson-repo-sync-card")
+  await expect(syncCard).toBeVisible()
   await expect(
-    page.getByRole("link", { name: "GitHub App installations" }),
+    syncCard.getByRole("link", { name: "GitHub App installations" }).first(),
   ).toHaveAttribute(
     "href",
     "https://github.com/apps/lesson-bot/installations/new",
   )
+
+  await context.close()
+})
+
+test("instructor sync card prompts install and blocks sync when no installations", async ({
+  browser,
+}) => {
+  const email = randomEmail()
+  const password = "changethis123"
+  await createUser({ email, password, is_instructor: true })
+
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  })
+  const page = await context.newPage()
+
+  await page.route("**/api/v1/workshop/lesson-repos/installations**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+        install_url: "https://github.com/apps/lesson-bot/installations/new",
+      }),
+    }),
+  )
+  await page.route("**/api/v1/workshop/lesson-repos?**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+      }),
+    }),
+  )
+
+  await page.goto("/login")
+  await page.getByTestId("email-input").fill(email)
+  await page.getByTestId("password-input").fill(password)
+  await page.getByRole("button", { name: "Log In" }).click()
+  await page.waitForURL("/dashboard/instructor")
+
+  await page.goto("/workshops")
+  await page.waitForURL("/workshops")
+  await page.waitForLoadState("networkidle")
+  await expect(page.getByTestId("workshop-sync-install-prompt")).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: "Open GitHub to install/configure" }),
+  ).toHaveAttribute(
+    "href",
+    "https://github.com/apps/lesson-bot/installations/new",
+  )
+
+  await page
+    .getByTestId("workshop-sync-full-name")
+    .fill("acme/workshop-lessons")
+  await page.getByTestId("workshop-sync-installation-id").fill("123456")
+  await expect(page.getByTestId("workshop-sync-submit")).toBeDisabled()
+
+  await context.close()
+})
+
+test("instructor sync card explains app bootstrap when install URL is unavailable", async ({
+  browser,
+}) => {
+  const email = randomEmail()
+  const password = "changethis123"
+  await createUser({ email, password, is_instructor: true })
+
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  })
+  const page = await context.newPage()
+
+  await page.route("**/api/v1/workshop/lesson-repos/installations**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+      }),
+    }),
+  )
+  await page.route("**/api/v1/workshop/lesson-repos?**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+      }),
+    }),
+  )
+
+  await page.goto("/login")
+  await page.getByTestId("email-input").fill(email)
+  await page.getByTestId("password-input").fill(password)
+  await page.getByRole("button", { name: "Log In" }).click()
+  await page.waitForURL("/dashboard/instructor")
+
+  await page.goto("/workshops")
+  await page.waitForURL("/workshops")
+  await page.waitForLoadState("networkidle")
+  await expect(page.getByTestId("workshop-sync-install-prompt")).toBeVisible()
+  await expect(
+    page.getByText("No install kickoff URL is configured."),
+  ).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: "Create a GitHub App" }),
+  ).toHaveAttribute(
+    "href",
+    "https://docs.github.com/en/apps/creating-github-apps",
+  )
+  await expect(page.getByTestId("workshop-sync-submit")).toBeDisabled()
+
+  await context.close()
+})
+
+test("selected installation without entitled repos prompts grant access and blocks sync", async ({
+  browser,
+}) => {
+  const email = randomEmail()
+  const password = "changethis123"
+  await createUser({ email, password, is_instructor: true })
+
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  })
+  const page = await context.newPage()
+  let entitlementRefreshCalls = 0
+
+  await page.route("**/api/v1/workshop/lesson-repos/installations**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          {
+            installation_id: 123456,
+            account_login: "acme-org",
+            account_type: "Organization",
+            repository_selection: "selected",
+            app_slug: "lesson-bot",
+            suspended: false,
+            entitled_repositories_count: 0,
+            entitled_repositories: [],
+            installation_settings_url:
+              "https://github.com/settings/installations/123456",
+          },
+        ],
+        count: 1,
+      }),
+    }),
+  )
+  await page.route(
+    "**/api/v1/workshop/lesson-repos/installations/123456/repositories/refresh",
+    (route) => {
+      entitlementRefreshCalls += 1
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          installation_id: 123456,
+          repository_selection: "selected",
+          repositories_total: 0,
+          added: 0,
+          removed: 0,
+          unchanged: 0,
+        }),
+      })
+    },
+  )
+  await page.route(
+    "**/api/v1/workshop/lesson-repos/installations/refresh",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          installations_refreshed: 1,
+          installations_created: 0,
+          installations_updated: 1,
+          repositories_refreshed: 0,
+        }),
+      }),
+  )
+  await page.route("**/api/v1/workshop/lesson-repos?**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+      }),
+    }),
+  )
+
+  await page.route(
+    "**/api/v1/workshop/lesson-repos/installations/123456/accessible-repositories**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          installation_id: 123456,
+          repository_selection: "selected",
+          full_names: [],
+          count: 0,
+        }),
+      }),
+  )
+
+  await page.goto("/login")
+  await page.getByTestId("email-input").fill(email)
+  await page.getByTestId("password-input").fill(password)
+  await page.getByRole("button", { name: "Log In" }).click()
+  await page.waitForURL("/dashboard/instructor")
+
+  await page.goto("/workshops")
+  await page.waitForURL("/workshops")
+  await page.waitForLoadState("networkidle")
+  await page
+    .getByTestId("workshop-sync-full-name")
+    .fill("acme/workshop-lessons")
+  await expect(
+    page.getByTestId("workshop-sync-grant-access-prompt"),
+  ).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: "Grant repository access" }),
+  ).toHaveAttribute("href", "https://github.com/settings/installations/123456")
+  await expect(page.getByTestId("workshop-sync-submit")).toBeDisabled()
+  await page.getByTestId("workshop-sync-refresh-entitlements").click()
+  await expect.poll(() => entitlementRefreshCalls).toBeGreaterThan(0)
+
+  await context.close()
+})
+
+test("refresh lists triggers installations and selected entitlement refresh", async ({
+  browser,
+}) => {
+  const email = randomEmail()
+  const password = "changethis123"
+  await createUser({ email, password, is_instructor: true })
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  })
+  const page = await context.newPage()
+  let installationsRefreshCalls = 0
+  let repoRefreshCalls = 0
+
+  await page.route("**/api/v1/workshop/lesson-repos/installations**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          {
+            installation_id: 123456,
+            account_login: "acme-org",
+            account_type: "Organization",
+            repository_selection: "selected",
+            app_slug: "lesson-bot",
+            suspended: false,
+            entitled_repositories_count: 0,
+            entitled_repositories: [],
+            installation_settings_url:
+              "https://github.com/settings/installations/123456",
+          },
+        ],
+        count: 1,
+      }),
+    }),
+  )
+  await page.route(
+    "**/api/v1/workshop/lesson-repos/installations/refresh",
+    (route) => {
+      installationsRefreshCalls += 1
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          installations_refreshed: 1,
+          installations_created: 0,
+          installations_updated: 1,
+          repositories_refreshed: 0,
+        }),
+      })
+    },
+  )
+  await page.route(
+    "**/api/v1/workshop/lesson-repos/installations/123456/repositories/refresh",
+    (route) => {
+      repoRefreshCalls += 1
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          installation_id: 123456,
+          repository_selection: "selected",
+          repositories_total: 0,
+          added: 0,
+          removed: 0,
+          unchanged: 0,
+        }),
+      })
+    },
+  )
+  await page.route("**/api/v1/workshop/lesson-repos?**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+      }),
+    }),
+  )
+
+  await page.route(
+    "**/api/v1/workshop/lesson-repos/installations/123456/accessible-repositories**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          installation_id: 123456,
+          repository_selection: "selected",
+          full_names: [],
+          count: 0,
+        }),
+      }),
+  )
+
+  await page.goto("/login")
+  await page.getByTestId("email-input").fill(email)
+  await page.getByTestId("password-input").fill(password)
+  await page.getByRole("button", { name: "Log In" }).click()
+  await page.waitForURL("/dashboard/instructor")
+  await page.goto("/workshops")
+  await page.waitForURL("/workshops")
+  await page.waitForLoadState("networkidle")
+  await page.getByTestId("workshop-sync-refresh").click()
+
+  await expect.poll(() => installationsRefreshCalls).toBeGreaterThan(0)
+  await expect.poll(() => repoRefreshCalls).toBeGreaterThan(0)
 
   await context.close()
 })

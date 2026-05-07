@@ -22,6 +22,12 @@ from app.services.github_app_tokens import (
     GithubAppTokenError,
     mint_installation_access_token,
 )
+from app.services.github_installation_polling import (
+    GithubInstallationPollingError,
+    _parse_datetime_maybe,
+    fetch_app_installations,
+    fetch_installation_repositories,
+)
 from app.services.lesson_github_fetch import (
     GithubContentsFetchError,
     fetch_lesson_repo_path_map_from_github,
@@ -132,6 +138,33 @@ class GithubInstallationListPublic(BaseModel):
     install_url: str | None = None
 
 
+class GithubInstallationRefreshBody(BaseModel):
+    include_repositories: bool = False
+
+
+class GithubInstallationRefreshPublic(BaseModel):
+    installations_refreshed: int
+    installations_created: int
+    installations_updated: int
+    repositories_refreshed: int
+
+
+class GithubInstallationRepositoriesRefreshPublic(BaseModel):
+    installation_id: int
+    repository_selection: str | None = None
+    repositories_total: int
+    added: int
+    removed: int
+    unchanged: int
+
+
+class GithubInstallationAccessibleRepositoriesPublic(BaseModel):
+    installation_id: int
+    repository_selection: str | None = None
+    full_names: list[str]
+    count: int
+
+
 def _require_installation_repo_entitlement(
     *,
     session: Session,
@@ -160,10 +193,149 @@ def _require_installation_repo_entitlement(
 def _resolve_github_app_install_url(
     installations: list[GithubAppInstallation],
 ) -> str | None:
+    configured_url = settings.GITHUB_APP_INSTALL_URL
+    if configured_url:
+        return configured_url
     for installation in installations:
         if installation.app_slug:
             return f"https://github.com/apps/{installation.app_slug}/installations/new"
+    configured_slug = settings.GITHUB_APP_SLUG
+    if configured_slug:
+        return f"https://github.com/apps/{configured_slug}/installations/new"
     return None
+
+
+def _upsert_installation_from_api_row(
+    *, session: Session, row: dict[str, Any]
+) -> tuple[GithubAppInstallation, bool]:
+    install_id_raw = row.get("id")
+    if isinstance(install_id_raw, bool) or not isinstance(install_id_raw, int):
+        raise GithubInstallationPollingError("Installation row missing valid id")
+    account = row.get("account")
+    if not isinstance(account, dict):
+        raise GithubInstallationPollingError("Installation row missing account")
+    account_id_raw = account.get("id")
+    account_login_raw = account.get("login")
+    account_type_raw = account.get("type")
+    if isinstance(account_id_raw, bool) or not isinstance(account_id_raw, int):
+        raise GithubInstallationPollingError("Installation account missing valid id")
+    if not isinstance(account_login_raw, str) or not account_login_raw.strip():
+        raise GithubInstallationPollingError("Installation account missing valid login")
+    if not isinstance(account_type_raw, str) or not account_type_raw.strip():
+        raise GithubInstallationPollingError("Installation account missing valid type")
+
+    target_type = row.get("target_type")
+    repository_selection = row.get("repository_selection")
+    app_slug_direct = row.get("app_slug")
+    app_payload = row.get("app")
+    app_slug = app_slug_direct
+    if isinstance(app_payload, dict) and isinstance(app_payload.get("slug"), str):
+        app_slug = app_payload.get("slug")
+
+    installation = session.get(GithubAppInstallation, install_id_raw)
+    created = installation is None
+    if installation is None:
+        installation = GithubAppInstallation(
+            id=install_id_raw,
+            account_id=account_id_raw,
+            account_login=account_login_raw.strip(),
+            account_type=account_type_raw.strip(),
+            target_type=(
+                target_type.strip()
+                if isinstance(target_type, str) and target_type.strip()
+                else account_type_raw.strip()
+            ),
+            repository_selection=(
+                repository_selection.strip()
+                if isinstance(repository_selection, str)
+                and repository_selection.strip()
+                else None
+            ),
+            app_slug=app_slug.strip()
+            if isinstance(app_slug, str) and app_slug
+            else None,
+            suspended_at=_parse_datetime_maybe(row.get("suspended_at")),
+        )
+    else:
+        installation.account_id = account_id_raw
+        installation.account_login = account_login_raw.strip()
+        installation.account_type = account_type_raw.strip()
+        installation.target_type = (
+            target_type.strip()
+            if isinstance(target_type, str) and target_type.strip()
+            else account_type_raw.strip()
+        )
+        installation.repository_selection = (
+            repository_selection.strip()
+            if isinstance(repository_selection, str) and repository_selection.strip()
+            else None
+        )
+        installation.app_slug = (
+            app_slug.strip() if isinstance(app_slug, str) and app_slug else None
+        )
+        installation.suspended_at = _parse_datetime_maybe(row.get("suspended_at"))
+
+    session.add(installation)
+    return installation, created
+
+
+def _sync_github_installation_metadata_from_github_or_fallback(
+    *, session: Session
+) -> None:
+    """Upsert installation rows from GitHub App API (best-effort).
+
+    On polling failure, keep existing database rows so instructors still see stale
+    installs when GitHub or app credentials are unavailable.
+    """
+    try:
+        installation_rows = fetch_app_installations(settings=settings)
+    except GithubInstallationPollingError as exc:
+        logger.warning(
+            "GET /workshop/lesson-repos/installations: GitHub metadata sync failed, "
+            "using database cache: %s",
+            exc,
+        )
+        return
+    except Exception as exc:
+        logger.warning(
+            "GET /workshop/lesson-repos/installations: unexpected error during "
+            "GitHub metadata sync, using database cache: %s",
+            exc,
+            exc_info=True,
+        )
+        return
+    for row in installation_rows:
+        _upsert_installation_from_api_row(session=session, row=row)
+    session.commit()
+
+
+def _reconcile_installation_repositories(
+    *, session: Session, installation_id: int, full_names: list[str]
+) -> tuple[int, int, int]:
+    existing_rows = session.exec(
+        select(GithubInstallationRepository).where(
+            GithubInstallationRepository.installation_id == installation_id
+        )
+    ).all()
+    existing_map = {row.full_name: row for row in existing_rows}
+    target_set = {name.strip() for name in full_names if name.strip()}
+    existing_set = set(existing_map.keys())
+
+    to_add = target_set - existing_set
+    to_remove = existing_set - target_set
+    unchanged = len(existing_set & target_set)
+
+    for repo_name in sorted(to_add):
+        session.add(
+            GithubInstallationRepository(
+                installation_id=installation_id,
+                full_name=repo_name,
+            )
+        )
+    for repo_name in sorted(to_remove):
+        session.delete(existing_map[repo_name])
+
+    return len(to_add), len(to_remove), unchanged
 
 
 @router.get("", response_model=LessonRepoListPublic)
@@ -261,8 +433,15 @@ def read_github_installations(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> GithubInstallationListPublic:
-    """List known GitHub App installations and entitlement summaries."""
+    """List GitHub App installations and entitlement summaries.
+
+    Best-effort sync of installation metadata from GitHub before querying the
+    database, so empty DB resets still pick up installs without a manual refresh.
+    If GitHub is unreachable, responds from the last synced database rows only.
+    """
     _require_lesson_github_editor(current_user)
+
+    _sync_github_installation_metadata_from_github_or_fallback(session=session)
 
     rows = session.exec(
         select(
@@ -323,6 +502,183 @@ def read_github_installations(
         data=data,
         count=int(total),
         install_url=_resolve_github_app_install_url([inst for inst, _count in rows]),
+    )
+
+
+@router.post(
+    "/installations/refresh",
+    response_model=GithubInstallationRefreshPublic,
+)
+def refresh_github_installations(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    body: GithubInstallationRefreshBody,
+) -> GithubInstallationRefreshPublic:
+    """Poll GitHub App installations and refresh local installation metadata."""
+    _require_lesson_github_editor(current_user)
+    try:
+        installation_rows = fetch_app_installations(settings=settings)
+    except GithubInstallationPollingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+
+    created = 0
+    refreshed_repositories = 0
+    for row in installation_rows:
+        installation, was_created = _upsert_installation_from_api_row(
+            session=session, row=row
+        )
+        if was_created:
+            created += 1
+        if body.include_repositories:
+            try:
+                repo_names, selection_mode = fetch_installation_repositories(
+                    settings=settings,
+                    installation_id=installation.id,
+                )
+            except GithubInstallationPollingError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=str(exc),
+                ) from exc
+            if selection_mode:
+                installation.repository_selection = selection_mode
+                session.add(installation)
+            if (selection_mode or installation.repository_selection) == "selected":
+                _reconcile_installation_repositories(
+                    session=session,
+                    installation_id=installation.id,
+                    full_names=repo_names,
+                )
+            else:
+                rows = session.exec(
+                    select(GithubInstallationRepository).where(
+                        GithubInstallationRepository.installation_id == installation.id
+                    )
+                ).all()
+                for existing in rows:
+                    session.delete(existing)
+            refreshed_repositories += 1
+
+    session.commit()
+    refreshed = len(installation_rows)
+    return GithubInstallationRefreshPublic(
+        installations_refreshed=refreshed,
+        installations_created=created,
+        installations_updated=max(refreshed - created, 0),
+        repositories_refreshed=refreshed_repositories,
+    )
+
+
+@router.post(
+    "/installations/{installation_id}/repositories/refresh",
+    response_model=GithubInstallationRepositoriesRefreshPublic,
+)
+def refresh_github_installation_repositories(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    installation_id: int,
+) -> GithubInstallationRepositoriesRefreshPublic:
+    """Poll one installation's repository grants and reconcile entitlement rows."""
+    _require_lesson_github_editor(current_user)
+    installation = session.get(GithubAppInstallation, installation_id)
+    if installation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unknown GitHub App installation; refresh installations first",
+        )
+
+    try:
+        repo_names, selection_mode = fetch_installation_repositories(
+            settings=settings,
+            installation_id=installation_id,
+        )
+    except GithubInstallationPollingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+
+    if selection_mode:
+        installation.repository_selection = selection_mode
+    session.add(installation)
+
+    if (selection_mode or installation.repository_selection) == "selected":
+        added, removed, unchanged = _reconcile_installation_repositories(
+            session=session,
+            installation_id=installation_id,
+            full_names=repo_names,
+        )
+    else:
+        rows = session.exec(
+            select(GithubInstallationRepository).where(
+                GithubInstallationRepository.installation_id == installation_id
+            )
+        ).all()
+        removed = len(rows)
+        for existing in rows:
+            session.delete(existing)
+        added = 0
+        unchanged = 0
+
+    session.commit()
+    return GithubInstallationRepositoriesRefreshPublic(
+        installation_id=installation_id,
+        repository_selection=installation.repository_selection,
+        repositories_total=len(repo_names),
+        added=added,
+        removed=removed,
+        unchanged=unchanged,
+    )
+
+
+@router.get(
+    "/installations/{installation_id}/accessible-repositories",
+    response_model=GithubInstallationAccessibleRepositoriesPublic,
+)
+def read_github_installation_accessible_repositories(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    installation_id: int,
+) -> GithubInstallationAccessibleRepositoriesPublic:
+    """List repositories visible to this installation token (GitHub Installation API).
+
+    Same source as entitlement refresh but read-only—useful for owner/repo autocomplete
+    when the installation grants access to all repositories (no persisted entitlement rows).
+    """
+    _require_lesson_github_editor(current_user)
+    installation = session.get(GithubAppInstallation, installation_id)
+    if installation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unknown GitHub App installation; refresh installations first",
+        )
+    try:
+        repo_names, selection_mode = fetch_installation_repositories(
+            settings=settings,
+            installation_id=installation_id,
+        )
+    except GithubInstallationPollingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+
+    normalized = sorted(
+        {n.strip() for n in repo_names if isinstance(n, str) and n.strip()}
+    )
+    sel = selection_mode if selection_mode else installation.repository_selection
+
+    return GithubInstallationAccessibleRepositoriesPublic(
+        installation_id=installation_id,
+        repository_selection=sel,
+        full_names=normalized,
+        count=len(normalized),
     )
 
 
@@ -403,9 +759,7 @@ def sync_lesson_repo_from_github(
     if inst is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                "Unknown GitHub App installation; complete a GitHub install webhook first"
-            ),
+            detail=("Unknown GitHub App installation; refresh installations first"),
         )
     if inst.suspended_at is not None:
         raise HTTPException(

@@ -27,7 +27,13 @@ def create_github_app_jwt(*, settings: Settings, ttl_seconds: int = 60) -> str:
         "exp": now + ttl_seconds,
         "iss": settings.GITHUB_APP_ID,
     }
-    encoded = jwt.encode(payload, pem, algorithm="RS256")
+    try:
+        encoded = jwt.encode(payload, pem, algorithm="RS256")
+    except NotImplementedError as exc:
+        raise GithubAppTokenError(
+            "PyJWT RS256 requires the cryptography package; "
+            "ensure `cryptography` is installed in the backend environment."
+        ) from exc
     if isinstance(encoded, bytes):
         encoded = encoded.decode("utf-8")
     return encoded

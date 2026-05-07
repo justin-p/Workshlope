@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { ApiError, WorkshopLessonReposService } from "@/client"
 import { Button } from "@/components/ui/button"
@@ -11,8 +11,59 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const RECENT_REPOS_KEY = "workshop.lessonRepoSync.recentRepos"
+const INSTALLATION_PREF_KEY = "workshop.lessonRepoSync.lastInstallationId"
+
+type InstallationRowLite = {
+  installation_id: number
+  account_login: string
+}
+
+function sortInstallationRows(
+  rows: InstallationRowLite[],
+): InstallationRowLite[] {
+  return [...rows].sort(
+    (a, b) =>
+      a.account_login.localeCompare(b.account_login) ||
+      a.installation_id - b.installation_id,
+  )
+}
+
+function persistInstallationPreference(installationId: number) {
+  try {
+    localStorage.setItem(INSTALLATION_PREF_KEY, String(installationId))
+  } catch {
+    // Ignore localStorage write failures in private/locked contexts.
+  }
+}
+
+function pickInstallationIdFromRows(rows: InstallationRowLite[]): number {
+  if (rows.length === 1) {
+    return rows[0].installation_id
+  }
+  try {
+    const raw = localStorage.getItem(INSTALLATION_PREF_KEY)
+    const saved = raw ? Number.parseInt(raw, 10) : NaN
+    if (
+      Number.isFinite(saved) &&
+      saved > 0 &&
+      rows.some((r) => r.installation_id === saved)
+    ) {
+      return saved
+    }
+  } catch {
+    // Ignore localStorage read failures.
+  }
+  return sortInstallationRows(rows)[0].installation_id
+}
 const OWNER_REPO_RE = /^[^/\s]+\/[^/\s]+$/
 const COPY_ID_FEEDBACK_MS = 1500
 const AUTOFILL_FEEDBACK_MS = 2000
@@ -55,6 +106,7 @@ function buildRecentRepos(nextRepo: string, recentRepos: string[]): string[] {
 
 export function WorkshopLessonRepoSyncCard() {
   const queryClient = useQueryClient()
+  const lastAutofillFingerprintForEmpty = useRef<string | null>(null)
   const [fullName, setFullName] = useState("")
   const [installationId, setInstallationId] = useState("")
   const [recentRepos, setRecentRepos] = useState<string[]>([])
@@ -78,6 +130,8 @@ export function WorkshopLessonRepoSyncCard() {
   >({})
   const [healthFilter, setHealthFilter] = useState<RepoHealthFilter>("all")
   const [repoSearch, setRepoSearch] = useState("")
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [advancedManualOpen, setAdvancedManualOpen] = useState(false)
 
   useEffect(() => {
     try {
@@ -115,6 +169,9 @@ export function WorkshopLessonRepoSyncCard() {
         queryClient.invalidateQueries({ queryKey: ["workshopLessonRepos"] }),
         queryClient.invalidateQueries({
           queryKey: ["workshopGithubInstallations"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopInstallationAccessibleRepos"],
         }),
       ])
       setLastRefreshedAt(new Date())
@@ -166,17 +223,53 @@ export function WorkshopLessonRepoSyncCard() {
         limit: 50,
       }),
   })
-  const installCtaHref =
-    installationsQuery.data?.install_url ??
-    "https://github.com/settings/installations"
+  useEffect(() => {
+    const rawRows = installationsQuery.data?.data ?? []
+    const rows: InstallationRowLite[] = rawRows.map((r) => ({
+      installation_id: r.installation_id,
+      account_login: r.account_login,
+    }))
+    if (!installationsQuery.isSuccess || rows.length === 0) {
+      return
+    }
 
-  const canSubmit =
-    normalizedRepo.length > 0 &&
-    repoFormatValid &&
-    installationIdValid &&
-    Number.isFinite(installationIdInt) &&
-    !syncMutation.isPending
+    const fingerprint = rows
+      .map((r) => r.installation_id)
+      .sort((a, b) => a - b)
+      .join(",")
 
+    const currentTrim = installationId.trim()
+    if (currentTrim !== "") {
+      const parsed = Number.parseInt(currentTrim, 10)
+      if (
+        Number.isFinite(parsed) &&
+        parsed > 0 &&
+        rows.some((r) => r.installation_id === parsed)
+      ) {
+        persistInstallationPreference(parsed)
+      }
+      lastAutofillFingerprintForEmpty.current = fingerprint
+      return
+    }
+
+    if (lastAutofillFingerprintForEmpty.current === fingerprint) {
+      return
+    }
+    lastAutofillFingerprintForEmpty.current = fingerprint
+
+    const pick = pickInstallationIdFromRows(rows)
+    setInstallationId(String(pick))
+    persistInstallationPreference(pick)
+  }, [
+    installationId,
+    installationsQuery.isSuccess,
+    installationsQuery.data?.data,
+  ])
+
+  const installCtaHref = installationsQuery.data?.install_url ?? null
+  const hasInstallKickoff = Boolean(installCtaHref)
+  const installationsCount = installationsQuery.data?.count ?? 0
+  const hasAnyInstallations = installationsCount > 0
   const selectedInstallation = useMemo(() => {
     if (!Number.isFinite(installationIdInt)) return null
     return (
@@ -185,6 +278,88 @@ export function WorkshopLessonRepoSyncCard() {
       ) ?? null
     )
   }, [installationIdInt, installationsQuery.data?.data])
+
+  const sortedInstallRows = useMemo(() => {
+    const raw = installationsQuery.data?.data ?? []
+    return [...raw].sort(
+      (a, b) =>
+        a.account_login.localeCompare(b.account_login) ||
+        a.installation_id - b.installation_id,
+    )
+  }, [installationsQuery.data?.data])
+
+  /** Installation + repo pickers when we have cached installs from the API */
+  const primaryPickerMode =
+    installationsQuery.isSuccess && sortedInstallRows.length > 0
+  /** Empty install list — allow typing IDs until GitHub/sync populates rows */
+  const showManualFallback = installationsQuery.isSuccess && !primaryPickerMode
+
+  const accessibleReposQuery = useQuery({
+    queryKey: ["workshopInstallationAccessibleRepos", installationIdInt],
+    queryFn: () =>
+      WorkshopLessonReposService.readGithubInstallationAccessibleRepositories({
+        installationId: installationIdInt,
+      }),
+    enabled:
+      installationsQuery.isSuccess &&
+      hasAnyInstallations &&
+      Number.isFinite(installationIdInt) &&
+      installationIdInt > 0,
+  })
+
+  /** Prefer live GitHub list; fall back to DB entitlements while loading/on error ("selected" installs). */
+  const repoNameSuggestions = useMemo(() => {
+    if (accessibleReposQuery.isSuccess) {
+      return accessibleReposQuery.data.full_names
+    }
+    const entitled = selectedInstallation?.entitled_repositories ?? []
+    if (
+      selectedInstallation?.repository_selection === "selected" &&
+      entitled.length > 0
+    ) {
+      return entitled
+    }
+    return []
+  }, [
+    accessibleReposQuery.data?.full_names,
+    accessibleReposQuery.isSuccess,
+    selectedInstallation?.repository_selection,
+    selectedInstallation?.entitled_repositories,
+  ])
+
+  const installationSelectValue =
+    primaryPickerMode &&
+    sortedInstallRows.some((row) => row.installation_id === installationIdInt)
+      ? String(installationIdInt)
+      : undefined
+
+  const selectedInstallLiveListsNoRepos =
+    selectedInstallation?.repository_selection === "selected" &&
+    accessibleReposQuery.isSuccess &&
+    (accessibleReposQuery.data?.full_names?.length ?? 0) === 0
+
+  /** DB mirror may lag after install — only nag when GitHub confirms no repo access too. */
+  const selectedInstallationNeedsGrant =
+    selectedInstallation?.repository_selection === "selected" &&
+    (selectedInstallation.entitled_repositories?.length ?? 0) === 0 &&
+    selectedInstallLiveListsNoRepos
+  const blockingSetupHint = !installationsQuery.isSuccess
+    ? null
+    : !hasAnyInstallations
+      ? hasInstallKickoff
+        ? "No installations loaded yet — use Discover / Refresh lists, or install the GitHub App from the link below."
+        : "GitHub App setup is not configured yet. Ask a platform admin to set GITHUB_APP_SLUG or GITHUB_APP_INSTALL_URL."
+      : selectedInstallationNeedsGrant
+        ? "Grant repository access for the selected installation before syncing."
+        : null
+
+  const canSubmit =
+    normalizedRepo.length > 0 &&
+    repoFormatValid &&
+    installationIdValid &&
+    Number.isFinite(installationIdInt) &&
+    blockingSetupHint === null &&
+    !syncMutation.isPending
 
   const visibleSyncedRepos = useMemo(
     () => reposQuery.data?.data ?? [],
@@ -205,12 +380,20 @@ export function WorkshopLessonRepoSyncCard() {
     if (syncMutation.isPending) return "Sync in progress..."
     if (isRefreshingData)
       return "Refreshing installation and repository lists..."
-    if (errorDetail) return `Sync failed: ${errorDetail}`
+    if (blockingSetupHint) return blockingSetupHint
     if (syncMutation.data) {
       return `Last sync succeeded for ${syncMutation.data.full_name}.`
     }
-    return "Ready to sync from GitHub."
-  }, [errorDetail, isRefreshingData, syncMutation.data, syncMutation.isPending])
+    return primaryPickerMode
+      ? "Choose an installation and repository, then sync."
+      : "Ready to sync from GitHub."
+  }, [
+    blockingSetupHint,
+    isRefreshingData,
+    primaryPickerMode,
+    syncMutation.data,
+    syncMutation.isPending,
+  ])
 
   useEffect(() => {
     if (
@@ -257,16 +440,78 @@ export function WorkshopLessonRepoSyncCard() {
     }
   }
 
-  const refreshCardData = async () => {
+  const refreshCardData = useCallback(async () => {
+    const apiBase = (import.meta.env.VITE_API_URL as string | undefined)?.trim()
+    const baseUrl =
+      apiBase && apiBase.length > 0 ? apiBase : window.location.origin
+    const token = localStorage.getItem("access_token")
+    const authHeaders = new Headers()
+    if (token) {
+      authHeaders.set("Authorization", `Bearer ${token}`)
+    }
+    setRefreshError(null)
+    try {
+      const installRefreshResponse = await fetch(
+        `${baseUrl}/api/v1/workshop/lesson-repos/installations/refresh`,
+        {
+          method: "POST",
+          headers: new Headers({
+            "content-type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          }),
+          body: JSON.stringify({ include_repositories: false }),
+        },
+      )
+      if (!installRefreshResponse.ok) {
+        const body = (await installRefreshResponse.json()) as
+          | { detail?: string }
+          | undefined
+        throw new Error(body?.detail ?? "Failed to refresh installations")
+      }
+      if (Number.isFinite(installationIdInt) && installationIdInt > 0) {
+        const entitlementResponse = await fetch(
+          `${baseUrl}/api/v1/workshop/lesson-repos/installations/${installationIdInt}/repositories/refresh`,
+          {
+            method: "POST",
+            headers: authHeaders,
+          },
+        )
+        if (!entitlementResponse.ok) {
+          const body = (await entitlementResponse.json()) as
+            | { detail?: string }
+            | undefined
+          throw new Error(
+            body?.detail ?? "Failed to refresh installation repositories",
+          )
+        }
+      }
+    } catch (error) {
+      setRefreshError(
+        error instanceof Error
+          ? error.message
+          : "Failed to refresh installation metadata",
+      )
+    }
     await Promise.all([reposQuery.refetch(), installationsQuery.refetch()])
+    void queryClient.invalidateQueries({
+      queryKey: ["workshopInstallationAccessibleRepos"],
+    })
     setLastRefreshedAt(new Date())
-  }
+  }, [
+    installationIdInt,
+    installationsQuery.refetch,
+    queryClient,
+    reposQuery.refetch,
+  ])
 
   const clearInputs = () => {
     setFullName("")
+    lastAutofillFingerprintForEmpty.current = null
     setInstallationId("")
     setErrorDetail(null)
+    setRefreshError(null)
     setAutofillHint(null)
+    setAdvancedManualOpen(false)
   }
 
   const loadRepoPreview = async (repoId: string) => {
@@ -335,41 +580,389 @@ export function WorkshopLessonRepoSyncCard() {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Need to install or adjust repository access first? Open{" "}
-          <a
-            href={installCtaHref}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="underline text-primary"
-          >
-            GitHub App installations
-          </a>
-          .
+          Need to install or adjust repository access first?{" "}
+          {installCtaHref ? (
+            <>
+              Open{" "}
+              <a
+                href={installCtaHref}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="underline text-primary"
+              >
+                GitHub App installations
+              </a>
+              .
+            </>
+          ) : (
+            <>
+              First create and configure the GitHub App, then return here to
+              install and grant repo access.
+            </>
+          )}
         </p>
+        {installationsQuery.isSuccess && !hasAnyInstallations ? (
+          <div
+            className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200"
+            data-testid="workshop-sync-install-prompt"
+          >
+            <p className="font-medium">No installations in app state yet</p>
+            {installCtaHref ? (
+              <>
+                <p className="mt-1">
+                  Listing installations syncs metadata from GitHub on each load.
+                  If you still see none, check backend GitHub App credentials or
+                  use{" "}
+                  <strong className="font-medium">
+                    Discover / Refresh lists
+                  </strong>{" "}
+                  below to retry and refresh repository grant rows.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={isBusy}
+                    onClick={() => void refreshCardData()}
+                    data-testid="workshop-sync-discover-installations"
+                  >
+                    Discover installations now
+                  </Button>
+                  <a
+                    href={installCtaHref}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex h-7 items-center rounded-md border border-input bg-transparent px-2 text-xs underline text-primary hover:bg-accent"
+                  >
+                    Open GitHub to install/configure
+                  </a>
+                </div>
+              </>
+            ) : (
+              <>
+                <p>
+                  No install kickoff URL is configured. Platform admins should
+                  set <code>GITHUB_APP_SLUG</code> or{" "}
+                  <code>GITHUB_APP_INSTALL_URL</code> in backend env.
+                </p>
+                <a
+                  href="https://docs.github.com/en/apps/creating-github-apps"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline text-primary"
+                >
+                  Create a GitHub App
+                </a>
+              </>
+            )}
+          </div>
+        ) : null}
         <p className="text-xs text-muted-foreground" aria-live="polite">
           {statusMessage}
         </p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label
-              className="text-xs text-muted-foreground"
-              htmlFor="repo-full-name"
+        {installationsQuery.isError ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs">
+            <span className="text-destructive">
+              Could not load installations.
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => void installationsQuery.refetch()}
+              disabled={isBusy}
             >
-              Repository (owner/name)
-            </label>
-            <Input
-              id="repo-full-name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && canSubmit) {
-                  event.preventDefault()
-                  onSubmit()
-                }
-              }}
-              placeholder="acme/workshop-lessons"
-              data-testid="workshop-sync-full-name"
-            />
+              Retry
+            </Button>
+          </div>
+        ) : null}
+
+        {!installationsQuery.isSuccess && !installationsQuery.isError ? (
+          <p className="text-xs text-muted-foreground">
+            Loading GitHub installations…
+          </p>
+        ) : primaryPickerMode ? (
+          <div className="space-y-3 rounded-md border border-border/80 bg-muted/20 p-3">
+            <p className="text-xs font-medium text-foreground">
+              Choose installation and repository
+            </p>
+            <div className="space-y-1.5">
+              <label
+                className="text-xs text-muted-foreground"
+                htmlFor="workshop-install-select-trigger"
+              >
+                GitHub App installation
+              </label>
+              <Select
+                key={sortedInstallRows.map((r) => r.installation_id).join(",")}
+                value={installationSelectValue}
+                onValueChange={(value) => {
+                  setInstallationId(value)
+                  persistInstallationPreference(Number.parseInt(value, 10))
+                  setFullName("")
+                  setErrorDetail(null)
+                }}
+              >
+                <SelectTrigger
+                  id="workshop-install-select-trigger"
+                  className="w-full"
+                  data-testid="workshop-sync-installation-select"
+                >
+                  <SelectValue placeholder="Select installation…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortedInstallRows.map((inst) => (
+                    <SelectItem
+                      key={inst.installation_id}
+                      value={String(inst.installation_id)}
+                    >
+                      {inst.account_login} · #{inst.installation_id} ·{" "}
+                      {inst.repository_selection ?? "unknown"}
+                      {inst.suspended ? " · suspended" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedInstallation ? (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  <a
+                    href={selectedInstallation.installation_settings_url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-primary underline"
+                  >
+                    Open installation on GitHub
+                  </a>
+                  <button
+                    type="button"
+                    className="text-primary underline"
+                    onClick={() =>
+                      void copyInstallationId(
+                        selectedInstallation.installation_id,
+                      )
+                    }
+                  >
+                    {copiedInstallationId ===
+                    selectedInstallation.installation_id
+                      ? "Copied ID"
+                      : "Copy installation ID"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                className="text-xs text-muted-foreground"
+                htmlFor="repo-full-name-primary"
+              >
+                Repository (owner/name)
+              </label>
+              {repoNameSuggestions.length > 0 ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Pick a repo this installation can access, or type owner/repo
+                    below.
+                  </p>
+                  <div
+                    className="flex flex-wrap gap-2"
+                    data-testid="workshop-repo-suggest-chips"
+                  >
+                    {repoNameSuggestions.map((name) => (
+                      <Button
+                        key={name}
+                        type="button"
+                        variant={
+                          normalizedRepo === name ? "secondary" : "outline"
+                        }
+                        size="sm"
+                        className="h-7 max-w-full truncate px-2 text-xs font-normal"
+                        title={name}
+                        onClick={() => {
+                          setFullName(name)
+                          setErrorDetail(null)
+                        }}
+                      >
+                        {name}
+                      </Button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+              {accessibleReposQuery.isFetching &&
+              !accessibleReposQuery.isSuccess ? (
+                <p className="text-xs text-muted-foreground">
+                  Loading repositories GitHub grants this installation…
+                </p>
+              ) : null}
+              <Input
+                id="repo-full-name-primary"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && canSubmit) {
+                    event.preventDefault()
+                    onSubmit()
+                  }
+                }}
+                placeholder="owner/repo (e.g. acme/workshop-lessons)"
+                data-testid="workshop-sync-full-name"
+              />
+              {accessibleReposQuery.isSuccess &&
+              repoNameSuggestions.length === 0 &&
+              !blockingSetupHint ? (
+                <p className="text-xs text-muted-foreground">
+                  No repository list from GitHub yet—type owner/repo manually or
+                  open install settings and use Refresh lists.
+                </p>
+              ) : null}
+              {accessibleReposQuery.isError &&
+              !(
+                selectedInstallation?.repository_selection === "selected" &&
+                (selectedInstallation.entitled_repositories?.length ?? 0) > 0
+              ) ? (
+                <p className="text-xs text-destructive">
+                  Could not load repository names from GitHub. Check backend
+                  credentials and try Refresh lists.
+                </p>
+              ) : null}
+              {accessibleReposQuery.isError &&
+              selectedInstallation?.repository_selection === "selected" &&
+              (selectedInstallation.entitled_repositories?.length ?? 0) > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Showing saved entitlements; live list from GitHub is
+                  unavailable.
+                </p>
+              ) : null}
+              {showRepoValidation ? (
+                <p className="text-xs text-destructive">
+                  Use owner/repo format, for example{" "}
+                  <code>acme/workshop-lessons</code>.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="border-t border-border/60 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground"
+                onClick={() => setAdvancedManualOpen((open) => !open)}
+                data-testid="workshop-sync-toggle-manual-entry"
+              >
+                {advancedManualOpen ? "Hide manual entry" : "Manual entry"}
+                <span className="text-muted-foreground/80">
+                  {" "}
+                  (installation ID override)
+                </span>
+              </Button>
+              {advancedManualOpen ? (
+                <div className="mt-2 max-w-xs space-y-1">
+                  <label
+                    className="text-xs text-muted-foreground"
+                    htmlFor="installation-id-override"
+                  >
+                    Installation ID
+                  </label>
+                  <Input
+                    id="installation-id-override"
+                    type="number"
+                    min={1}
+                    value={installationId}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setInstallationId(v)
+                      if (v.trim() === "") {
+                        lastAutofillFingerprintForEmpty.current = null
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && canSubmit) {
+                        event.preventDefault()
+                        onSubmit()
+                      }
+                    }}
+                    placeholder="12345678"
+                    data-testid="workshop-sync-installation-id"
+                  />
+                  {showInstallationValidation ? (
+                    <p className="text-xs text-destructive">
+                      Installation ID must be a positive number.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : showManualFallback ? (
+          <div className="space-y-2 rounded-md border border-border/80 bg-muted/20 p-3">
+            <p className="text-xs text-muted-foreground">
+              No installations are in app state yet. After you install the
+              GitHub App, use Discover / Refresh lists. If you already know the
+              numeric installation ID (from the GitHub URL), you can enter it
+              here.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label
+                  className="text-xs text-muted-foreground"
+                  htmlFor="installation-id"
+                >
+                  Installation ID
+                </label>
+                <Input
+                  id="installation-id"
+                  type="number"
+                  min={1}
+                  value={installationId}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setInstallationId(v)
+                    if (v.trim() === "") {
+                      lastAutofillFingerprintForEmpty.current = null
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && canSubmit) {
+                      event.preventDefault()
+                      onSubmit()
+                    }
+                  }}
+                  placeholder="12345678"
+                  data-testid="workshop-sync-installation-id"
+                />
+                {showInstallationValidation ? (
+                  <p className="text-xs text-destructive">
+                    Installation ID must be a positive number.
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-1">
+                <label
+                  className="text-xs text-muted-foreground"
+                  htmlFor="repo-full-name"
+                >
+                  Repository (owner/name)
+                </label>
+                <Input
+                  id="repo-full-name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && canSubmit) {
+                      event.preventDefault()
+                      onSubmit()
+                    }
+                  }}
+                  placeholder="acme/workshop-lessons"
+                  data-testid="workshop-sync-full-name"
+                />
+              </div>
+            </div>
             {showRepoValidation ? (
               <p className="text-xs text-destructive">
                 Use owner/repo format, for example{" "}
@@ -377,169 +970,44 @@ export function WorkshopLessonRepoSyncCard() {
               </p>
             ) : null}
           </div>
-          <div className="space-y-1">
-            <label
-              className="text-xs text-muted-foreground"
-              htmlFor="installation-id"
-            >
-              Installation ID
-            </label>
-            <Input
-              id="installation-id"
-              type="number"
-              min={1}
-              value={installationId}
-              onChange={(e) => setInstallationId(e.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && canSubmit) {
-                  event.preventDefault()
-                  onSubmit()
-                }
-              }}
-              placeholder="12345678"
-              data-testid="workshop-sync-installation-id"
-              list="workshop-installation-ids"
-            />
-            <datalist id="workshop-installation-ids">
-              {(installationsQuery.data?.data ?? []).map((inst) => (
-                <option
-                  key={inst.installation_id}
-                  value={String(inst.installation_id)}
-                />
-              ))}
-            </datalist>
-            {showInstallationValidation ? (
-              <p className="text-xs text-destructive">
-                Installation ID must be a positive number.
-              </p>
-            ) : null}
-            <p className="text-xs text-muted-foreground">
-              Find this in the GitHub App installation URL.
-            </p>
-            {installationsQuery.isSuccess &&
-            (installationsQuery.data?.count ?? 0) > 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Known installations: {installationsQuery.data?.count}
-              </p>
-            ) : null}
-            {installationsQuery.isError ? (
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-destructive">
-                  Could not load installations.
-                </p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => void installationsQuery.refetch()}
-                  disabled={isBusy}
-                >
-                  Retry
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        </div>
-        {installationsQuery.isSuccess &&
-        (installationsQuery.data?.count ?? 0) > 0 ? (
+        ) : null}
+
+        {selectedInstallationNeedsGrant && selectedInstallation ? (
           <div
-            className="space-y-1"
-            data-testid="workshop-installation-options"
+            className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200"
+            data-testid="workshop-sync-grant-access-prompt"
           >
-            <p className="text-xs text-muted-foreground">
-              Installation options
+            <p className="font-medium">
+              Grant repository access before syncing
             </p>
-            <div className="flex flex-wrap gap-2">
-              {installationsQuery.data?.data.map((inst) => (
-                <div
-                  key={inst.installation_id}
-                  className="flex items-center gap-1"
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => {
-                      setInstallationId(String(inst.installation_id))
-                      setErrorDetail(null)
-                    }}
-                  >
-                    {inst.account_login}#{inst.installation_id} ·{" "}
-                    {inst.repository_selection ?? "unknown"}
-                    {inst.suspended ? " · suspended" : ""}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() =>
-                      void copyInstallationId(inst.installation_id)
-                    }
-                    title="Copy installation ID"
-                  >
-                    {copiedInstallationId === inst.installation_id
-                      ? "Copied"
-                      : "Copy ID"}
-                  </Button>
-                  <a
-                    href={inst.installation_settings_url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-xs text-primary underline"
-                  >
-                    Open settings
-                  </a>
-                </div>
-              ))}
+            <p>
+              This installation uses selected repositories but none are entitled
+              in app state yet. Open GitHub, grant the repo, then refresh.
+            </p>
+            <a
+              href={selectedInstallation.installation_settings_url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline text-primary"
+            >
+              Grant repository access
+            </a>
+            <div className="mt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => void refreshCardData()}
+                disabled={isBusy}
+                data-testid="workshop-sync-refresh-entitlements"
+              >
+                Refresh entitlements now
+              </Button>
             </div>
           </div>
         ) : null}
-        {selectedInstallation ? (
-          <div
-            className="space-y-1"
-            data-testid="workshop-selected-installation-meta"
-          >
-            <p className="text-xs text-muted-foreground">
-              Selected installation:{" "}
-              <span className="font-medium text-foreground">
-                {selectedInstallation.account_login}#
-                {selectedInstallation.installation_id}
-              </span>{" "}
-              ({selectedInstallation.repository_selection ?? "unknown"} access)
-            </p>
-            {selectedInstallation.repository_selection === "selected" ? (
-              selectedInstallation.entitled_repositories.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {selectedInstallation.entitled_repositories.map((repo) => (
-                    <Button
-                      key={repo}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => {
-                        applyInstallationAndRepo(
-                          selectedInstallation.installation_id,
-                          repo,
-                        )
-                      }}
-                    >
-                      {repo}
-                    </Button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  This installation is set to selected repositories but
-                  currently has no entitled repos in app state.
-                </p>
-              )
-            ) : null}
-          </div>
-        ) : null}
+
         {recentRepos.length > 0 ? (
           <div className="space-y-1" data-testid="workshop-sync-recent-repos">
             <p className="text-xs text-muted-foreground">Recent repositories</p>
@@ -605,7 +1073,7 @@ export function WorkshopLessonRepoSyncCard() {
             disabled={isBusy}
             data-testid="workshop-sync-clear-inputs"
           >
-            Clear inputs
+            Reset
           </Button>
           <Button
             type="button"
@@ -642,6 +1110,14 @@ export function WorkshopLessonRepoSyncCard() {
             data-testid="workshop-sync-error"
           >
             {errorDetail}
+          </p>
+        ) : null}
+        {refreshError ? (
+          <p
+            className="text-xs text-destructive"
+            data-testid="workshop-sync-refresh-error"
+          >
+            {refreshError}
           </p>
         ) : null}
         {autofillHint ? (
