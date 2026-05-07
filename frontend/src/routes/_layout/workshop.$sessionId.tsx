@@ -458,6 +458,8 @@ function WorkshopSessionPage() {
   const isPreworkGateError = errorDetail === "Required prerequisites incomplete"
   const participantRemainingRequiredCount = overdueRequiredPrerequisites.length
   const instructorBlockedTraineesCount = gapsQuery.data?.count ?? 0
+  const currentPartIndex = detailQuery.data?.session.current_part_index ?? 0
+  const currentPart = detailQuery.data?.parts[currentPartIndex] ?? null
 
   return (
     <div className="space-y-4">
@@ -489,6 +491,26 @@ function WorkshopSessionPage() {
           Roster trainees blocked by required pre-work:{" "}
           {instructorBlockedTraineesCount}
         </p>
+      ) : null}
+      {currentPart ? (
+        <section
+          className="rounded-lg border bg-card p-4 space-y-3"
+          data-testid="workshop-current-part"
+        >
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-lg font-semibold">{currentPart.title}</h2>
+            <span className="text-xs text-muted-foreground">
+              Part {currentPart.ordering + 1} of{" "}
+              {detailQuery.data?.parts.length ?? 0}
+            </span>
+          </div>
+          <article
+            className="prose prose-sm max-w-none dark:prose-invert"
+            data-testid="workshop-current-part-body"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: server sends nh3-sanitized html.
+            dangerouslySetInnerHTML={{ __html: currentPart.body_html ?? "" }}
+          />
+        </section>
       ) : null}
 
       {userSeesTraineePrework &&

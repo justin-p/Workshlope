@@ -6,6 +6,7 @@ boundary is mocked by signing bridge tokens with the shared secret directly in
 the tests.
 """
 
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -83,6 +84,23 @@ class TestBridgeTokenValidation:
         )
         r = client.post(f"{API}/oauth/github/bridge", json={"bridge_token": token})
         assert r.status_code == 400
+
+    def test_missing_provider_account_id_returns_400(self, client: TestClient) -> None:
+        now = datetime.now(timezone.utc)
+        token = jwt.encode(
+            {
+                "iss": settings.GITHUB_BRIDGE_ISSUER,
+                "aud": settings.GITHUB_BRIDGE_AUDIENCE,
+                "iat": now,
+                "exp": now + timedelta(minutes=2),
+                "provider": "github",
+            },
+            settings.GITHUB_BRIDGE_SECRET,
+            algorithm="HS256",
+        )
+        r = client.post(f"{API}/oauth/github/bridge", json={"bridge_token": token})
+        assert r.status_code == 400
+        assert r.json()["detail"] == "Bridge token missing provider_account_id"
 
 
 class TestBridgeLinkedFlow:
@@ -565,6 +583,29 @@ class TestAdminUnlinkAndStatus:
         )
         assert r.status_code == 200
         assert r.json() is None
+
+
+def test_pending_github_login_upsert_updates_full_name_and_avatar(
+    db: Session,
+) -> None:
+    pid = f"github:{uuid.uuid4()}"
+    row = crud.upsert_pending_github_login(
+        session=db,
+        provider="github",
+        provider_account_id=pid,
+        provider_login="login",
+    )
+    assert row.full_name is None
+
+    updated = crud.upsert_pending_github_login(
+        session=db,
+        provider="github",
+        provider_account_id=pid,
+        full_name="Ada",
+        avatar_url="http://avatars.example/a.png",
+    )
+    assert updated.full_name == "Ada"
+    assert updated.avatar_url == "http://avatars.example/a.png"
 
 
 # ---------------------------------------------------------------------------

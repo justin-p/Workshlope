@@ -5,9 +5,11 @@ import jwt
 import pytest
 from fastapi import WebSocketDisconnect
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 from sqlmodel import Session, select
 
 from app import crud
+from app.api.routes import workshop_sessions as workshop_sessions_routes
 from app.core.config import settings
 from app.core.security import ALGORITHM
 from app.models import (
@@ -1079,10 +1081,41 @@ def test_http_workshop_enter_start_end_ticket_return_404_for_unknown_session_id(
     client: TestClient, normal_user_token_headers: dict[str, str]
 ) -> None:
     missing = uuid.uuid4()
+    hdrs = normal_user_token_headers
     for suffix in ("enter", "start", "end", "ws-ticket"):
         r = client.post(
             f"{settings.API_V1_STR}/workshop/sessions/{missing}/{suffix}",
-            headers=normal_user_token_headers,
+            headers=hdrs,
+        )
+        assert r.status_code == 404
+        assert r.json()["detail"] == "Session not found"
+
+    for suffix in ("timer", "timer/events"):
+        r = client.get(
+            f"{settings.API_V1_STR}/workshop/sessions/{missing}/{suffix}",
+            headers=hdrs,
+        )
+        assert r.status_code == 404
+        assert r.json()["detail"] == "Session not found"
+
+    members = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{missing}/members",
+        headers=hdrs,
+        json={"user_id": str(uuid.uuid4()), "role": "participant"},
+    )
+    assert members.status_code == 404
+    assert members.json()["detail"] == "Session not found"
+
+    for suffix, body in (
+        ("timer/start", {"mode": "countup"}),
+        ("timer/pause", {}),
+        ("timer/resume", {}),
+        ("timer/stop", {}),
+    ):
+        r = client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{missing}/{suffix}",
+            headers=hdrs,
+            json=body,
         )
         assert r.status_code == 404
         assert r.json()["detail"] == "Session not found"
@@ -1946,6 +1979,7 @@ def test_get_workshop_session_detail_participant_view(
     assert "self" in body
     assert body["self"]["live_status"] == "busy"
     assert len(body["parts"]) == 2
+    assert body["parts"][0]["body_html"] == "<h1>Part 0</h1>\n"
     assert body["session"]["id"] == str(session_row.id)
 
 
@@ -1991,6 +2025,40 @@ def test_get_workshop_session_detail_instructor_roster(
     assert train_email in emails
     ins_emails = {i["email"] for i in body["instructors"]}
     assert inst_email in ins_emails
+
+
+def test_get_workshop_session_detail_part_html_is_sanitized(
+    client: TestClient, db: Session
+) -> None:
+    iso_email = f"detail-sanitize-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+    session_row = _create_live_session(db)
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    db.add(
+        LessonPart(
+            lesson_id=lesson.id,
+            ordering=0,
+            slug=f"part-x-{uuid.uuid4()}",
+            title="Part X",
+            path="x.md",
+            body_md="<script>alert(1)</script>**safe**",
+        )
+    )
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=user.id))
+    db.commit()
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    html = body["parts"][0]["body_html"]
+    assert "<script>" not in html
+    assert "<strong>safe</strong>" in html
 
 
 def test_get_workshop_session_detail_forbidden(client: TestClient, db: Session) -> None:
@@ -3412,3 +3480,540 @@ def test_timer_countdown_includes_remaining_seconds(
     assert isinstance(remaining, int)
     assert isinstance(elapsed, int)
     assert 0 <= remaining <= 120
+
+
+def test_ws_superuser_instructor_handshake_without_instructor_seat(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    ticket_resp = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=get_superuser_token_headers(client),
+    )
+    ticket = ticket_resp.json()["ticket"]
+    decoded = jwt.decode(
+        ticket,
+        settings.SECRET_KEY,
+        algorithms=[ALGORITHM],
+        audience="workshop-ws",
+    )
+    assert decoded["role"] == "instructor"
+
+    with client.websocket_connect(
+        _workshop_ws_path(session_row.id),
+        subprotocols=["ticket", ticket],
+    ) as websocket:
+        assert websocket.receive_json()["type"] == "session.connected"
+
+
+def test_patch_live_session_repeat_status_returns_ok(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-live-repeat-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(
+        SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"),
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"status": "live"},
+    )
+    assert response.status_code == 200
+
+
+def test_patch_session_rejects_transition_from_ended(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"sess-ended-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(
+        SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"),
+    )
+    db.commit()
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+
+    ended = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"status": "ended"},
+    )
+    assert ended.status_code == 200
+
+    blocked = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"status": "live"},
+    )
+    assert blocked.status_code == 403
+    assert blocked.json()["detail"] == "session_already_ended"
+
+
+def test_timer_read_while_paused_populates_pause_elapsed_math(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-pause-read-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=headers,
+        json={"mode": "countdown", "target_seconds": 600},
+    )
+    client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/pause",
+        headers=headers,
+    )
+    paused_read = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer",
+        headers=headers,
+    )
+    assert paused_read.status_code == 200
+    body = paused_read.json()
+    assert body["status"] == "paused"
+    assert isinstance(body["elapsed_seconds"], int)
+
+
+def test_http_patch_delete_participants_unknown_session_returns_404(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    missing = uuid.uuid4()
+    uid = uuid.uuid4()
+    d = client.delete(
+        f"{settings.API_V1_STR}/workshop/sessions/{missing}/participants/{uid}",
+        headers=normal_user_token_headers,
+    )
+    assert d.status_code == 404
+    assert d.json()["detail"] == "Session not found"
+
+    p = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{missing}/participants/{uid}",
+        headers=normal_user_token_headers,
+        json={"live_status": "done"},
+    )
+    assert p.status_code == 404
+    assert p.json()["detail"] == "Session not found"
+
+
+def test_http_patch_unknown_workshop_session_returns_404(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    r = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{uuid.uuid4()}",
+        headers=normal_user_token_headers,
+        json={"status": "paused"},
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Session not found"
+
+
+def test_members_post_unknown_target_user_returns_404(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"mbr-tgt-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    r = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members",
+        headers=headers,
+        json={"user_id": str(uuid.uuid4()), "role": "participant"},
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Target user not found"
+
+
+def test_patch_remove_nonexistent_instructor_seat_returns_404(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"patch-rm-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    r = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"remove_instructor_user_id": str(uuid.uuid4())},
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Instructor seat not found"
+
+
+def test_timer_second_pause_while_paused_returns_not_running(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-dbl-pause-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+            headers=headers,
+            json={"mode": "countup"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/pause",
+            headers=headers,
+        ).status_code
+        == 200
+    )
+    again = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/pause",
+        headers=headers,
+    )
+    assert again.status_code == 409
+    assert again.json()["detail"] == "timer_not_running"
+
+
+def test_timer_pause_resume_stop_without_started_timer_returns_409(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-idle-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    for suffix in ("timer/pause", "timer/resume", "timer/stop"):
+        r = client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/{suffix}",
+            headers=headers,
+        )
+        assert r.status_code == 409
+        assert r.json()["detail"] == "timer_not_active"
+
+
+def test_timer_get_reflects_persistent_inactive_row_after_stop(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-read-inact-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=headers,
+        json={"mode": "countup"},
+    )
+    client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/stop",
+        headers=headers,
+    )
+
+    read = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer",
+        headers=headers,
+    )
+    assert read.status_code == 200
+    assert read.json()["status"] == "inactive"
+
+
+def test_members_upsert_reopens_soft_removed_participant(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"mbr-reopen-p-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    trainee = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"mbr-trainee-p-{uuid.uuid4()}@example.com",
+            password="pw123456",
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    now = datetime.now(timezone.utc)
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=trainee.id,
+            invited_at=now,
+            removed_at=now,
+        )
+    )
+    db.commit()
+    seat_row = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_row.id,
+            WorkshopParticipant.user_id == trainee.id,
+        )
+    ).first()
+    assert seat_row is not None
+    db.execute(
+        update(WorkshopParticipant)
+        .where(WorkshopParticipant.id == seat_row.id)
+        .values(invited_at=None)
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    r = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members",
+        headers=headers,
+        json={"user_id": str(trainee.id), "role": "participant"},
+    )
+    assert r.status_code == 200
+
+    reopen = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_row.id,
+            WorkshopParticipant.user_id == trainee.id,
+        )
+    ).first()
+    assert reopen is not None
+    assert reopen.removed_at is None
+    assert reopen.invited_at is not None
+
+
+def test_patch_participant_updates_joined_and_finished_timestamps(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"patch-p-join-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    trainee = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"patch-p-trainee-{uuid.uuid4()}@example.com",
+            password="pw123456",
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    joined = datetime.now(timezone.utc)
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=trainee.id,
+            invited_at=joined,
+            joined_at=None,
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    fin = joined + timedelta(hours=1)
+    r = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/participants/"
+        f"{trainee.id}",
+        headers=headers,
+        json={
+            "joined_at": joined.isoformat(),
+            "finished_at": fin.isoformat(),
+        },
+    )
+    assert r.status_code == 200
+
+    seat = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_row.id,
+            WorkshopParticipant.user_id == trainee.id,
+        )
+    ).first()
+    assert seat is not None
+    assert seat.joined_at is not None
+    assert seat.finished_at is not None
+
+
+def test_read_session_detail_raises_when_participant_view_has_no_seat_snapshot(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Defensive branch: claimed participant view but roster row missing."""
+
+    session_row = _create_live_session(db)
+    email = f"no-roster-snap-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=email, db=db)
+
+    monkeypatch.setattr(
+        workshop_sessions_routes,
+        "_workshop_session_detail_view_kind",
+        lambda session_db, session_id, current_user: "participant",
+    )
+
+    r = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert r.status_code == 500
+    assert r.json()["detail"] == "participant_seat_missing"
+
+
+def test_members_upsert_restores_soft_removed_instructor(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"mbr-reopen-i-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    co = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"mbr-co-{uuid.uuid4()}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    now = datetime.now(timezone.utc)
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=co.id,
+            role="co_instructor",
+            assigned_at=now,
+            removed_at=now,
+        )
+    )
+    db.commit()
+
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    r = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members",
+        headers=headers,
+        json={"user_id": str(co.id), "role": "instructor"},
+    )
+    assert r.status_code == 200
+
+    seat = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_row.id,
+            SessionInstructor.user_id == co.id,
+        )
+    ).first()
+    assert seat is not None
+    assert seat.removed_at is None

@@ -19,3 +19,14 @@ def test_get_current_active_instructor_rejects_non_instructor() -> None:
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "The user doesn't have instructor privileges"
+
+
+def test_get_current_active_instructor_returns_user_when_flag_set() -> None:
+    instructor = User(
+        email="inst@example.com",
+        hashed_password="hashed",
+        is_active=True,
+        is_superuser=False,
+        is_instructor=True,
+    )
+    assert get_current_active_instructor(instructor) is instructor

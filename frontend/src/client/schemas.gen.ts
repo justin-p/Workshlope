@@ -148,6 +148,82 @@ export const GitHubBridgeRequestSchema = {
     title: 'GitHubBridgeRequest'
 } as const;
 
+export const GithubInstallationListItemPublicSchema = {
+    properties: {
+        installation_id: {
+            type: 'integer',
+            title: 'Installation Id'
+        },
+        account_login: {
+            type: 'string',
+            title: 'Account Login'
+        },
+        account_type: {
+            type: 'string',
+            title: 'Account Type'
+        },
+        repository_selection: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Repository Selection'
+        },
+        app_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'App Slug'
+        },
+        suspended: {
+            type: 'boolean',
+            title: 'Suspended'
+        },
+        entitled_repositories_count: {
+            type: 'integer',
+            title: 'Entitled Repositories Count'
+        },
+        entitled_repositories: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Entitled Repositories'
+        }
+    },
+    type: 'object',
+    required: ['installation_id', 'account_login', 'account_type', 'suspended', 'entitled_repositories_count', 'entitled_repositories'],
+    title: 'GithubInstallationListItemPublic'
+} as const;
+
+export const GithubInstallationListPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/GithubInstallationListItemPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'GithubInstallationListPublic'
+} as const;
+
 export const HTTPValidationErrorSchema = {
     properties: {
         detail: {
@@ -285,6 +361,128 @@ export const ItemsPublicSchema = {
     type: 'object',
     required: ['data', 'count'],
     title: 'ItemsPublic'
+} as const;
+
+export const LessonRepoGithubSyncBodySchema = {
+    properties: {
+        full_name: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Full Name'
+        },
+        installation_id: {
+            type: 'integer',
+            exclusiveMinimum: 0,
+            title: 'Installation Id'
+        }
+    },
+    type: 'object',
+    required: ['full_name', 'installation_id'],
+    title: 'LessonRepoGithubSyncBody'
+} as const;
+
+export const LessonRepoGithubSyncPublicSchema = {
+    properties: {
+        lesson_repo_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Repo Id'
+        },
+        lessons_synced: {
+            type: 'integer',
+            title: 'Lessons Synced'
+        },
+        full_name: {
+            type: 'string',
+            title: 'Full Name'
+        },
+        health: {
+            type: 'string',
+            title: 'Health'
+        },
+        default_branch: {
+            type: 'string',
+            title: 'Default Branch'
+        }
+    },
+    type: 'object',
+    required: ['lesson_repo_id', 'lessons_synced', 'full_name', 'health', 'default_branch'],
+    title: 'LessonRepoGithubSyncPublic'
+} as const;
+
+export const LessonRepoListItemPublicSchema = {
+    properties: {
+        lesson_repo_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Repo Id'
+        },
+        full_name: {
+            type: 'string',
+            title: 'Full Name'
+        },
+        default_branch: {
+            type: 'string',
+            title: 'Default Branch'
+        },
+        health: {
+            type: 'string',
+            title: 'Health'
+        },
+        github_installation_id: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Github Installation Id'
+        },
+        last_synced_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Synced At'
+        },
+        lesson_count: {
+            type: 'integer',
+            title: 'Lesson Count'
+        },
+        part_count: {
+            type: 'integer',
+            title: 'Part Count'
+        }
+    },
+    type: 'object',
+    required: ['lesson_repo_id', 'full_name', 'default_branch', 'health', 'lesson_count', 'part_count'],
+    title: 'LessonRepoListItemPublic'
+} as const;
+
+export const LessonRepoListPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/LessonRepoListItemPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'LessonRepoListPublic'
 } as const;
 
 export const MessageSchema = {
@@ -996,6 +1194,17 @@ export const WorkshopLessonPartBriefSchema = {
         title: {
             type: 'string',
             title: 'Title'
+        },
+        body_html: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Body Html'
         }
     },
     type: 'object',

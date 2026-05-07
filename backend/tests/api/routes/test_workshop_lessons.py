@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -1133,3 +1134,231 @@ def test_read_lesson_prerequisite_aggregates_excludes_removed_participant_from_r
     )
     assert response.status_code == 200
     assert response.json()["data"][0]["roster_count"] == 1
+
+
+def test_create_prerequisite_404_when_lesson_missing(
+    client: TestClient, db: Session
+) -> None:
+    email = f"ws-lesson-miss-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(client=client, email=email, db=db)
+    missing = uuid.uuid4()
+    r = client.post(
+        f"{settings.API_V1_STR}/workshop/lessons/{missing}/prerequisites",
+        headers=headers,
+        json={"type": "task", "title": "T", "ordering": 0},
+    )
+    assert r.status_code == 404
+
+
+def test_complete_prerequisite_404_unknown_target_user(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    email = f"ws-complete-miss-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(client=client, email=email, db=db)
+    pre = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="reading",
+        title="Doc",
+        details="",
+        ordering=0,
+        required_flag=False,
+    )
+    db.add(pre)
+    db.commit()
+
+    r = client.post(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/"
+        f"{pre.id}/complete",
+        headers=headers,
+        json={"user_id": str(uuid.uuid4())},
+    )
+    assert r.status_code == 404
+
+
+def _instructor_headers(client: TestClient, db: Session) -> dict[str, str]:
+    email = f"ws06-pr404-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    return authentication_token_from_email(client=client, email=email, db=db)
+
+
+def test_patch_prerequisite_404_lesson_not_found(
+    client: TestClient, db: Session
+) -> None:
+    headers = _instructor_headers(client, db)
+    missing_lesson = uuid.uuid4()
+    r = client.patch(
+        f"{settings.API_V1_STR}/workshop/lessons/{missing_lesson}/prerequisites/"
+        f"{uuid.uuid4()}",
+        headers=headers,
+        json={"title": "Nope"},
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Lesson not found"
+
+
+def test_patch_prerequisite_404_row_not_found(client: TestClient, db: Session) -> None:
+    lesson = _create_lesson(db)
+    headers = _instructor_headers(client, db)
+    r = client.patch(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/"
+        f"{uuid.uuid4()}",
+        headers=headers,
+        json={"title": "Nope"},
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Prerequisite not found"
+
+
+def test_delete_and_list_prerequisite_404_lesson_not_found(
+    client: TestClient, db: Session
+) -> None:
+    headers = _instructor_headers(client, db)
+    lid = uuid.uuid4()
+    pre_id = uuid.uuid4()
+
+    deleted = client.delete(
+        f"{settings.API_V1_STR}/workshop/lessons/{lid}/prerequisites/{pre_id}",
+        headers=headers,
+    )
+    assert deleted.status_code == 404
+    assert deleted.json()["detail"] == "Lesson not found"
+
+    listed = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lid}/prerequisites",
+        headers=headers,
+    )
+    assert listed.status_code == 404
+    assert listed.json()["detail"] == "Lesson not found"
+
+
+def test_complete_prerequisite_404_lesson_not_found(
+    client: TestClient, db: Session
+) -> None:
+    learner_headers = authentication_token_from_email(
+        client=client,
+        email=f"ws06-complete-lesson-{uuid.uuid4()}@example.com",
+        db=db,
+    )
+    r = client.post(
+        f"{settings.API_V1_STR}/workshop/lessons/{uuid.uuid4()}/prerequisites/"
+        f"{uuid.uuid4()}/complete",
+        headers=learner_headers,
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Lesson not found"
+
+
+def test_complete_prerequisite_404_prerequisite_not_found(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    learner_headers = authentication_token_from_email(
+        client=client,
+        email=f"ws06-complete-pre-{uuid.uuid4()}@example.com",
+        db=db,
+    )
+    r = client.post(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/"
+        f"{uuid.uuid4()}/complete",
+        headers=learner_headers,
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Prerequisite not found"
+
+
+def test_patch_prerequisite_updates_type_details_and_url(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    headers = _instructor_headers(client, db)
+    create = client.post(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites",
+        headers=headers,
+        json={"type": "task", "title": "Orig", "ordering": 0},
+    )
+    assert create.status_code == 200
+    pre_id = create.json()["id"]
+
+    patched = client.patch(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/{pre_id}",
+        headers=headers,
+        json={
+            "type": "reading",
+            "details": "See chapter 2",
+            "url": "https://example.com/doc",
+        },
+    )
+    assert patched.status_code == 200
+    body = patched.json()
+    assert body["type"] == "reading"
+    assert body["details"] == "See chapter 2"
+    assert body["url"] == "https://example.com/doc"
+
+
+def test_prerequisite_gaps_skip_roster_ids_with_no_user_row(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lesson = _create_lesson(db)
+    ws = _create_scheduled_workshop_session(db, lesson)
+    pre = LessonPrerequisite(
+        lesson_id=lesson.id,
+        type="task",
+        title="Req",
+        ordering=0,
+        required_flag=True,
+    )
+    db.add(pre)
+    db.commit()
+
+    instructor_email = f"ws06-gap-null-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+
+    orphan = uuid.uuid4()
+    monkeypatch.setattr(
+        "app.api.routes.workshop_lessons._active_trainee_roster_user_ids_for_session",
+        lambda *, session, session_id: [orphan],
+    )
+
+    r = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/prerequisites/gaps",
+        headers=headers,
+        params={"session_id": str(ws.id)},
+    )
+    assert r.status_code == 200
+    assert r.json()["count"] == 0

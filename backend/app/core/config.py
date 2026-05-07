@@ -95,6 +95,9 @@ class Settings(BaseSettings):
     GITHUB_APP_ID: str | None = None
     GITHUB_APP_PRIVATE_KEY: str | None = None
     GITHUB_WEBHOOK_SECRET: str | None = None
+    GITHUB_WEBHOOK_MAX_REQUESTS_PER_MINUTE_PER_IP: int = 240
+    GITHUB_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS: int = 60
+    GITHUB_WEBHOOK_MAX_CLOCK_SKEW_SECONDS: int = 300
 
     @computed_field  # type: ignore[prop-decorator]
     @property

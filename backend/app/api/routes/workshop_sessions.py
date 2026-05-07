@@ -52,6 +52,7 @@ from app.models import (
     WorkshopSessionTimerStart,
     WorkshopSessionUpsertMember,
 )
+from app.services.lesson_markdown_pipeline import lesson_markdown_to_safe_html
 from app.services.workshop_realtime import (
     WorkshopWsConnection,
     workshop_hub,
@@ -781,6 +782,7 @@ def _workshop_session_detail_shared(
             ordering=int(row.ordering),
             slug=row.slug,
             title=row.title,
+            body_html=lesson_markdown_to_safe_html(row.body_md),
         )
         for row in part_rows
     ]

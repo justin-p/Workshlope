@@ -2,6 +2,8 @@ import asyncio
 import uuid
 from unittest.mock import AsyncMock
 
+import pytest
+
 from app.services.workshop_realtime import (
     WorkshopRealtimeHub,
     WorkshopWsConnection,
@@ -262,5 +264,55 @@ def test_hub_publish_session_status_changed_swallows_send_errors() -> None:
         await hub.publish_session_status_changed(session_id=sid, status="ended")
 
         await hub.detach(flaky)
+
+    asyncio.run(runner())
+
+
+def test_hub_timer_operations_cover_state_branches() -> None:
+    async def runner() -> None:
+        hub = WorkshopRealtimeHub()
+        sid = uuid.uuid4()
+
+        with pytest.raises(ValueError, match="timer_not_active"):
+            await hub.pause_timer(session_id=sid)
+
+        with pytest.raises(ValueError, match="timer_not_active"):
+            await hub.resume_timer(session_id=sid)
+
+        started = await hub.start_timer(
+            session_id=sid,
+            mode="countdown",
+            target_seconds=30,
+        )
+        assert started.status == "running"
+
+        with pytest.raises(ValueError, match="timer_already_active"):
+            await hub.start_timer(
+                session_id=sid,
+                mode="countup",
+                target_seconds=None,
+            )
+
+        paused = await hub.pause_timer(session_id=sid)
+        assert paused.status == "paused"
+        assert paused.paused_at is not None
+
+        with pytest.raises(ValueError, match="timer_not_running"):
+            await hub.pause_timer(session_id=sid)
+
+        resumed = await hub.resume_timer(session_id=sid)
+        assert resumed.status == "running"
+
+        with pytest.raises(ValueError, match="timer_not_paused"):
+            await hub.resume_timer(session_id=sid)
+
+        assert await hub.get_timer(session_id=sid) is not None
+
+        await hub.stop_timer(session_id=sid)
+
+        with pytest.raises(ValueError, match="timer_not_active"):
+            await hub.stop_timer(session_id=sid)
+
+        assert await hub.get_timer(session_id=sid) is None
 
     asyncio.run(runner())
