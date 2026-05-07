@@ -35,6 +35,25 @@ def test_create_user(client: TestClient, db: Session) -> None:
     assert user.full_name == "Pollo Listo"
 
 
+def test_create_user_can_set_instructor_flag(client: TestClient, db: Session) -> None:
+    r = client.post(
+        f"{settings.API_V1_STR}/private/users/",
+        json={
+            "email": "instructor@listo.com",
+            "password": "password123",
+            "full_name": "Instructor Listo",
+            "is_instructor": True,
+        },
+    )
+
+    assert r.status_code == 200
+    data = r.json()
+    user = db.exec(select(User).where(User.id == data["id"])).first()
+
+    assert user is not None
+    assert user.is_instructor is True
+
+
 def test_private_bootstrap_e2e_workshop_live_session(
     client: TestClient, db: Session
 ) -> None:

@@ -152,6 +152,7 @@ export type PrivateUserCreate = {
     password: string;
     full_name: string;
     is_verified?: boolean;
+    is_instructor?: boolean;
 };
 
 export type PrivateWorkshopE2ELiveSessionResponse = {

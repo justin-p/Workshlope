@@ -694,6 +694,11 @@ export const PrivateUserCreateSchema = {
             type: 'boolean',
             title: 'Is Verified',
             default: false
+        },
+        is_instructor: {
+            type: 'boolean',
+            title: 'Is Instructor',
+            default: false
         }
     },
     type: 'object',
