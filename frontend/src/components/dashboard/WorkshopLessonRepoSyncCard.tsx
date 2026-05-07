@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 
 import { ApiError, WorkshopLessonReposService } from "@/client"
@@ -65,6 +65,15 @@ export function WorkshopLessonRepoSyncCard() {
       }
       setErrorDetail(e instanceof Error ? e.message : "Sync request failed")
     },
+  })
+
+  const reposQuery = useQuery({
+    queryKey: ["workshopLessonRepos"],
+    queryFn: () =>
+      WorkshopLessonReposService.readLessonRepos({
+        skip: 0,
+        limit: 20,
+      }),
   })
 
   const normalizedRepo = fullName.trim()
@@ -212,6 +221,48 @@ export function WorkshopLessonRepoSyncCard() {
             {errorDetail}
           </p>
         ) : null}
+        <div className="space-y-1 pt-2">
+          <p className="text-xs font-medium">Synced lesson repositories</p>
+          {reposQuery.isLoading ? (
+            <p className="text-xs text-muted-foreground">
+              Loading repositories…
+            </p>
+          ) : reposQuery.isError ? (
+            <p className="text-xs text-destructive">
+              Could not load repositories list.
+            </p>
+          ) : (reposQuery.data?.count ?? 0) === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No lesson repositories synced yet.
+            </p>
+          ) : (
+            <ul className="divide-y rounded-md border text-xs">
+              {reposQuery.data?.data.map((repo) => (
+                <li
+                  key={repo.lesson_repo_id}
+                  className="px-2 py-2 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{repo.full_name}</p>
+                    <p className="text-muted-foreground truncate">
+                      {repo.default_branch} · {repo.lesson_count} lesson(s) ·{" "}
+                      {repo.part_count} part(s)
+                    </p>
+                  </div>
+                  <span
+                    className={
+                      repo.health === "healthy"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-amber-600 dark:text-amber-400"
+                    }
+                  >
+                    {repo.health}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

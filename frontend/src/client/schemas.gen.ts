@@ -334,6 +334,81 @@ export const LessonRepoGithubSyncPublicSchema = {
     title: 'LessonRepoGithubSyncPublic'
 } as const;
 
+export const LessonRepoListItemPublicSchema = {
+    properties: {
+        lesson_repo_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Repo Id'
+        },
+        full_name: {
+            type: 'string',
+            title: 'Full Name'
+        },
+        default_branch: {
+            type: 'string',
+            title: 'Default Branch'
+        },
+        health: {
+            type: 'string',
+            title: 'Health'
+        },
+        github_installation_id: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Github Installation Id'
+        },
+        last_synced_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Synced At'
+        },
+        lesson_count: {
+            type: 'integer',
+            title: 'Lesson Count'
+        },
+        part_count: {
+            type: 'integer',
+            title: 'Part Count'
+        }
+    },
+    type: 'object',
+    required: ['lesson_repo_id', 'full_name', 'default_branch', 'health', 'lesson_count', 'part_count'],
+    title: 'LessonRepoListItemPublic'
+} as const;
+
+export const LessonRepoListPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/LessonRepoListItemPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'LessonRepoListPublic'
+} as const;
+
 export const MessageSchema = {
     properties: {
         message: {

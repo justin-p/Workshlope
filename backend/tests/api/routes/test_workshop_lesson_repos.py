@@ -12,6 +12,8 @@ from app.core.db import engine
 from app.models import (
     GithubAppInstallation,
     GithubInstallationRepository,
+    Lesson,
+    LessonPart,
     LessonRepo,
     User,
     get_datetime_utc,
@@ -574,3 +576,71 @@ def test_sync_from_github_logs_completion(
 
     assert response.status_code == 200
     assert any("lesson_repo_sync completed" in rec.message for rec in caplog.records)
+
+
+def test_read_lesson_repos_lists_counts_and_health(client: TestClient) -> None:
+    install_id = 909_000_000 + (uuid.uuid4().int % 1_000_000)
+    full_name = f"repo-list/repo-{uuid.uuid4()}"
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_id,
+                account_id=1,
+                account_login="trainer",
+                account_type="User",
+                target_type="User",
+                repository_selection="all",
+                app_slug="x",
+                suspended_at=None,
+            ),
+        )
+        repo = LessonRepo(
+            full_name=full_name,
+            default_branch="main",
+            health="healthy",
+            github_installation_id=install_id,
+        )
+        session.add(repo)
+        session.flush()
+        lesson = Lesson(
+            repo_id=repo.id,
+            slug=f"lesson-{uuid.uuid4()}",
+            title="Lesson",
+            lesson_sync_generation=1,
+        )
+        session.add(lesson)
+        session.flush()
+        session.add(
+            LessonPart(
+                lesson_id=lesson.id,
+                ordering=0,
+                slug=f"part-{uuid.uuid4()}",
+                title="Part 1",
+                path="one.md",
+                body_md="# one",
+            )
+        )
+        session.add(
+            LessonPart(
+                lesson_id=lesson.id,
+                ordering=1,
+                slug=f"part-{uuid.uuid4()}",
+                title="Part 2",
+                path="two.md",
+                body_md="# two",
+            )
+        )
+        session.commit()
+
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    row = next((r for r in payload["data"] if r["full_name"] == full_name), None)
+    assert row is not None
+    assert row["health"] == "healthy"
+    assert row["lesson_count"] >= 1
+    assert row["part_count"] >= 2

@@ -1,15 +1,18 @@
 import logging
 import uuid
+from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
-from sqlmodel import Session, select
+from sqlmodel import Session, col, func, select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
 from app.models import (
     GithubAppInstallation,
     GithubInstallationRepository,
+    Lesson,
+    LessonPart,
     LessonRepo,
     User,
 )
@@ -63,6 +66,22 @@ class LessonRepoGithubSyncPublic(BaseModel):
     default_branch: str
 
 
+class LessonRepoListItemPublic(BaseModel):
+    lesson_repo_id: uuid.UUID
+    full_name: str
+    default_branch: str
+    health: str
+    github_installation_id: int | None = None
+    last_synced_at: datetime | None = None
+    lesson_count: int
+    part_count: int
+
+
+class LessonRepoListPublic(BaseModel):
+    data: list[LessonRepoListItemPublic]
+    count: int
+
+
 def _require_installation_repo_entitlement(
     *,
     session: Session,
@@ -86,6 +105,48 @@ def _require_installation_repo_entitlement(
             "grant repository access in GitHub App settings and retry"
         ),
     )
+
+
+@router.get("", response_model=LessonRepoListPublic)
+def read_lesson_repos(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> LessonRepoListPublic:
+    """List lesson repos with health + lesson/part counts for instructor tooling."""
+    _require_lesson_github_editor(current_user)
+
+    rows = session.exec(
+        select(
+            LessonRepo,
+            func.count(col(Lesson.id)).label("lesson_count"),
+            func.count(col(LessonPart.id)).label("part_count"),
+        )
+        .outerjoin(Lesson, col(Lesson.repo_id) == col(LessonRepo.id))
+        .outerjoin(LessonPart, col(LessonPart.lesson_id) == col(Lesson.id))
+        .group_by(col(LessonRepo.id))
+        .order_by(col(LessonRepo.full_name))
+        .offset(skip)
+        .limit(limit),
+    ).all()
+    total = session.exec(select(func.count()).select_from(LessonRepo)).one()
+
+    data = [
+        LessonRepoListItemPublic(
+            lesson_repo_id=repo.id,
+            full_name=repo.full_name,
+            default_branch=repo.default_branch,
+            health=repo.health,
+            github_installation_id=repo.github_installation_id,
+            last_synced_at=repo.last_synced_at,
+            lesson_count=int(lesson_count or 0),
+            part_count=int(part_count or 0),
+        )
+        for repo, lesson_count, part_count in rows
+    ]
+    return LessonRepoListPublic(data=data, count=int(total))
 
 
 @router.post("/sync-from-github", response_model=LessonRepoGithubSyncPublic)
