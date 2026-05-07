@@ -41,3 +41,16 @@ This project is indexed by GitNexus as **testing** (4234 symbols, 6377 relations
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+## Stacked PR Merge Safeguard (Required)
+
+- NEVER treat stacked PR merges into non-`main` bases as landed on `main`.
+- Before merging stacked PRs, verify each PR base explicitly:
+  - `gh pr view <n> --json number,baseRefName,headRefName,state`
+- If any PR base is not `main`, do one of:
+  - retarget/rebase so the next PR merges to `main`, or
+  - merge remaining stack branches into `main` in order with explicit merge commits.
+- After merges, prove `main` contains the stack tip:
+  - `git checkout main && git pull`
+  - `git rev-list --count main..<stack-tip-branch>` must be `0`
+  - `git log --oneline --decorate -n 20` must show expected merge commits.
