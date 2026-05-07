@@ -54,3 +54,22 @@ This project is indexed by GitNexus as **testing** (4234 symbols, 6377 relations
   - `git checkout main && git pull`
   - `git rev-list --count main..<stack-tip-branch>` must be `0`
   - `git log --oneline --decorate -n 20` must show expected merge commits.
+
+## Workshop Delivery Guardrails
+
+- Treat `workshop_lessons_&_sessions_aa012042.plan.md` as the detailed delivery map; keep `AGENTS.md` as execution rules and safety checks.
+- For stacked workshop slices, follow one merge path only:
+  - retarget/rebase each PR toward `main`, or
+  - merge remaining stack branches into `main` in order with explicit merge commits.
+- After merging any workshop stack, always run:
+  - `gh pr view <n> --json number,baseRefName,headRefName,state,mergedAt`
+  - `git rev-list --count main..<stack-tip-branch>` (must be `0`)
+
+## PR Babysitting Policy (Required)
+
+- For every PR intended for `main`, run a fix loop until green:
+  - `gh pr view --json number,title,state,mergeable,reviewDecision,statusCheckRollup,comments,reviews`
+  - `gh pr checks`
+  - `gh run view <run-id> --log-failed`
+  - `gh pr checks --watch`
+- Do not merge with pending/failing checks unless the user explicitly requests an override.
