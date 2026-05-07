@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
       providerAccountId: session.providerAccountId,
       providerLogin: session.providerLogin ?? null,
       email: session.user?.email ?? null,
+      avatarUrl: session.user?.image ?? null,
     })
     target.searchParams.set("bridge_token", bridgeToken)
     return NextResponse.redirect(target)

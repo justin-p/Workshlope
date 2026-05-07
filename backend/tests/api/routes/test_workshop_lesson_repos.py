@@ -660,12 +660,14 @@ def test_read_lesson_repos_lists_counts_and_health(client: TestClient) -> None:
 
 def test_read_github_installations_lists_entitlements(client: TestClient) -> None:
     install_id = 910_000_000 + (uuid.uuid4().int % 1_000_000)
+    acct_login = f"acct-{uuid.uuid4()}"
+    repo_full = f"org/repo-{uuid.uuid4()}"
     with Session(engine) as session:
         session.add(
             GithubAppInstallation(
                 id=install_id,
                 account_id=2,
-                account_login=f"acct-{uuid.uuid4()}",
+                account_login=acct_login,
                 account_type="Organization",
                 target_type="Organization",
                 repository_selection="selected",
@@ -676,7 +678,7 @@ def test_read_github_installations_lists_entitlements(client: TestClient) -> Non
         session.add(
             GithubInstallationRepository(
                 installation_id=install_id,
-                full_name=f"org/repo-{uuid.uuid4()}",
+                full_name=repo_full,
             ),
         )
         session.commit()
@@ -684,7 +686,21 @@ def test_read_github_installations_lists_entitlements(client: TestClient) -> Non
     headers = get_superuser_token_headers(client)
     with patch(
         "app.api.routes.workshop_lesson_repos.fetch_app_installations",
-        return_value=[],
+        return_value=[
+            {
+                "id": install_id,
+                "account": {
+                    "id": 2,
+                    "login": acct_login,
+                    "type": "Organization",
+                },
+                "target_type": "Organization",
+                "repository_selection": "selected",
+                "app_slug": "lesson-bot",
+                "app": {"slug": "lesson-bot"},
+                "suspended_at": None,
+            },
+        ],
     ):
         response = client.get(
             f"{settings.API_V1_STR}/workshop/lesson-repos/installations",
@@ -700,6 +716,7 @@ def test_read_github_installations_lists_entitlements(client: TestClient) -> Non
     assert row["repository_selection"] == "selected"
     assert row["entitled_repositories_count"] >= 1
     assert len(row["entitled_repositories"]) >= 1
+    assert repo_full in row["entitled_repositories"]
     assert row["installation_settings_url"].endswith(f"/{install_id}")
     assert (
         payload["install_url"] == "https://github.com/apps/lesson-bot/installations/new"
@@ -745,6 +762,58 @@ def test_read_github_installations_populates_db_from_github_on_get(
         row = session.get(GithubAppInstallation, install_id)
         assert row is not None
         assert row.account_login == "from-github-org"
+
+
+def test_read_github_installations_prunes_removed_installations(
+    client: TestClient,
+) -> None:
+    stale_id = 944_000_000 + (uuid.uuid4().int % 1_000_000)
+    remaining_id = 945_000_000 + (uuid.uuid4().int % 1_000_000)
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=stale_id,
+                account_id=1,
+                account_login="uninstalled",
+                account_type="Organization",
+                target_type="Organization",
+                repository_selection="all",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            ),
+        )
+        session.commit()
+
+    headers = get_superuser_token_headers(client)
+    with patch(
+        "app.api.routes.workshop_lesson_repos.fetch_app_installations",
+        return_value=[
+            {
+                "id": remaining_id,
+                "account": {
+                    "id": 202,
+                    "login": "still-here",
+                    "type": "Organization",
+                },
+                "target_type": "Organization",
+                "repository_selection": "all",
+                "app_slug": "lesson-bot",
+                "suspended_at": None,
+            },
+        ],
+    ):
+        response = client.get(
+            f"{settings.API_V1_STR}/workshop/lesson-repos/installations",
+            headers=headers,
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    ids_on_wire = {row["installation_id"] for row in payload["data"]}
+    assert stale_id not in ids_on_wire
+    assert remaining_id in ids_on_wire
+
+    with Session(engine) as session:
+        assert session.get(GithubAppInstallation, stale_id) is None
 
 
 def test_read_github_installations_github_unreachable_still_returns_db_rows(
@@ -951,6 +1020,67 @@ def test_refresh_github_installations_upserts_rows(client: TestClient) -> None:
         assert row.account_login == "acct-refresh"
         assert row.repository_selection == "selected"
         assert row.app_slug == "lesson-bot"
+
+
+def test_refresh_github_installations_prunes_removed_rows(client: TestClient) -> None:
+    stale_id = 946_000_000 + (uuid.uuid4().int % 1_000_000)
+    remaining_id = 947_000_000 + (uuid.uuid4().int % 1_000_000)
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=stale_id,
+                account_id=1,
+                account_login="gone",
+                account_type="Organization",
+                target_type="Organization",
+                repository_selection="all",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            ),
+        )
+        session.add(
+            GithubAppInstallation(
+                id=remaining_id,
+                account_id=2,
+                account_login="present",
+                account_type="Organization",
+                target_type="Organization",
+                repository_selection="selected",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            ),
+        )
+        session.commit()
+
+    headers = get_superuser_token_headers(client)
+    with patch(
+        "app.api.routes.workshop_lesson_repos.fetch_app_installations",
+        return_value=[
+            {
+                "id": remaining_id,
+                "account": {
+                    "id": 303,
+                    "login": "present",
+                    "type": "Organization",
+                },
+                "target_type": "Organization",
+                "repository_selection": "selected",
+                "app_slug": "lesson-bot",
+                "suspended_at": None,
+            },
+        ],
+    ):
+        response = client.post(
+            f"{settings.API_V1_STR}/workshop/lesson-repos/installations/refresh",
+            headers=headers,
+            json={"include_repositories": False},
+        )
+    assert response.status_code == 200
+    assert response.json()["installations_refreshed"] == 1
+
+    with Session(engine) as session:
+        assert session.get(GithubAppInstallation, stale_id) is None
+        assert session.get(GithubAppInstallation, remaining_id) is not None
 
 
 def test_refresh_github_installations_can_refresh_selected_entitlements(

@@ -110,6 +110,7 @@ def create_oauth_account(
     provider: str,
     provider_account_id: str,
     provider_login: str | None = None,
+    avatar_url: str | None = None,
     linked_by_user_id: uuid.UUID | None = None,
 ) -> OAuthAccount:
     db_obj = OAuthAccount(
@@ -117,12 +118,41 @@ def create_oauth_account(
         provider=provider,
         provider_account_id=str(provider_account_id),
         provider_login=provider_login,
+        avatar_url=avatar_url,
         linked_by_user_id=linked_by_user_id,
     )
     session.add(db_obj)
     session.commit()
     session.refresh(db_obj)
     return db_obj
+
+
+def sync_linked_github_oauth_from_bridge_claims(
+    *,
+    session: Session,
+    account: OAuthAccount,
+    provider_login: object | None,
+    avatar_url: object | None,
+) -> OAuthAccount:
+    """Update stored GitHub profile fields from a verified bridge token (linked user)."""
+    if account.provider != "github":
+        return account
+    changed = False
+    if isinstance(provider_login, str):
+        login = provider_login.strip()[:255]
+        if login and account.provider_login != login:
+            account.provider_login = login
+            changed = True
+    if isinstance(avatar_url, str):
+        avatar = avatar_url.strip()[:512]
+        if avatar and account.avatar_url != avatar:
+            account.avatar_url = avatar
+            changed = True
+    if changed:
+        session.add(account)
+        session.commit()
+        session.refresh(account)
+    return account
 
 
 def delete_oauth_account_for_user(

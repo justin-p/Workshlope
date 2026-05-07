@@ -2153,6 +2153,15 @@ def test_get_workshop_session_detail_instructor_roster(
         user_create=UserCreate(email=train_email, password="pw123456"),
     )
     db.add(WorkshopParticipant(session_id=session_row.id, user_id=train_user.id))
+    train_avatar = "https://avatars.train.example/roster-parity.png"
+    crud.create_oauth_account(
+        session=db,
+        user_id=train_user.id,
+        provider="github",
+        provider_account_id=str(uuid.uuid4()),
+        provider_login="train-parity",
+        avatar_url=train_avatar,
+    )
     inst_email = f"detail-inst-{uuid.uuid4()}@example.com"
     inst_user = crud.create_user(
         session=db,
@@ -2183,6 +2192,8 @@ def test_get_workshop_session_detail_instructor_roster(
     assert body["view"] == "instructor"
     emails = {p["email"] for p in body["participants"]}
     assert train_email in emails
+    row_by_email = {p["email"]: p for p in body["participants"]}
+    assert row_by_email[train_email]["avatar_url"] == train_avatar
     ins_emails = {i["email"] for i in body["instructors"]}
     assert inst_email in ins_emails
 

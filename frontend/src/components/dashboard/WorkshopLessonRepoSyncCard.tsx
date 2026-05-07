@@ -247,8 +247,14 @@ export function WorkshopLessonRepoSyncCard() {
         rows.some((r) => r.installation_id === parsed)
       ) {
         persistInstallationPreference(parsed)
+        lastAutofillFingerprintForEmpty.current = fingerprint
+        return
       }
-      lastAutofillFingerprintForEmpty.current = fingerprint
+      // GitHub no longer returns this installation (e.g. app was uninstalled).
+      lastAutofillFingerprintForEmpty.current = null
+      setInstallationId("")
+      setFullName("")
+      setErrorDetail(null)
       return
     }
 
@@ -331,6 +337,12 @@ export function WorkshopLessonRepoSyncCard() {
     primaryPickerMode &&
     sortedInstallRows.some((row) => row.installation_id === installationIdInt)
       ? String(installationIdInt)
+      : undefined
+
+  const repoSuggestSelectValue =
+    repoNameSuggestions.length > 0 &&
+    repoNameSuggestions.includes(normalizedRepo)
+      ? normalizedRepo
       : undefined
 
   const selectedInstallLiveListsNoRepos =
@@ -757,45 +769,49 @@ export function WorkshopLessonRepoSyncCard() {
             <div className="space-y-1.5">
               <label
                 className="text-xs text-muted-foreground"
-                htmlFor="repo-full-name-primary"
+                htmlFor={
+                  repoNameSuggestions.length > 0
+                    ? "workshop-repo-suggest-trigger"
+                    : "repo-full-name-primary"
+                }
               >
                 Repository (owner/name)
               </label>
               {repoNameSuggestions.length > 0 ? (
-                <>
-                  <p className="text-xs text-muted-foreground">
-                    Pick a repo this installation can access, or type owner/repo
-                    below.
-                  </p>
-                  <div
-                    className="flex flex-wrap gap-2"
-                    data-testid="workshop-repo-suggest-chips"
+                <Select
+                  key={installationIdInt}
+                  value={repoSuggestSelectValue}
+                  onValueChange={(value) => {
+                    setFullName(value)
+                    setErrorDetail(null)
+                  }}
+                >
+                  <SelectTrigger
+                    id="workshop-repo-suggest-trigger"
+                    className="w-full"
+                    data-testid="workshop-sync-repo-suggest"
                   >
+                    <SelectValue placeholder="Select repository…" />
+                  </SelectTrigger>
+                  <SelectContent>
                     {repoNameSuggestions.map((name) => (
-                      <Button
-                        key={name}
-                        type="button"
-                        variant={
-                          normalizedRepo === name ? "secondary" : "outline"
-                        }
-                        size="sm"
-                        className="h-7 max-w-full truncate px-2 text-xs font-normal"
-                        title={name}
-                        onClick={() => {
-                          setFullName(name)
-                          setErrorDetail(null)
-                        }}
-                      >
+                      <SelectItem key={name} value={name}>
                         {name}
-                      </Button>
+                      </SelectItem>
                     ))}
-                  </div>
-                </>
+                  </SelectContent>
+                </Select>
               ) : null}
               {accessibleReposQuery.isFetching &&
               !accessibleReposQuery.isSuccess ? (
                 <p className="text-xs text-muted-foreground">
                   Loading repositories GitHub grants this installation…
+                </p>
+              ) : null}
+              {repoNameSuggestions.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Or enter owner/repo below if the repo is missing from the
+                  list.
                 </p>
               ) : null}
               <Input

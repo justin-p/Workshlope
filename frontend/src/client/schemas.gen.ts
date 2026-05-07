@@ -770,6 +770,17 @@ export const OAuthAccountPublicSchema = {
             ],
             title: 'Provider Login'
         },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
+        },
         linked_at: {
             anyOf: [
                 {

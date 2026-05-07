@@ -59,6 +59,8 @@ def create_bridge_token(
     provider_account_id: str,
     provider_login: str | None = None,
     email: str | None = None,
+    avatar_url: str | None = None,
+    picture: str | None = None,
     expires_delta: timedelta | None = None,
 ) -> str:
     """Create a signed bridge token. Used by the Auth.js service and tests.
@@ -81,4 +83,8 @@ def create_bridge_token(
         payload["provider_login"] = provider_login
     if email is not None:
         payload["email"] = email
+    if avatar_url is not None:
+        payload["avatar_url"] = avatar_url
+    if picture is not None:
+        payload["picture"] = picture
     return jwt.encode(payload, settings.GITHUB_BRIDGE_SECRET, algorithm=ALGORITHM)
