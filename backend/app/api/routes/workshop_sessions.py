@@ -68,6 +68,28 @@ WS_PART_ADVANCE_REQUIRES_STATUS = frozenset({"live"})
 WORKSHOP_ACTIVE_STATUSES = frozenset({"live", "paused"})
 
 
+def _workshop_session_start_content_issue(
+    session_db: Session, *, workshop_row: WorkshopSession
+) -> str | None:
+    lesson = session_db.get(Lesson, workshop_row.lesson_id)
+    if lesson is None:
+        return "lesson_missing"
+
+    lesson_repo = session_db.get(LessonRepo, lesson.repo_id)
+    if lesson_repo is None:
+        return "lesson_repo_missing"
+    if lesson_repo.health != "healthy":
+        return "lesson_repo_unhealthy"
+
+    has_part = session_db.exec(
+        select(LessonPart.id).where(LessonPart.lesson_id == lesson.id).limit(1)
+    ).first()
+    if has_part is None:
+        return "no_parts_synced"
+
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class WorkshopWsHandshake:
     """Snapshot of websocket auth tied to DB state at handshake time."""
@@ -1329,6 +1351,14 @@ async def start_workshop_session(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="start_requires_scheduled_session",
+        )
+    content_issue = _workshop_session_start_content_issue(
+        session, workshop_row=workshop_session
+    )
+    if content_issue is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"lesson_content_unavailable:{content_issue}",
         )
     workshop_session.status = "live"
     session.add(workshop_session)
