@@ -327,6 +327,134 @@ test("instructor sync card install CTA prefers app install URL from API", async 
   await context.close()
 })
 
+test("instructor sync card prompts install and blocks sync when no installations", async ({
+  browser,
+}) => {
+  const email = randomEmail()
+  const password = "changethis123"
+  await createUser({ email, password, is_instructor: true })
+
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  })
+  const page = await context.newPage()
+
+  await page.route("**/api/v1/workshop/lesson-repos/installations**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+        install_url: "https://github.com/apps/lesson-bot/installations/new",
+      }),
+    }),
+  )
+  await page.route("**/api/v1/workshop/lesson-repos?**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+      }),
+    }),
+  )
+
+  await page.goto("/login")
+  await page.getByTestId("email-input").fill(email)
+  await page.getByTestId("password-input").fill(password)
+  await page.getByRole("button", { name: "Log In" }).click()
+  await page.waitForURL("/dashboard/instructor")
+
+  await page.goto("/workshops")
+  await page.waitForURL("/workshops")
+  await expect(page.getByTestId("workshop-sync-install-prompt")).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: "Install GitHub App" }),
+  ).toHaveAttribute(
+    "href",
+    "https://github.com/apps/lesson-bot/installations/new",
+  )
+
+  await page
+    .getByTestId("workshop-sync-full-name")
+    .fill("acme/workshop-lessons")
+  await page.getByTestId("workshop-sync-installation-id").fill("123456")
+  await expect(page.getByTestId("workshop-sync-submit")).toBeDisabled()
+
+  await context.close()
+})
+
+test("selected installation without entitled repos prompts grant access and blocks sync", async ({
+  browser,
+}) => {
+  const email = randomEmail()
+  const password = "changethis123"
+  await createUser({ email, password, is_instructor: true })
+
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  })
+  const page = await context.newPage()
+
+  await page.route("**/api/v1/workshop/lesson-repos/installations**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          {
+            installation_id: 123456,
+            account_login: "acme-org",
+            account_type: "Organization",
+            repository_selection: "selected",
+            app_slug: "lesson-bot",
+            suspended: false,
+            entitled_repositories_count: 0,
+            entitled_repositories: [],
+            installation_settings_url:
+              "https://github.com/settings/installations/123456",
+          },
+        ],
+        count: 1,
+      }),
+    }),
+  )
+  await page.route("**/api/v1/workshop/lesson-repos?**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [],
+        count: 0,
+      }),
+    }),
+  )
+
+  await page.goto("/login")
+  await page.getByTestId("email-input").fill(email)
+  await page.getByTestId("password-input").fill(password)
+  await page.getByRole("button", { name: "Log In" }).click()
+  await page.waitForURL("/dashboard/instructor")
+
+  await page.goto("/workshops")
+  await page.waitForURL("/workshops")
+  await page.getByTestId("workshop-sync-installation-id").fill("123456")
+  await page
+    .getByTestId("workshop-sync-full-name")
+    .fill("acme/workshop-lessons")
+  await expect(
+    page.getByTestId("workshop-sync-grant-access-prompt"),
+  ).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: "Grant repository access" }),
+  ).toHaveAttribute("href", "https://github.com/settings/installations/123456")
+  await expect(page.getByTestId("workshop-sync-submit")).toBeDisabled()
+
+  await context.close()
+})
+
 test("instructor sync card passes health and query filters to repo API", async ({
   browser,
 }) => {

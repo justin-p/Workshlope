@@ -169,14 +169,8 @@ export function WorkshopLessonRepoSyncCard() {
   const installCtaHref =
     installationsQuery.data?.install_url ??
     "https://github.com/settings/installations"
-
-  const canSubmit =
-    normalizedRepo.length > 0 &&
-    repoFormatValid &&
-    installationIdValid &&
-    Number.isFinite(installationIdInt) &&
-    !syncMutation.isPending
-
+  const installationsCount = installationsQuery.data?.count ?? 0
+  const hasAnyInstallations = installationsCount > 0
   const selectedInstallation = useMemo(() => {
     if (!Number.isFinite(installationIdInt)) return null
     return (
@@ -185,6 +179,22 @@ export function WorkshopLessonRepoSyncCard() {
       ) ?? null
     )
   }, [installationIdInt, installationsQuery.data?.data])
+  const selectedInstallationNeedsGrant =
+    selectedInstallation?.repository_selection === "selected" &&
+    selectedInstallation.entitled_repositories.length === 0
+  const blockingSetupHint = !hasAnyInstallations
+    ? "Install the GitHub App before syncing lesson repositories."
+    : selectedInstallationNeedsGrant
+      ? "Grant repository access for the selected installation before syncing."
+      : null
+
+  const canSubmit =
+    normalizedRepo.length > 0 &&
+    repoFormatValid &&
+    installationIdValid &&
+    Number.isFinite(installationIdInt) &&
+    blockingSetupHint === null &&
+    !syncMutation.isPending
 
   const visibleSyncedRepos = useMemo(
     () => reposQuery.data?.data ?? [],
@@ -205,12 +215,19 @@ export function WorkshopLessonRepoSyncCard() {
     if (syncMutation.isPending) return "Sync in progress..."
     if (isRefreshingData)
       return "Refreshing installation and repository lists..."
+    if (blockingSetupHint) return blockingSetupHint
     if (errorDetail) return `Sync failed: ${errorDetail}`
     if (syncMutation.data) {
       return `Last sync succeeded for ${syncMutation.data.full_name}.`
     }
     return "Ready to sync from GitHub."
-  }, [errorDetail, isRefreshingData, syncMutation.data, syncMutation.isPending])
+  }, [
+    blockingSetupHint,
+    errorDetail,
+    isRefreshingData,
+    syncMutation.data,
+    syncMutation.isPending,
+  ])
 
   useEffect(() => {
     if (
@@ -346,6 +363,26 @@ export function WorkshopLessonRepoSyncCard() {
           </a>
           .
         </p>
+        {!hasAnyInstallations ? (
+          <div
+            className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200"
+            data-testid="workshop-sync-install-prompt"
+          >
+            <p className="font-medium">GitHub App access required</p>
+            <p>
+              No installations were found yet. Install the GitHub App to connect
+              lesson repositories.
+            </p>
+            <a
+              href={installCtaHref}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline text-primary"
+            >
+              Install GitHub App
+            </a>
+          </div>
+        ) : null}
         <p className="text-xs text-muted-foreground" aria-live="polite">
           {statusMessage}
         </p>
@@ -532,10 +569,26 @@ export function WorkshopLessonRepoSyncCard() {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  This installation is set to selected repositories but
-                  currently has no entitled repos in app state.
-                </p>
+                <div
+                  className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200"
+                  data-testid="workshop-sync-grant-access-prompt"
+                >
+                  <p className="font-medium">
+                    Grant repository access before syncing
+                  </p>
+                  <p>
+                    This installation uses selected repositories but none are
+                    currently entitled in app state.
+                  </p>
+                  <a
+                    href={selectedInstallation.installation_settings_url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="underline text-primary"
+                  >
+                    Grant repository access
+                  </a>
+                </div>
               )
             ) : null}
           </div>
