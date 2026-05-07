@@ -65,6 +65,7 @@ This project is indexed by GitNexus as **testing** (4234 symbols, 6377 relations
   - before editing, ensure current branch is not `main`; if on `main`, create/switch to a feature branch first,
   - branch names must encode one scope and one slice slug using `<type>/<scope>/<slice-slug>` (example: `feat/workshop/repo-health-filter`),
   - branch names must not include multi-scope separators like `+`, `,`, `_and_`, or `-and-`,
+  - branch names must not use generic slice slugs (forbidden examples: `next`, `functionality`, `slice`, `misc`, `temp`, `wip`, `changes`),
   - open a PR for each completed slice and share the PR URL,
   - do not merge to `main` locally without explicit user approval.
 - Required skills by default for code changes:

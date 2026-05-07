@@ -533,6 +533,127 @@ test.describe("Workshop live session", () => {
     ).toContainText("(lesson_repo_missing)")
   })
 
+  test("can retry lesson check and resume controls after content recovers", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+    let detailRequests = 0
+
+    await page.route("**/api/v1/workshop/sessions/*", async (route) => {
+      const req = route.request()
+      if (
+        req.method() !== "GET" ||
+        !/\/api\/v1\/workshop\/sessions\/[^/]+$/.test(req.url())
+      ) {
+        await route.continue()
+        return
+      }
+
+      detailRequests += 1
+      const upstream = await route.fetch()
+      const body = (await upstream.json()) as {
+        lesson?: Record<string, unknown>
+        parts?: unknown[]
+      }
+
+      if (detailRequests === 1) {
+        body.lesson = {
+          ...(body.lesson ?? {}),
+          lesson_content_available: false,
+          lesson_content_issue: "no_parts_synced",
+        }
+        body.parts = []
+      }
+
+      await route.fulfill({
+        response: upstream,
+        body: JSON.stringify(body),
+        headers: {
+          ...upstream.headers(),
+          "content-type": "application/json",
+        },
+      })
+    })
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(
+      page.getByTestId("workshop-lesson-content-unavailable"),
+    ).toBeVisible()
+    await expect(page.getByTestId("workshop-instructor-advance")).toBeDisabled()
+
+    await page.getByTestId("workshop-lesson-content-refresh").click()
+    await expect(
+      page.getByTestId("workshop-lesson-content-unavailable"),
+    ).toHaveCount(0)
+    await expect(page.getByTestId("workshop-instructor-advance")).toBeEnabled()
+  })
+
+  test("auto-recovers lesson banner when detail polling sees content return", async ({
+    page,
+    request,
+  }) => {
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+    let detailRequests = 0
+
+    await page.route("**/api/v1/workshop/sessions/*", async (route) => {
+      const req = route.request()
+      if (
+        req.method() !== "GET" ||
+        !/\/api\/v1\/workshop\/sessions\/[^/]+$/.test(req.url())
+      ) {
+        await route.continue()
+        return
+      }
+
+      detailRequests += 1
+      const upstream = await route.fetch()
+      const body = (await upstream.json()) as {
+        lesson?: Record<string, unknown>
+        parts?: unknown[]
+      }
+
+      if (detailRequests === 1) {
+        body.lesson = {
+          ...(body.lesson ?? {}),
+          lesson_content_available: false,
+          lesson_content_issue: "no_parts_synced",
+        }
+        body.parts = []
+      }
+
+      await route.fulfill({
+        response: upstream,
+        body: JSON.stringify(body),
+        headers: {
+          ...upstream.headers(),
+          "content-type": "application/json",
+        },
+      })
+    })
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(
+      page.getByTestId("workshop-lesson-content-unavailable"),
+    ).toBeVisible()
+    await expect(page.getByTestId("workshop-instructor-advance")).toBeDisabled()
+
+    await expect(
+      page.getByTestId("workshop-lesson-content-unavailable"),
+    ).toHaveCount(0, {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId("workshop-instructor-advance")).toBeEnabled()
+  })
+
   test("workshops hub shows blocked pre-work count on cards", async ({
     page,
     request,

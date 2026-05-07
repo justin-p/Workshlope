@@ -93,6 +93,11 @@ function WorkshopSessionPage() {
       WorkshopSessionsService.readWorkshopSessionDetail({ sessionId }),
     enabled: uuidOk,
     retry: false,
+    // Keep probing for recovery while content is marked unavailable.
+    refetchInterval: (query) =>
+      query.state.data?.lesson.lesson_content_available === false
+        ? 5_000
+        : false,
   })
 
   const lessonId = detailQuery.data?.lesson.id
@@ -540,6 +545,20 @@ function WorkshopSessionPage() {
             {lessonContentIssue ? `(${lessonContentIssue}) ` : ""}
             Sync lesson content before running this workshop.
           </AlertDescription>
+          <div className="mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-testid="workshop-lesson-content-refresh"
+              disabled={detailQuery.isFetching}
+              onClick={() => {
+                void detailQuery.refetch()
+              }}
+            >
+              Retry lesson check
+            </Button>
+          </div>
         </Alert>
       ) : null}
       {detailView === "participant" ? (
