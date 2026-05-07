@@ -57,7 +57,7 @@ This project is indexed by GitNexus as **testing** (4234 symbols, 6377 relations
 
 ## Change Delivery Guardrails
 
-- Treat `workshop_lessons_&_sessions_aa012042.plan.md` as the detailed delivery map; keep `AGENTS.md` as execution rules and safety checks.
+- Treat `PLAN.md` as the detailed delivery map; keep `AGENTS.md` as execution rules and safety checks.
 - Required skills by default for code changes:
   - `/python-tdd-with-uv` for backend Python changes (RED -> GREEN -> REFACTOR via `uv run`).
   - `/playwright-local-gate` for local Playwright validation on behavior/UI changes.
