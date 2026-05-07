@@ -75,6 +75,14 @@ export function WorkshopLessonRepoSyncCard() {
         limit: 20,
       }),
   })
+  const installationsQuery = useQuery({
+    queryKey: ["workshopGithubInstallations"],
+    queryFn: () =>
+      WorkshopLessonReposService.readGithubInstallations({
+        skip: 0,
+        limit: 50,
+      }),
+  })
 
   const normalizedRepo = fullName.trim()
   const repoFormatValid =
@@ -161,7 +169,16 @@ export function WorkshopLessonRepoSyncCard() {
               onChange={(e) => setInstallationId(e.target.value)}
               placeholder="12345678"
               data-testid="workshop-sync-installation-id"
+              list="workshop-installation-ids"
             />
+            <datalist id="workshop-installation-ids">
+              {(installationsQuery.data?.data ?? []).map((inst) => (
+                <option
+                  key={inst.installation_id}
+                  value={String(inst.installation_id)}
+                />
+              ))}
+            </datalist>
             {showInstallationValidation ? (
               <p className="text-xs text-destructive">
                 Installation ID must be a positive number.
@@ -170,8 +187,43 @@ export function WorkshopLessonRepoSyncCard() {
             <p className="text-xs text-muted-foreground">
               Find this in the GitHub App installation URL.
             </p>
+            {installationsQuery.isSuccess &&
+            (installationsQuery.data?.count ?? 0) > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Known installations: {installationsQuery.data?.count}
+              </p>
+            ) : null}
           </div>
         </div>
+        {installationsQuery.isSuccess &&
+        (installationsQuery.data?.count ?? 0) > 0 ? (
+          <div
+            className="space-y-1"
+            data-testid="workshop-installation-options"
+          >
+            <p className="text-xs text-muted-foreground">
+              Installation options
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {installationsQuery.data?.data.map((inst) => (
+                <Button
+                  key={inst.installation_id}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    setInstallationId(String(inst.installation_id))
+                    setErrorDetail(null)
+                  }}
+                >
+                  {inst.account_login}#{inst.installation_id}
+                  {inst.suspended ? " (suspended)" : ""}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {recentRepos.length > 0 ? (
           <div className="space-y-1" data-testid="workshop-sync-recent-repos">
             <p className="text-xs text-muted-foreground">Recent repositories</p>

@@ -148,6 +148,82 @@ export const GitHubBridgeRequestSchema = {
     title: 'GitHubBridgeRequest'
 } as const;
 
+export const GithubInstallationListItemPublicSchema = {
+    properties: {
+        installation_id: {
+            type: 'integer',
+            title: 'Installation Id'
+        },
+        account_login: {
+            type: 'string',
+            title: 'Account Login'
+        },
+        account_type: {
+            type: 'string',
+            title: 'Account Type'
+        },
+        repository_selection: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Repository Selection'
+        },
+        app_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'App Slug'
+        },
+        suspended: {
+            type: 'boolean',
+            title: 'Suspended'
+        },
+        entitled_repositories_count: {
+            type: 'integer',
+            title: 'Entitled Repositories Count'
+        },
+        entitled_repositories: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Entitled Repositories'
+        }
+    },
+    type: 'object',
+    required: ['installation_id', 'account_login', 'account_type', 'suspended', 'entitled_repositories_count', 'entitled_repositories'],
+    title: 'GithubInstallationListItemPublic'
+} as const;
+
+export const GithubInstallationListPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/GithubInstallationListItemPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'GithubInstallationListPublic'
+} as const;
+
 export const HTTPValidationErrorSchema = {
     properties: {
         detail: {

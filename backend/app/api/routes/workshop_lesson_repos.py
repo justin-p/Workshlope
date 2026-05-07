@@ -82,6 +82,22 @@ class LessonRepoListPublic(BaseModel):
     count: int
 
 
+class GithubInstallationListItemPublic(BaseModel):
+    installation_id: int
+    account_login: str
+    account_type: str
+    repository_selection: str | None = None
+    app_slug: str | None = None
+    suspended: bool
+    entitled_repositories_count: int
+    entitled_repositories: list[str]
+
+
+class GithubInstallationListPublic(BaseModel):
+    data: list[GithubInstallationListItemPublic]
+    count: int
+
+
 def _require_installation_repo_entitlement(
     *,
     session: Session,
@@ -147,6 +163,72 @@ def read_lesson_repos(
         for repo, lesson_count, part_count in rows
     ]
     return LessonRepoListPublic(data=data, count=int(total))
+
+
+@router.get("/installations", response_model=GithubInstallationListPublic)
+def read_github_installations(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> GithubInstallationListPublic:
+    """List known GitHub App installations and entitlement summaries."""
+    _require_lesson_github_editor(current_user)
+
+    rows = session.exec(
+        select(
+            GithubAppInstallation,
+            func.count(col(GithubInstallationRepository.id)).label(
+                "entitled_repositories_count"
+            ),
+        )
+        .outerjoin(
+            GithubInstallationRepository,
+            col(GithubInstallationRepository.installation_id)
+            == col(GithubAppInstallation.id),
+        )
+        .group_by(col(GithubAppInstallation.id))
+        .order_by(
+            col(GithubAppInstallation.account_login), col(GithubAppInstallation.id)
+        )
+        .offset(skip)
+        .limit(limit),
+    ).all()
+    total = session.exec(select(func.count()).select_from(GithubAppInstallation)).one()
+
+    installation_ids = [inst.id for inst, _count in rows]
+    entitled_rows = (
+        session.exec(
+            select(GithubInstallationRepository).where(
+                col(GithubInstallationRepository.installation_id).in_(installation_ids)
+            )
+        ).all()
+        if installation_ids
+        else []
+    )
+    entitled_by_installation: dict[int, list[str]] = {}
+    for row in entitled_rows:
+        entitled_by_installation.setdefault(row.installation_id, []).append(
+            row.full_name
+        )
+    for values in entitled_by_installation.values():
+        values.sort()
+
+    data = [
+        GithubInstallationListItemPublic(
+            installation_id=inst.id,
+            account_login=inst.account_login,
+            account_type=inst.account_type,
+            repository_selection=inst.repository_selection,
+            app_slug=inst.app_slug,
+            suspended=inst.suspended_at is not None,
+            entitled_repositories_count=int(entitled_count or 0),
+            entitled_repositories=entitled_by_installation.get(inst.id, []),
+        )
+        for inst, entitled_count in rows
+    ]
+    return GithubInstallationListPublic(data=data, count=int(total))
 
 
 @router.post("/sync-from-github", response_model=LessonRepoGithubSyncPublic)

@@ -39,6 +39,22 @@ export type GitHubBridgeRequest = {
     bridge_token: string;
 };
 
+export type GithubInstallationListItemPublic = {
+    installation_id: number;
+    account_login: string;
+    account_type: string;
+    repository_selection?: (string | null);
+    app_slug?: (string | null);
+    suspended: boolean;
+    entitled_repositories_count: number;
+    entitled_repositories: Array<(string)>;
+};
+
+export type GithubInstallationListPublic = {
+    data: Array<GithubInstallationListItemPublic>;
+    count: number;
+};
+
 export type HTTPValidationError = {
     detail?: Array<ValidationError>;
 };
@@ -738,6 +754,13 @@ export type WorkshopLessonReposReadLessonReposData = {
 };
 
 export type WorkshopLessonReposReadLessonReposResponse = (LessonRepoListPublic);
+
+export type WorkshopLessonReposReadGithubInstallationsData = {
+    limit?: number;
+    skip?: number;
+};
+
+export type WorkshopLessonReposReadGithubInstallationsResponse = (GithubInstallationListPublic);
 
 export type WorkshopLessonReposSyncLessonRepoFromGithubData = {
     requestBody: LessonRepoGithubSyncBody;

@@ -644,3 +644,43 @@ def test_read_lesson_repos_lists_counts_and_health(client: TestClient) -> None:
     assert row["health"] == "healthy"
     assert row["lesson_count"] >= 1
     assert row["part_count"] >= 2
+
+
+def test_read_github_installations_lists_entitlements(client: TestClient) -> None:
+    install_id = 910_000_000 + (uuid.uuid4().int % 1_000_000)
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_id,
+                account_id=2,
+                account_login=f"acct-{uuid.uuid4()}",
+                account_type="Organization",
+                target_type="Organization",
+                repository_selection="selected",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            ),
+        )
+        session.add(
+            GithubInstallationRepository(
+                installation_id=install_id,
+                full_name=f"org/repo-{uuid.uuid4()}",
+            ),
+        )
+        session.commit()
+
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos/installations",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    row = next(
+        (item for item in payload["data"] if item["installation_id"] == install_id),
+        None,
+    )
+    assert row is not None
+    assert row["repository_selection"] == "selected"
+    assert row["entitled_repositories_count"] >= 1
+    assert len(row["entitled_repositories"]) >= 1
