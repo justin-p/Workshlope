@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.db import engine, init_db
 from app.main import app
 from app.models import (
+    GithubAppInstallation,
     Item,
     Lesson,
     LessonPart,
@@ -47,6 +48,8 @@ def db() -> Generator[Session, None, None]:
         statement = delete(Lesson)
         session.execute(statement)
         statement = delete(LessonRepo)
+        session.execute(statement)
+        statement = delete(GithubAppInstallation)
         session.execute(statement)
         statement = delete(OAuthAccount)
         session.execute(statement)
