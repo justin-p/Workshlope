@@ -141,6 +141,24 @@ export function WorkshopLessonRepoSyncCard() {
 
   const isRefreshingData =
     reposQuery.isFetching || installationsQuery.isFetching
+  const isBusy = syncMutation.isPending || isRefreshingData
+  const freshnessLabel = useMemo(() => {
+    if (!lastRefreshedAt) return "not refreshed yet"
+    const ageMs = Date.now() - lastRefreshedAt.getTime()
+    if (ageMs < 60_000) return "fresh"
+    if (ageMs < 5 * 60_000) return "aging"
+    return "stale"
+  }, [lastRefreshedAt])
+
+  useEffect(() => {
+    if (
+      !lastRefreshedAt &&
+      reposQuery.isSuccess &&
+      installationsQuery.isSuccess
+    ) {
+      setLastRefreshedAt(new Date())
+    }
+  }, [installationsQuery.isSuccess, lastRefreshedAt, reposQuery.isSuccess])
 
   const onSubmit = () => {
     if (!canSubmit) return
@@ -176,6 +194,12 @@ export function WorkshopLessonRepoSyncCard() {
   const refreshCardData = async () => {
     await Promise.all([reposQuery.refetch(), installationsQuery.refetch()])
     setLastRefreshedAt(new Date())
+  }
+
+  const clearInputs = () => {
+    setFullName("")
+    setInstallationId("")
+    setErrorDetail(null)
   }
 
   return (
@@ -405,10 +429,21 @@ export function WorkshopLessonRepoSyncCard() {
             size="sm"
             className="h-7 px-2 text-xs"
             onClick={() => void refreshCardData()}
-            disabled={isRefreshingData}
+            disabled={isBusy}
             data-testid="workshop-sync-refresh"
           >
             {isRefreshingData ? "Refreshing..." : "Refresh lists"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={clearInputs}
+            disabled={isBusy}
+            data-testid="workshop-sync-clear-inputs"
+          >
+            Clear inputs
           </Button>
         </div>
         {errorDetail ? (
@@ -424,7 +459,8 @@ export function WorkshopLessonRepoSyncCard() {
             <p className="text-xs font-medium">Synced lesson repositories</p>
             <p className="text-xs text-muted-foreground">
               {reposQuery.data?.count ?? 0} repo(s) ·{" "}
-              {installationsQuery.data?.count ?? 0} installation(s)
+              {installationsQuery.data?.count ?? 0} installation(s) ·{" "}
+              {freshnessLabel}
             </p>
           </div>
           {reposQuery.isLoading ? (
