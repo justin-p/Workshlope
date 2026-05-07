@@ -1,0 +1,12 @@
+---
+description: Enforce branch-first delivery and PR-based integration
+alwaysApply: true
+---
+
+# Branch and PR workflow
+
+- For implementation work, never stay on `main`; create/use a feature branch first.
+- Before committing, verify current branch is not `main` or `master`.
+- After completing a slice, push branch and open/update a PR.
+- If a PR supersedes another open PR, cross-link both and close the superseded one.
+- Keep `PLAN.md` synchronized in the same pass whenever behavior/backlog changes materially.
