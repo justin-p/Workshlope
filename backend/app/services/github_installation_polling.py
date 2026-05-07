@@ -139,9 +139,22 @@ def fetch_installation_repositories(
     return unique_full_names, selection_mode
 
 
+def github_app_installation_ids_from_api_rows(
+    rows: list[dict[str, Any]],
+) -> set[int]:
+    """Installation ids present in GitHub app installation list payloads."""
+    ids: set[int] = set()
+    for row in rows:
+        raw = row.get("id")
+        if isinstance(raw, int) and not isinstance(raw, bool):
+            ids.add(raw)
+    return ids
+
+
 __all__ = [
     "GithubInstallationPollingError",
     "_parse_datetime_maybe",
     "fetch_app_installations",
     "fetch_installation_repositories",
+    "github_app_installation_ids_from_api_rows",
 ]

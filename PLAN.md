@@ -10,7 +10,7 @@ Use this section after a pause or repo switch—do not rely on chat memory alone
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-07** — Lesson GitHub polling model (install + repo refresh POSTs, periodic poller), webhook removal + migration dropping `github_webhook_delivery`. **Lesson sync UX/API:** `GET …/lesson-repos/installations` best-efforts sync from GitHub App `GET /app/installations`, upserts `github_app_installation` rows, falls back to DB cache on polling failure (`accessible-repositories` + repo picker). |
+| **Last synced** | **2026-05-07** — Lesson GitHub polling model (install + repo refresh POSTs, periodic poller), webhook removal + migration dropping `github_webhook_delivery`. **Lesson sync UX/API:** `GET …/lesson-repos/installations` best-efforts sync from GitHub App `GET /app/installations`, upserts rows, **prunes installs GitHub no longer returns** (on successful poll + `installations/refresh`; DB cache unchanged if GitHub fails), falls back to DB cache on polling failure (`accessible-repositories`). **Lesson sync UI:** repository choice is a dropdown (`Select`) with optional typed owner/repo; installation selector clears stale picks when GitHub drops an install. |
 | **Integration tip** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 

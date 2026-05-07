@@ -22,11 +22,15 @@ from app.services.github_app_tokens import (
     GithubAppTokenError,
     mint_installation_access_token,
 )
+from app.services.github_installation_poller import (
+    prune_github_installations_removed_on_github,
+)
 from app.services.github_installation_polling import (
     GithubInstallationPollingError,
     _parse_datetime_maybe,
     fetch_app_installations,
     fetch_installation_repositories,
+    github_app_installation_ids_from_api_rows,
 )
 from app.services.lesson_github_fetch import (
     GithubContentsFetchError,
@@ -306,6 +310,12 @@ def _sync_github_installation_metadata_from_github_or_fallback(
         return
     for row in installation_rows:
         _upsert_installation_from_api_row(session=session, row=row)
+    prune_github_installations_removed_on_github(
+        session=session,
+        live_installation_ids=github_app_installation_ids_from_api_rows(
+            installation_rows
+        ),
+    )
     session.commit()
 
 
@@ -562,6 +572,13 @@ def refresh_github_installations(
                 for existing in rows:
                     session.delete(existing)
             refreshed_repositories += 1
+
+    prune_github_installations_removed_on_github(
+        session=session,
+        live_installation_ids=github_app_installation_ids_from_api_rows(
+            installation_rows
+        ),
+    )
 
     session.commit()
     refreshed = len(installation_rows)

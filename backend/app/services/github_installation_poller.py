@@ -12,12 +12,33 @@ from app.services.github_installation_polling import (
     GithubInstallationPollingError,
     fetch_app_installations,
     fetch_installation_repositories,
+    github_app_installation_ids_from_api_rows,
 )
 
 logger = logging.getLogger(__name__)
 
 _THREAD: threading.Thread | None = None
 _STOP_EVENT = threading.Event()
+
+
+def prune_github_installations_removed_on_github(
+    *, session: Session, live_installation_ids: set[int]
+) -> int:
+    """Delete local rows for installations GitHub no longer lists (user uninstalled).
+
+    ``LessonRepo.github_installation_id`` uses ON DELETE SET NULL.
+    Entitlement rows cascade with the installation row.
+    """
+    stored = session.exec(select(GithubAppInstallation.id)).all()
+    removed = 0
+    for inst_id in stored:
+        if inst_id in live_installation_ids:
+            continue
+        row = session.get(GithubAppInstallation, inst_id)
+        if row is not None:
+            session.delete(row)
+            removed += 1
+    return removed
 
 
 def _sync_installations_once() -> None:
@@ -97,6 +118,10 @@ def _sync_installations_once() -> None:
                     )
                 for stale_name in sorted(set(existing_map.keys()) - target):
                     session.delete(existing_map[stale_name])
+        live_ids = github_app_installation_ids_from_api_rows(installation_rows)
+        prune_github_installations_removed_on_github(
+            session=session, live_installation_ids=live_ids
+        )
         session.commit()
 
 
