@@ -93,6 +93,8 @@ class Settings(BaseSettings):
 
     # GitHub App (lesson repo sync — separate from OAuth login app)
     GITHUB_APP_ID: str | None = None
+    GITHUB_APP_SLUG: str | None = None
+    GITHUB_APP_INSTALL_URL: str | None = None
     GITHUB_APP_PRIVATE_KEY: str | None = None
     GITHUB_WEBHOOK_SECRET: str | None = None
     GITHUB_WEBHOOK_MAX_REQUESTS_PER_MINUTE_PER_IP: int = 240

@@ -701,6 +701,43 @@ def test_read_github_installations_lists_entitlements(client: TestClient) -> Non
     )
 
 
+def test_read_github_installations_uses_configured_install_url_when_empty(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        settings,
+        "GITHUB_APP_INSTALL_URL",
+        "https://github.com/apps/lesson-bot/installations/new",
+    )
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos/installations",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert (
+        payload["install_url"] == "https://github.com/apps/lesson-bot/installations/new"
+    )
+
+
+def test_read_github_installations_uses_configured_slug_when_empty(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "GITHUB_APP_INSTALL_URL", None)
+    monkeypatch.setattr(settings, "GITHUB_APP_SLUG", "lesson-bot")
+    headers = get_superuser_token_headers(client)
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/lesson-repos/installations",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert (
+        payload["install_url"] == "https://github.com/apps/lesson-bot/installations/new"
+    )
+
+
 def test_read_lesson_repo_preview_returns_lessons_and_parts(client: TestClient) -> None:
     install_id = 911_000_000 + (uuid.uuid4().int % 1_000_000)
     repo_id: uuid.UUID | None = None

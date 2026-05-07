@@ -160,9 +160,15 @@ def _require_installation_repo_entitlement(
 def _resolve_github_app_install_url(
     installations: list[GithubAppInstallation],
 ) -> str | None:
+    configured_url = settings.GITHUB_APP_INSTALL_URL
+    if configured_url:
+        return configured_url
     for installation in installations:
         if installation.app_slug:
             return f"https://github.com/apps/{installation.app_slug}/installations/new"
+    configured_slug = settings.GITHUB_APP_SLUG
+    if configured_slug:
+        return f"https://github.com/apps/{configured_slug}/installations/new"
     return None
 
 
