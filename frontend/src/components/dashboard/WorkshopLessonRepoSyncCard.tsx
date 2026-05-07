@@ -32,6 +32,7 @@ export function WorkshopLessonRepoSyncCard() {
     number | null
   >(null)
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null)
+  const [autofillHint, setAutofillHint] = useState<string | null>(null)
 
   useEffect(() => {
     try {
@@ -175,6 +176,10 @@ export function WorkshopLessonRepoSyncCard() {
     setInstallationId(String(installationIdValue))
     setFullName(repoName)
     setErrorDetail(null)
+    setAutofillHint(
+      `Autofilled ${repoName} with installation #${installationIdValue}.`,
+    )
+    setTimeout(() => setAutofillHint(null), 2000)
   }
 
   const copyInstallationId = async (value: number) => {
@@ -200,6 +205,7 @@ export function WorkshopLessonRepoSyncCard() {
     setFullName("")
     setInstallationId("")
     setErrorDetail(null)
+    setAutofillHint(null)
   }
 
   return (
@@ -236,6 +242,12 @@ export function WorkshopLessonRepoSyncCard() {
               id="repo-full-name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && canSubmit) {
+                  event.preventDefault()
+                  onSubmit()
+                }
+              }}
               placeholder="acme/workshop-lessons"
               data-testid="workshop-sync-full-name"
             />
@@ -259,6 +271,12 @@ export function WorkshopLessonRepoSyncCard() {
               min={1}
               value={installationId}
               onChange={(e) => setInstallationId(e.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && canSubmit) {
+                  event.preventDefault()
+                  onSubmit()
+                }
+              }}
               placeholder="12345678"
               data-testid="workshop-sync-installation-id"
               list="workshop-installation-ids"
@@ -452,6 +470,14 @@ export function WorkshopLessonRepoSyncCard() {
             data-testid="workshop-sync-error"
           >
             {errorDetail}
+          </p>
+        ) : null}
+        {autofillHint ? (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="workshop-sync-autofill-hint"
+          >
+            {autofillHint}
           </p>
         ) : null}
         <div className="space-y-1 pt-2">
