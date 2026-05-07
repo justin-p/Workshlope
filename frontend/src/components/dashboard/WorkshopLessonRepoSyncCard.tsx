@@ -15,6 +15,13 @@ import { Input } from "@/components/ui/input"
 const RECENT_REPOS_KEY = "workshop.lessonRepoSync.recentRepos"
 const OWNER_REPO_RE = /^[^/\s]+\/[^/\s]+$/
 
+function formatSyncTimestamp(iso: string | null | undefined): string {
+  if (!iso) return "never synced"
+  const dt = new Date(iso)
+  if (Number.isNaN(dt.getTime())) return "unknown sync time"
+  return dt.toLocaleString()
+}
+
 export function WorkshopLessonRepoSyncCard() {
   const [fullName, setFullName] = useState("")
   const [installationId, setInstallationId] = useState("")
@@ -128,6 +135,23 @@ export function WorkshopLessonRepoSyncCard() {
     })
   }
 
+  const applyInstallationAndRepo = (
+    installationIdValue: number,
+    repoName: string,
+  ) => {
+    setInstallationId(String(installationIdValue))
+    setFullName(repoName)
+    setErrorDetail(null)
+  }
+
+  const copyInstallationId = async (value: number) => {
+    try {
+      await navigator.clipboard.writeText(String(value))
+    } catch {
+      // Ignore clipboard write failures silently.
+    }
+  }
+
   return (
     <Card data-testid="workshop-lesson-repo-sync-card">
       <CardHeader>
@@ -224,21 +248,37 @@ export function WorkshopLessonRepoSyncCard() {
             </p>
             <div className="flex flex-wrap gap-2">
               {installationsQuery.data?.data.map((inst) => (
-                <Button
+                <div
                   key={inst.installation_id}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => {
-                    setInstallationId(String(inst.installation_id))
-                    setErrorDetail(null)
-                  }}
+                  className="flex items-center gap-1"
                 >
-                  {inst.account_login}#{inst.installation_id} ·{" "}
-                  {inst.repository_selection ?? "unknown"}
-                  {inst.suspended ? " · suspended" : ""}
-                </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => {
+                      setInstallationId(String(inst.installation_id))
+                      setErrorDetail(null)
+                    }}
+                  >
+                    {inst.account_login}#{inst.installation_id} ·{" "}
+                    {inst.repository_selection ?? "unknown"}
+                    {inst.suspended ? " · suspended" : ""}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() =>
+                      void copyInstallationId(inst.installation_id)
+                    }
+                    title="Copy installation ID"
+                  >
+                    Copy ID
+                  </Button>
+                </div>
               ))}
             </div>
           </div>
@@ -267,8 +307,10 @@ export function WorkshopLessonRepoSyncCard() {
                       size="sm"
                       className="h-7 px-2 text-xs"
                       onClick={() => {
-                        setFullName(repo)
-                        setErrorDetail(null)
+                        applyInstallationAndRepo(
+                          selectedInstallation.installation_id,
+                          repo,
+                        )
                       }}
                     >
                       {repo}
@@ -364,16 +406,36 @@ export function WorkshopLessonRepoSyncCard() {
                       {repo.default_branch} · {repo.lesson_count} lesson(s) ·{" "}
                       {repo.part_count} part(s)
                     </p>
+                    <p className="text-muted-foreground truncate">
+                      Last sync: {formatSyncTimestamp(repo.last_synced_at)}
+                    </p>
                   </div>
-                  <span
-                    className={
-                      repo.health === "healthy"
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-amber-600 dark:text-amber-400"
-                    }
-                  >
-                    {repo.health}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() =>
+                        applyInstallationAndRepo(
+                          repo.github_installation_id ?? installationIdInt,
+                          repo.full_name,
+                        )
+                      }
+                      disabled={!repo.github_installation_id}
+                    >
+                      Use
+                    </Button>
+                    <span
+                      className={
+                        repo.health === "healthy"
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-amber-600 dark:text-amber-400"
+                      }
+                    >
+                      {repo.health}
+                    </span>
+                  </div>
                 </li>
               ))}
             </ul>
