@@ -666,7 +666,9 @@ def test_timer_public_countdown_computes_elapsed_and_remaining() -> None:
     assert out.remaining_seconds <= 25
 
 
-def test_workshop_session_detail_shared_raises_when_lesson_row_missing() -> None:
+def test_workshop_session_detail_shared_returns_fallback_when_lesson_row_missing() -> (
+    None
+):
     lesson_id = uuid.uuid4()
     session_id = uuid.uuid4()
     mock_db = MagicMock()
@@ -684,10 +686,16 @@ def test_workshop_session_detail_shared_raises_when_lesson_row_missing() -> None
         created_at=datetime.now(timezone.utc),
     )
 
-    with pytest.raises(HTTPException) as exc:
-        ws_mod._workshop_session_detail_shared(mock_db, workshop_row=ws_row)
-    assert exc.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert exc.value.detail == "session_lesson_missing"
+    core, lesson_summary, parts = ws_mod._workshop_session_detail_shared(
+        mock_db, workshop_row=ws_row
+    )
+    assert core.id == session_id
+    assert lesson_summary.id == lesson_id
+    assert lesson_summary.title == "Lesson unavailable"
+    assert lesson_summary.lesson_repo_health == "unhealthy"
+    assert lesson_summary.lesson_content_available is False
+    assert lesson_summary.lesson_content_issue == "lesson_missing"
+    assert parts == []
 
 
 def test_timer_public_paused_uses_paused_at_for_elapsed_cap() -> None:
