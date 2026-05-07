@@ -10,15 +10,15 @@ Use this section after a pause or repo switch—do not rely on chat memory alone
 
 | Field | Value |
 | ------ | ------ |
-| **Last synced** | **2026-05-07** — Workshop stack remains merged to **`main`** via **[#18](https://github.com/justin-p/testing/pull/18)** (+ nested [#19](https://github.com/justin-p/testing/pull/19)–[#23](https://github.com/justin-p/testing/pull/23), [#26](https://github.com/justin-p/testing/pull/26), [#27](https://github.com/justin-p/testing/pull/27), [#29](https://github.com/justin-p/testing/pull/29)); current in-flight lesson follow-up is **[#34](https://github.com/justin-p/testing/pull/34)** on `ws-lesson-05-lesson-repo-sync-http` with additional instructor UX polish commits (`0336269`, `810b486`, `812bf26`). |
+| **Last synced** | **2026-05-07** — Lesson follow-up stack is now fully landed on **`main`**: [#30](https://github.com/justin-p/testing/pull/30) merged directly and remaining lesson branches were merged into `main` in order (L2-L5), followed by plan/rules cleanup (`PLAN.md` rename + AGENTS policy consolidation). |
 | **Integration tip** | **`main`** |
-| **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** - **Lesson GitHub sync**: backend tracked on **`ws-lesson-01`…`ws-lesson-05`** ([map](#lesson-source-follow-up-stack)); merge posture follows stacked PRs to **`main`**. Functional blockers are closed; current work is optional polish/ops follow-through (card ergonomics, observability, and merge sequencing through #30→#34). Posture **`security-hardening-new-features`**. |
+| **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** - core Lesson GitHub sync is shipped on `main`; remaining work is optional polish/ops follow-through (timer parity, realtime scale-out, dashboard/playwright breadth). Posture **`security-hardening-new-features`**. |
 
 ### Remaining work (authoritative)
 
-**1. Lesson source pipeline** (backend on **`ws-lesson-01`…`ws-lesson-05`**, not merged to **`main`** until the stacked PR chain lands)
+**1. Lesson source pipeline** (core scope shipped on `main`; follow-ups are polish/ops only)
 
-- **Progress (landed locally on stacked branches `ws-lesson-01` … `ws-lesson-05` — merge in order):** [`lesson_manifest.py`](backend/app/services/lesson_manifest.py) + [`lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py) (**L1**). DB **`github_app_installation`** + FK on **`LessonRepo`** (**L2**). [`github_app_tokens.py`](backend/app/services/github_app_tokens.py) (**L3**). [`github_webhooks.py`](backend/app/api/routes/github_webhooks.py) — **`POST /api/v1/github/webhooks`** (**L4**). [`lesson_github_fetch.py`](backend/app/services/lesson_github_fetch.py) + [`workshop_lesson_repos.py`](backend/app/api/routes/workshop_lesson_repos.py) — **`POST /api/v1/workshop/lesson-repos/sync-from-github`** (**L5**). See **[Lesson source follow-up stack](#lesson-source-follow-up-stack)**.
+- **Progress (shipped on `main`):** [`lesson_manifest.py`](backend/app/services/lesson_manifest.py) + [`lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py) (**L1**). DB **`github_app_installation`** + FK on **`LessonRepo`** (**L2**). [`github_app_tokens.py`](backend/app/services/github_app_tokens.py) (**L3**). [`github_webhooks.py`](backend/app/api/routes/github_webhooks.py) — **`POST /api/v1/github/webhooks`** (**L4**). [`lesson_github_fetch.py`](backend/app/services/lesson_github_fetch.py) + [`workshop_lesson_repos.py`](backend/app/api/routes/workshop_lesson_repos.py) — **`POST /api/v1/workshop/lesson-repos/sync-from-github`** (**L5**). See **[Lesson source follow-up stack](#lesson-source-follow-up-stack)** for historical chain.
 - **GitHub App (still hardening vs [Locked decisions](#locked-decisions)):** **Shipped:** `POST /api/v1/github/webhooks` verifies `X-GitHub-Delivery` via **`github_webhook_delivery`** (idempotent replay) and applies **per-IP sliding-window throttle** (`GITHUB_WEBHOOK_MAX_REQUESTS_PER_MINUTE_PER_IP`, `GITHUB_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS`). **Shipped:** instructor-bound repo entitlement for `repository_selection="selected"` via **`github_installation_repository`** webhook-fed rows (`installation_repositories` add/remove) and optional **HTTP Date/skew** replay window (`GITHUB_WEBHOOK_MAX_CLOCK_SKEW_SECONDS`).
 - **Sync + models (remaining product work):** **Sync-time rewrite** of relative markdown / simple HTML asset URLs → **`raw.githubusercontent.com`** (+ strip ``<script>`` / ``<iframe>`` outside fenced blocks) via [`lesson_markdown_pipeline.py`](backend/app/services/lesson_markdown_pipeline.py); **`lesson_markdown_to_safe_html`** (CommonMark `html=false` + **nh3**) is now wired in session detail API and workshop SPA current-part rendering. **`LessonManifest`** SHA row if you want audit; instructor **Install/configure** UI.
 - **Instructor UX**: Repo list, Install/configure CTA (instructor-only — **[Product constraints](#product-constraints)**), Sync, health, parts preview — aligns with **[UI / UX](#ui--ux-specification)** IA; backend routes must catch up.
@@ -37,9 +37,9 @@ Use this section when reopening the project **after intentional stop**. Do **not
 
 | Item | Value |
 | ---- | ----- |
-| Branch | **`ws-lesson-05-lesson-repo-sync-http`** (GitHub lesson stack tip) |
-| PR | Open stacked **[#30](https://github.com/justin-p/testing/pull/30)**→**[#34](https://github.com/justin-p/testing/pull/34)** — merge **`#30` into `main` first**, then rebase/stack-update or merge up the chain ([map](#lesson-source-follow-up-stack)). |
-| Latest work | **Shipped on `main`:** session core, realtime/privacy, dashboards/workshops, prerequisites, pacing, badges + hardening. **Lesson GitHub stack (`ws-lesson-01`→`ws-lesson-05`):** manifests, **`github_app_installation`**, JWT/token, **`/github/webhooks`**, **`sync-from-github`** ([map](#lesson-source-follow-up-stack)) - awaiting merge into `main`. [Remaining work](#remaining-work-authoritative) §1. |
+| Branch | **`main`** |
+| PR | Lesson follow-up stack [#30](https://github.com/justin-p/testing/pull/30)→[#34](https://github.com/justin-p/testing/pull/34) is merged; no open stack PR required for current state. |
+| Latest work | **Shipped on `main`:** session core, realtime/privacy, dashboards/workshops, prerequisites, pacing, badges + hardening, plus complete Lesson GitHub sync stack (manifests, installation persistence, app token flow, webhooks, sync-from-github API/UI). [Remaining work](#remaining-work-authoritative) now tracks optional polish. |
 
 **Resume in this order:**
 
