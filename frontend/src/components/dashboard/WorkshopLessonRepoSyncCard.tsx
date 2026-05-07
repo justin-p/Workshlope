@@ -14,12 +14,20 @@ import { Input } from "@/components/ui/input"
 
 const RECENT_REPOS_KEY = "workshop.lessonRepoSync.recentRepos"
 const OWNER_REPO_RE = /^[^/\s]+\/[^/\s]+$/
+const COPY_ID_FEEDBACK_MS = 1500
+const AUTOFILL_FEEDBACK_MS = 2000
+const FRESH_AGE_MS = 60_000
+const AGING_AGE_MS = 5 * 60_000
 
 function formatSyncTimestamp(iso: string | null | undefined): string {
   if (!iso) return "never synced"
   const dt = new Date(iso)
   if (Number.isNaN(dt.getTime())) return "unknown sync time"
   return dt.toLocaleString()
+}
+
+function buildRecentRepos(nextRepo: string, recentRepos: string[]): string[] {
+  return [nextRepo, ...recentRepos.filter((r) => r !== nextRepo)].slice(0, 5)
 }
 
 export function WorkshopLessonRepoSyncCard() {
@@ -58,10 +66,7 @@ export function WorkshopLessonRepoSyncCard() {
       setErrorDetail(null)
       const normalized = fullName.trim()
       if (OWNER_REPO_RE.test(normalized)) {
-        const next = [
-          normalized,
-          ...recentRepos.filter((r) => r !== normalized),
-        ].slice(0, 5)
+        const next = buildRecentRepos(normalized, recentRepos)
         setRecentRepos(next)
         try {
           localStorage.setItem(RECENT_REPOS_KEY, JSON.stringify(next))
@@ -146,8 +151,8 @@ export function WorkshopLessonRepoSyncCard() {
   const freshnessLabel = useMemo(() => {
     if (!lastRefreshedAt) return "not refreshed yet"
     const ageMs = Date.now() - lastRefreshedAt.getTime()
-    if (ageMs < 60_000) return "fresh"
-    if (ageMs < 5 * 60_000) return "aging"
+    if (ageMs < FRESH_AGE_MS) return "fresh"
+    if (ageMs < AGING_AGE_MS) return "aging"
     return "stale"
   }, [lastRefreshedAt])
   const statusMessage = useMemo(() => {
@@ -189,7 +194,7 @@ export function WorkshopLessonRepoSyncCard() {
     setAutofillHint(
       `Autofilled ${repoName} with installation #${installationIdValue}.`,
     )
-    setTimeout(() => setAutofillHint(null), 2000)
+    setTimeout(() => setAutofillHint(null), AUTOFILL_FEEDBACK_MS)
   }
 
   const copyInstallationId = async (value: number) => {
@@ -200,7 +205,7 @@ export function WorkshopLessonRepoSyncCard() {
         setCopiedInstallationId((current) =>
           current === value ? null : current,
         )
-      }, 1500)
+      }, COPY_ID_FEEDBACK_MS)
     } catch {
       // Ignore clipboard write failures silently.
     }
