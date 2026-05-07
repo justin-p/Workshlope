@@ -28,6 +28,7 @@ Rules:
 
 - one branch = one feature slice only
 - no branch names with `+`, `,`, `_and_`, or `-and-`
+- no generic slice slugs such as `next`, `functionality`, `slice`, `misc`, `temp`, `wip`, `changes`
 - if new unrelated work appears, open a new branch/PR instead of appending to current branch
 
 1. Implement, validate, and sync `PLAN.md` for meaningful changes.
