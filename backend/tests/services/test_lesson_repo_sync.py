@@ -61,6 +61,45 @@ parts:
     assert parts[0].body_md == "# One"
 
 
+def test_sync_rewrites_relative_image_to_raw_github_url(db: Session) -> None:
+    rid = uuid.uuid4()
+    full_name = f"org/img-{rid}"
+    repo = LessonRepo(
+        full_name=full_name,
+        default_branch="main",
+        health="healthy",
+    )
+    db.add(repo)
+    db.commit()
+    db.refresh(repo)
+
+    tree = {
+        "lessons/a/lesson.manifest.yaml": """
+version: 1
+lesson:
+  slug: lesson-img
+  title: Img
+parts:
+  - slug: one
+    title: One
+    path: one.md
+""",
+        "lessons/a/one.md": "![d](./diagram.png)",
+    }
+
+    sync_lesson_repo_from_path_map(
+        session=db,
+        lesson_repo=repo,
+        path_to_content=tree,
+    )
+    lesson = db.exec(select(Lesson).where(Lesson.repo_id == repo.id)).first()
+    assert lesson is not None
+    part = db.exec(select(LessonPart).where(LessonPart.lesson_id == lesson.id)).first()
+    assert part is not None
+    prefix = f"https://raw.githubusercontent.com/{full_name}/main/lessons/a/diagram.png"
+    assert part.body_md == f"![d]({prefix})"
+
+
 def test_sync_duplicate_lesson_slug_marks_repo_unhealthy(db: Session) -> None:
     rid = uuid.uuid4()
     repo = LessonRepo(

@@ -141,7 +141,55 @@ class GithubAppInstallation(SQLModel, table=True):
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
     )
+    repositories: list["GithubInstallationRepository"] = Relationship(
+        back_populates="installation",
+        cascade_delete=True,
+    )
     lesson_repos: list["LessonRepo"] = Relationship(back_populates="installation")
+
+
+class GithubInstallationRepository(SQLModel, table=True):
+    """Repository full_name values currently granted to an installation."""
+
+    __tablename__ = "github_installation_repository"
+    __table_args__ = (
+        UniqueConstraint(
+            "installation_id",
+            "full_name",
+            name="uq_github_installation_repository_full_name",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    installation_id: int = Field(
+        sa_column=Column(
+            BigInteger,
+            ForeignKey("github_app_installation.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        ),
+    )
+    full_name: str = Field(max_length=255, index=True)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    installation: GithubAppInstallation | None = Relationship(
+        back_populates="repositories",
+    )
+
+
+class GithubWebhookDelivery(SQLModel, table=True):
+    """Records ``X-GitHub-Delivery`` ids so webhook side effects run at most once."""
+
+    __tablename__ = "github_webhook_delivery"
+
+    delivery_id: str = Field(primary_key=True, max_length=128)
+    github_event: str = Field(default="", max_length=128)
+    received_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
 
 
 class LessonRepo(SQLModel, table=True):
@@ -552,6 +600,7 @@ class WorkshopLessonPartBrief(SQLModel):
     ordering: int
     slug: str
     title: str
+    body_html: str | None = None
 
 
 class WorkshopSessionTimerStart(SQLModel):

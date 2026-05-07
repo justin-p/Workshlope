@@ -39,6 +39,22 @@ export type GitHubBridgeRequest = {
     bridge_token: string;
 };
 
+export type GithubInstallationListItemPublic = {
+    installation_id: number;
+    account_login: string;
+    account_type: string;
+    repository_selection?: (string | null);
+    app_slug?: (string | null);
+    suspended: boolean;
+    entitled_repositories_count: number;
+    entitled_repositories: Array<(string)>;
+};
+
+export type GithubInstallationListPublic = {
+    data: Array<GithubInstallationListItemPublic>;
+    count: number;
+};
+
 export type HTTPValidationError = {
     detail?: Array<ValidationError>;
 };
@@ -64,6 +80,35 @@ export type ItemsPublic = {
 export type ItemUpdate = {
     title?: (string | null);
     description?: (string | null);
+};
+
+export type LessonRepoGithubSyncBody = {
+    full_name: string;
+    installation_id: number;
+};
+
+export type LessonRepoGithubSyncPublic = {
+    lesson_repo_id: string;
+    lessons_synced: number;
+    full_name: string;
+    health: string;
+    default_branch: string;
+};
+
+export type LessonRepoListItemPublic = {
+    lesson_repo_id: string;
+    full_name: string;
+    default_branch: string;
+    health: string;
+    github_installation_id?: (number | null);
+    last_synced_at?: (string | null);
+    lesson_count: number;
+    part_count: number;
+};
+
+export type LessonRepoListPublic = {
+    data: Array<LessonRepoListItemPublic>;
+    count: number;
 };
 
 export type Message = {
@@ -216,6 +261,7 @@ export type WorkshopLessonPartBrief = {
     ordering: number;
     slug: string;
     title: string;
+    body_html?: (string | null);
 };
 
 /**
@@ -701,6 +747,26 @@ export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData = {
 };
 
 export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse = (WorkshopSessionLeaderboardPublic);
+
+export type WorkshopLessonReposReadLessonReposData = {
+    limit?: number;
+    skip?: number;
+};
+
+export type WorkshopLessonReposReadLessonReposResponse = (LessonRepoListPublic);
+
+export type WorkshopLessonReposReadGithubInstallationsData = {
+    limit?: number;
+    skip?: number;
+};
+
+export type WorkshopLessonReposReadGithubInstallationsResponse = (GithubInstallationListPublic);
+
+export type WorkshopLessonReposSyncLessonRepoFromGithubData = {
+    requestBody: LessonRepoGithubSyncBody;
+};
+
+export type WorkshopLessonReposSyncLessonRepoFromGithubResponse = (LessonRepoGithubSyncPublic);
 
 export type WorkshopLessonsCreateLessonPrerequisiteData = {
     lessonId: string;
