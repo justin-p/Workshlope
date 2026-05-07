@@ -139,6 +139,9 @@ export function WorkshopLessonRepoSyncCard() {
     )
   }, [reposQuery.data?.data, selectedInstallation])
 
+  const isRefreshingData =
+    reposQuery.isFetching || installationsQuery.isFetching
+
   const onSubmit = () => {
     if (!canSubmit) return
     syncMutation.mutate({
@@ -168,6 +171,11 @@ export function WorkshopLessonRepoSyncCard() {
     } catch {
       // Ignore clipboard write failures silently.
     }
+  }
+
+  const refreshCardData = async () => {
+    await Promise.all([reposQuery.refetch(), installationsQuery.refetch()])
+    setLastRefreshedAt(new Date())
   }
 
   return (
@@ -391,6 +399,17 @@ export function WorkshopLessonRepoSyncCard() {
               Refreshed {lastRefreshedAt.toLocaleTimeString()}
             </span>
           ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => void refreshCardData()}
+            disabled={isRefreshingData}
+            data-testid="workshop-sync-refresh"
+          >
+            {isRefreshingData ? "Refreshing..." : "Refresh lists"}
+          </Button>
         </div>
         {errorDetail ? (
           <p
@@ -401,7 +420,13 @@ export function WorkshopLessonRepoSyncCard() {
           </p>
         ) : null}
         <div className="space-y-1 pt-2">
-          <p className="text-xs font-medium">Synced lesson repositories</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium">Synced lesson repositories</p>
+            <p className="text-xs text-muted-foreground">
+              {reposQuery.data?.count ?? 0} repo(s) ·{" "}
+              {installationsQuery.data?.count ?? 0} installation(s)
+            </p>
+          </div>
           {reposQuery.isLoading ? (
             <p className="text-xs text-muted-foreground">
               Loading repositories…
