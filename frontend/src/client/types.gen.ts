@@ -497,6 +497,10 @@ export type WorkshopWsTicket = {
     expires_at: string;
 };
 
+export type GithubIntegrationGithubWebhookResponse = ({
+    [key: string]: unknown;
+});
+
 export type ItemsReadItemsData = {
     limit?: number;
     skip?: number;
