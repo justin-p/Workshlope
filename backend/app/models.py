@@ -254,6 +254,34 @@ class LessonPart(SQLModel, table=True):
     lesson: Lesson | None = Relationship(back_populates="parts")
 
 
+class LessonManifestSync(SQLModel, table=True):
+    __tablename__ = "lesson_manifest_sync"
+    __table_args__ = (
+        UniqueConstraint(
+            "repo_id",
+            "manifest_repo_path",
+            name="uq_lesson_manifest_sync_repo_path",
+        ),
+        UniqueConstraint(
+            "repo_id",
+            "lesson_slug",
+            name="uq_lesson_manifest_sync_repo_slug",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    repo_id: uuid.UUID = Field(
+        foreign_key="lesson_repo.id", nullable=False, ondelete="CASCADE"
+    )
+    lesson_slug: str = Field(max_length=255)
+    manifest_repo_path: str = Field(max_length=512)
+    manifest_sha256: str = Field(max_length=64)
+    synced_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
 class WorkshopSession(SQLModel, table=True):
     __tablename__ = "workshop_session"
 

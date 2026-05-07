@@ -3,11 +3,18 @@ from __future__ import annotations
 import posixpath
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
+from hashlib import sha256
 from pathlib import PurePosixPath
 
 from sqlmodel import Session, select
 
-from app.models import Lesson, LessonPart, LessonRepo, get_datetime_utc
+from app.models import (
+    Lesson,
+    LessonManifestSync,
+    LessonPart,
+    LessonRepo,
+    get_datetime_utc,
+)
 from app.services.lesson_manifest import ManifestValidationError, parse_lesson_manifest
 from app.services.lesson_markdown_pipeline import (
     RelativeAssetRewriteError,
@@ -22,6 +29,7 @@ class LessonRepoSyncError(RuntimeError):
 @dataclass(frozen=True)
 class _PreparedLessonSync:
     manifest_repo_path: str
+    manifest_sha256: str
     lesson_slug: str
     title: str
     summary: str | None
@@ -137,6 +145,7 @@ def prepare_lesson_sync_ops_from_path_map(
         prepared.append(
             _PreparedLessonSync(
                 manifest_repo_path=manifest_path,
+                manifest_sha256=sha256(raw.encode("utf-8")).hexdigest(),
                 lesson_slug=slug,
                 title=manifest.lesson.title,
                 summary=manifest.lesson.summary,
@@ -151,7 +160,18 @@ def apply_prepared_lesson_sync_to_repo(
     *, session: Session, lesson_repo: LessonRepo, prepared: list[_PreparedLessonSync]
 ) -> None:
     """Upsert lessons and replace parts under ``lesson_repo`` (phase 2)."""
+    existing_manifest_rows = {
+        row.manifest_repo_path: row
+        for row in session.exec(
+            select(LessonManifestSync).where(
+                LessonManifestSync.repo_id == lesson_repo.id
+            )
+        ).all()
+    }
+    touched_manifest_paths: set[str] = set()
+
     for item in prepared:
+        touched_manifest_paths.add(item.manifest_repo_path)
         lesson = session.exec(
             select(Lesson).where(
                 Lesson.repo_id == lesson_repo.id,
@@ -192,6 +212,24 @@ def apply_prepared_lesson_sync_to_repo(
 
         lesson.lesson_sync_generation = lesson.lesson_sync_generation + 1
         session.add(lesson)
+
+        manifest_row = existing_manifest_rows.get(item.manifest_repo_path)
+        if manifest_row is None:
+            manifest_row = LessonManifestSync(
+                repo_id=lesson_repo.id,
+                lesson_slug=item.lesson_slug,
+                manifest_repo_path=item.manifest_repo_path,
+                manifest_sha256=item.manifest_sha256,
+            )
+        else:
+            manifest_row.lesson_slug = item.lesson_slug
+            manifest_row.manifest_sha256 = item.manifest_sha256
+            manifest_row.synced_at = get_datetime_utc()
+        session.add(manifest_row)
+
+    for stale_path, stale_row in existing_manifest_rows.items():
+        if stale_path not in touched_manifest_paths:
+            session.delete(stale_row)
 
 
 def sync_lesson_repo_from_path_map(

@@ -1,11 +1,12 @@
 """lesson_repo_sync: path-map validation and Lesson/LessonPart upserts."""
 
+import hashlib
 import uuid
 
 import pytest
 from sqlmodel import Session, select
 
-from app.models import Lesson, LessonPart, LessonRepo
+from app.models import Lesson, LessonManifestSync, LessonPart, LessonRepo
 from app.services.lesson_repo_sync import (
     LessonRepoSyncError,
     sync_lesson_repo_from_path_map,
@@ -98,6 +99,69 @@ parts:
     assert part is not None
     prefix = f"https://raw.githubusercontent.com/{full_name}/main/lessons/a/diagram.png"
     assert part.body_md == f"![d]({prefix})"
+
+
+def test_sync_records_manifest_sha_row_and_updates_on_change(db: Session) -> None:
+    rid = uuid.uuid4()
+    repo = LessonRepo(
+        full_name=f"org/manifest-{rid}",
+        default_branch="main",
+        health="healthy",
+    )
+    db.add(repo)
+    db.commit()
+    db.refresh(repo)
+
+    manifest_v1 = """
+version: 1
+lesson:
+  slug: lesson-manifest
+  title: Manifest V1
+parts:
+  - slug: one
+    title: Part One
+    path: one.md
+"""
+    tree_v1 = {
+        "lessons/a/lesson.manifest.yaml": manifest_v1,
+        "lessons/a/one.md": "# One",
+    }
+    sync_lesson_repo_from_path_map(
+        session=db,
+        lesson_repo=repo,
+        path_to_content=tree_v1,
+    )
+
+    row = db.exec(
+        select(LessonManifestSync).where(LessonManifestSync.repo_id == repo.id)
+    ).first()
+    assert row is not None
+    assert row.lesson_slug == "lesson-manifest"
+    assert row.manifest_repo_path == "lessons/a/lesson.manifest.yaml"
+    assert (
+        row.manifest_sha256 == hashlib.sha256(manifest_v1.encode("utf-8")).hexdigest()
+    )
+    assert row.synced_at is not None
+
+    manifest_v2 = manifest_v1.replace("Manifest V1", "Manifest V2")
+    tree_v2 = {
+        "lessons/a/lesson.manifest.yaml": manifest_v2,
+        "lessons/a/one.md": "# One",
+    }
+    sync_lesson_repo_from_path_map(
+        session=db,
+        lesson_repo=repo,
+        path_to_content=tree_v2,
+    )
+
+    rows_after = db.exec(
+        select(LessonManifestSync).where(LessonManifestSync.repo_id == repo.id)
+    ).all()
+    assert len(rows_after) == 1
+    assert (
+        rows_after[0].manifest_sha256
+        == hashlib.sha256(manifest_v2.encode("utf-8")).hexdigest()
+    )
 
 
 def test_sync_duplicate_lesson_slug_marks_repo_unhealthy(db: Session) -> None:
