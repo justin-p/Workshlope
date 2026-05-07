@@ -28,6 +28,7 @@ Use this section after a pause or repo switch—do not rely on chat memory alone
 - Expose pacing/timer parity with **[REST sketch](#rest-sketch-under-apiv1)** timer routes if you want symmetry beyond current HTTP surface.
 - **[Realtime](#realtime)** multi-instance (**Redis**/shared broker) remains explicitly deferred ([Locked decisions](#locked-decisions) single-process path).
 - Richer dashboard cards / trainee–instructor **Playwright** breadth ([Testing](#testing)); deeper prerequisite roster analytics ([Workshop HTTP vs realtime](#workshop-http-vs-realtime--delivery-gap-audit)).
+- **Polish stop condition (loop guard):** once a slice has green targeted + full Playwright and at least one analytics/dashboard enhancement landed, pause further optional polish and switch to PR merge-readiness unless a concrete bug/regression is reported.
 
 ### Pause / resume checkpoint (handoff)
 
@@ -39,7 +40,7 @@ Use this section when reopening the project **after intentional stop**. Do **not
 | ---- | ----- |
 | Branch | **`main`** |
 | PR | Lesson follow-up stack [#30](https://github.com/justin-p/testing/pull/30)→[#34](https://github.com/justin-p/testing/pull/34) is merged; no open stack PR required for current state. |
-| Latest work | **Shipped on `main`:** session core, realtime/privacy, dashboards/workshops, prerequisites, pacing, badges + hardening, plus complete Lesson GitHub sync stack (manifests, installation persistence, app token flow, webhooks, sync-from-github API/UI). [Remaining work](#remaining-work-authoritative) now tracks optional polish. |
+| Latest work | **Shipped on `main`:** session core, realtime/privacy, dashboards/workshops, prerequisites, pacing, badges + hardening, plus complete Lesson GitHub sync stack (manifests, installation persistence, app token flow, webhooks, sync-from-github API/UI). **In-flight local (unmerged):** expanded Playwright dashboard/workshops role-scope coverage, stabilized flaky workshop aggregate assertions, fixed stale-token `/login` redirect looping by validating `/me` before login-route redirect, added regression coverage that stale tokens are cleared, added instructor prerequisite-roster analytics assertions in workshop session E2E, added workshops-hub blocked prerequisite analytics summary card (sessions impacted + most-blocked session), added `lesson_manifest_sync` SHA audit rows persisted during repo sync (model + migration + service tests), and tightened delivery rules to require feature-branch + PR workflow by default (no implicit direct-to-`main`). [Remaining work](#remaining-work-authoritative) now tracks optional polish. |
 
 **Resume in this order:**
 
@@ -737,6 +738,9 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 - Security checks: webhook replay/idempotency tests and route-throttling tests for auth bridge/login/webhook routes.
 - Unit/API: prerequisite completion semantics, timer state transitions, badge grant/revoke authorization and audit fields.
 - Playwright: trainee prework checklist flow, instructor timer controls + overrun UI.
+- Playwright (in-flight local): expanded dashboard/workshops role routing and stub-rail shortcuts (`dashboard-routing.spec.ts`) plus non-instructor `/workshops` redirect and resilient blocked-count assertion (`workshop.spec.ts`); added stale-token regression coverage (`login tolerates stale access token without redirect loop`) and login guard now clears invalid local token instead of ping-ponging `/` ↔ `/login`; added instructor prerequisite-roster analytics coverage on live session view (`workshop-prework-instructor-panel` and gaps summary) and workshops-hub blocked-analytics summary (`workshop-blocked-analytics*`).
+- Backend/contracts (in-flight local): added `lesson_manifest_sync` audit table keyed by repo + manifest path with persisted `manifest_sha256` on sync (`backend/app/models.py`, `backend/app/services/lesson_repo_sync.py`, migration `f7a8b9c0d1e2`, service test coverage in `backend/tests/services/test_lesson_repo_sync.py`).
+- Backend/contract (in-flight local): `POST /api/v1/private/users/` now accepts `is_instructor` for deterministic E2E role seeding; covered by `backend/tests/api/routes/test_private.py::test_create_user_can_set_instructor_flag`.
 - Security tests: RBAC denial tests for all new endpoint families; trainee DTO/WS contract tests for absence of peer PII.
 
 ## Risks

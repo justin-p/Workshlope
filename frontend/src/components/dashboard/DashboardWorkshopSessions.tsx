@@ -70,6 +70,9 @@ export function DashboardWorkshopSessions({
           (b.blocked_required_prereq_count ?? 0) -
           (a.blocked_required_prereq_count ?? 0),
       ) ?? []
+  const mostBlockedSession = blockedRows[0] ?? null
+  const blockedSessionRatio =
+    data && data.count > 0 ? `${blockedRows.length}/${data.count}` : "0/0"
   const visibleRows = useMemo(() => {
     if (!data?.data) return []
     if (!blockedOnly) return data.data
@@ -155,6 +158,27 @@ export function DashboardWorkshopSessions({
                 </li>
               ))}
             </ul>
+          </div>
+        ) : null}
+        {blockedRows.length > 0 && mostBlockedSession ? (
+          <div
+            className="rounded-md border px-3 py-2 text-xs bg-card"
+            data-testid="workshop-blocked-analytics"
+          >
+            <p className="font-medium">Blocked prerequisite analytics</p>
+            <p
+              className="text-muted-foreground mt-1"
+              data-testid="workshop-blocked-analytics-ratio"
+            >
+              Sessions impacted: {blockedSessionRatio}
+            </p>
+            <p
+              className="text-muted-foreground"
+              data-testid="workshop-blocked-analytics-most-blocked"
+            >
+              Most blocked session: {mostBlockedSession.lesson_title} (
+              {mostBlockedSession.blocked_required_prereq_count ?? 0} blocked)
+            </p>
           </div>
         ) : null}
         {data && data.data.length > 0 ? (
