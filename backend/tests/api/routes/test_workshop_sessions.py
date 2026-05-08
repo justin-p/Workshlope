@@ -26,6 +26,7 @@ from app.models import (
     UserPrerequisiteCompletion,
     WorkshopParticipant,
     WorkshopSession,
+    WorkshopSessionTimer,
     WorkshopSessionTimerEvent,
 )
 from app.services import workshop_realtime as workshop_realtime_mod
@@ -801,6 +802,14 @@ def test_ws_instructor_can_advance_part_and_broadcast_to_participants(
             joined_at=datetime.now(timezone.utc),
         )
     )
+    timer_row = WorkshopSessionTimer(
+        session_id=session_row.id,
+        status="running",
+        mode="countdown",
+        target_seconds=300,
+        started_at=datetime.now(timezone.utc),
+    )
+    db.add(timer_row)
     db.commit()
 
     participant_ticket = client.post(
@@ -830,6 +839,8 @@ def test_ws_instructor_can_advance_part_and_broadcast_to_participants(
     assert ack["part_index"] == 1
     assert broadcast["type"] == "session.part_changed"
     assert broadcast["part_index"] == 1
+    db.refresh(timer_row)
+    assert timer_row.status == "inactive"
 
 
 def test_ws_part_advance_denied_when_session_paused(

@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-08** — **P0 manifest-backed timers (this PR):** sync persists `part.estimated_minutes` on `lesson_part`; countdown start defaults `target_seconds` from the current part when omitted; `POST .../timer/extend` adds time with audit `extend` event; OpenAPI + SPA client updated; instructor UI uses “Start part countdown” plus extend controls. |
-| **Branch** | **`feat/workshop/p0-lesson-estimated-timers`** |
-| **PR** | _TBD — open after CI green._ |
+| **Last synced** | **2026-05-08** — **`main`:** [#48](https://github.com/justin-p/testing/pull/48) merged — manifest-backed timers + extend + E2E bootstrap `estimated_minutes`. **In flight:** stop session timer on WS `part.advance` on branch **`feat/workshop/timer-stop-on-part-advance`**. |
+| **Branch** | **`feat/workshop/timer-stop-on-part-advance`** |
+| **PR** | _Open after CI green._ |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 

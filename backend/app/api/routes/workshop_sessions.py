@@ -591,6 +591,24 @@ async def _dispatch_workshop_ws_text(
                 return True
             target_part = lesson_parts[part_index_raw]
             target_part_slug = str(target_part.slug)
+            timer_row = db.exec(
+                select(WorkshopSessionTimer).where(
+                    WorkshopSessionTimer.session_id == session_id
+                )
+            ).first()
+            if timer_row is not None and timer_row.status != "inactive":
+                timer_row.status = "inactive"
+                timer_row.paused_at = None
+                timer_row.updated_at = datetime.now(timezone.utc)
+                db.add(timer_row)
+                _record_timer_event(
+                    db,
+                    session_id=session_id,
+                    actor_user_id=handshake.user_id,
+                    action="stop",
+                    mode=timer_row.mode,
+                    target_seconds=timer_row.target_seconds,
+                )
             workshop_session.current_part_index = part_index_raw
             workshop_session.current_part_slug = target_part_slug
             workshop_session.part_generation = int(workshop_session.part_generation) + 1
