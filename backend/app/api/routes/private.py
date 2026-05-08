@@ -128,6 +128,7 @@ def bootstrap_e2e_workshop_live_session(
             title="Part 0",
             path="01-part-0.md",
             body_md="# Part 0",
+            estimated_minutes=15,
         )
     )
     session.add(
@@ -138,6 +139,7 @@ def bootstrap_e2e_workshop_live_session(
             title="Part 1",
             path="02-part-1.md",
             body_md="# Part 1",
+            estimated_minutes=15,
         )
     )
 
