@@ -62,7 +62,7 @@ parts:
     assert parts[0].body_md == "# One"
 
 
-def test_sync_rewrites_relative_image_to_raw_github_url(db: Session) -> None:
+def test_sync_keeps_relative_image_reference_for_runtime_renderer(db: Session) -> None:
     rid = uuid.uuid4()
     full_name = f"org/img-{rid}"
     repo = LessonRepo(
@@ -97,8 +97,7 @@ parts:
     assert lesson is not None
     part = db.exec(select(LessonPart).where(LessonPart.lesson_id == lesson.id)).first()
     assert part is not None
-    prefix = f"https://raw.githubusercontent.com/{full_name}/main/lessons/a/diagram.png"
-    assert part.body_md == f"![d]({prefix})"
+    assert part.body_md == "![d](./diagram.png)"
 
 
 def test_sync_records_manifest_sha_row_and_updates_on_change(db: Session) -> None:

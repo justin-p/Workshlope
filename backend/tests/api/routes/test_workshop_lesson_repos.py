@@ -16,6 +16,7 @@ from app.models import (
     LessonManifestSync,
     LessonPart,
     LessonRepo,
+    LessonRepoAsset,
     User,
     get_datetime_utc,
 )
@@ -43,6 +44,22 @@ parts:
     path: one.md
 """,
         "lessons/demo/one.md": "# One",
+    }
+
+
+def _tree_with_image_ref() -> dict[str, str]:
+    return {
+        "lessons/demo/lesson.manifest.yaml": """
+version: 1
+lesson:
+  slug: demo-lesson
+  title: Demo Lesson
+parts:
+  - slug: one
+    title: Part One
+    path: one.md
+""",
+        "lessons/demo/one.md": "![diagram](./diagram.png)",
     }
 
 
@@ -143,6 +160,62 @@ def test_sync_from_github_happy_path_mocked_github(client: TestClient) -> None:
         if installation is not None:
             session.delete(installation)
             session.commit()
+
+
+def test_sync_from_github_caches_markdown_assets(client: TestClient) -> None:
+    install_id = 810_000_000 + (uuid.uuid4().int % 1_000_000)
+    full_name = f"sync-assets/repo-{uuid.uuid4()}"
+    headers = get_superuser_token_headers(client)
+
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_id,
+                account_id=654,
+                account_login="trainer",
+                account_type="User",
+                target_type="User",
+                repository_selection="all",
+                app_slug="lesson-bot",
+                suspended_at=None,
+            ),
+        )
+        session.commit()
+
+    mocked_token = InstallationAccessToken(token="mock-github-token", expires_at=None)
+    with (
+        patch(
+            "app.api.routes.workshop_lesson_repos.mint_installation_access_token",
+            return_value=mocked_token,
+        ),
+        patch(
+            "app.api.routes.workshop_lesson_repos.fetch_lesson_repo_path_map_from_github",
+            return_value=(_tree_with_image_ref(), "main"),
+        ),
+        patch(
+            "app.api.routes.workshop_lesson_repos.fetch_repo_file_bytes_from_github",
+            return_value=(b"PNG", "image/png"),
+        ),
+    ):
+        response = client.post(
+            f"{settings.API_V1_STR}/workshop/lesson-repos/sync-from-github",
+            headers=headers,
+            json={"full_name": full_name, "installation_id": install_id},
+        )
+
+    assert response.status_code == 200
+    with Session(engine) as session:
+        repo = session.exec(
+            select(LessonRepo).where(LessonRepo.full_name == full_name)
+        ).first()
+        assert repo is not None
+        assets = session.exec(
+            select(LessonRepoAsset).where(LessonRepoAsset.repo_id == repo.id)
+        ).all()
+        assert len(assets) == 1
+        assert assets[0].repo_path == "lessons/demo/diagram.png"
+        assert assets[0].content_type == "image/png"
+        assert assets[0].content_bytes == b"PNG"
 
 
 def test_sync_from_github_returns_409_when_installation_suspended(
@@ -698,6 +771,7 @@ def test_read_lesson_repos_lists_counts_and_health(client: TestClient) -> None:
     headers = get_superuser_token_headers(client)
     response = client.get(
         f"{settings.API_V1_STR}/workshop/lesson-repos",
+        params={"q": full_name},
         headers=headers,
     )
     assert response.status_code == 200

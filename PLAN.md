@@ -10,15 +10,10 @@
 
 | Field | Value |
 | ------ | ------ |
-<<<<<<< fix/workshop/sync-entitlement-autorefresh
-| **Last synced** | **2026-05-08** — **Workshop create-session + entitlement UX:** added **`POST /api/v1/workshop/sessions/`** (instructor/superuser) to create scheduled sessions from lesson previews and auto-seat creator as lead instructor; workshops sync card exposes “Preview parts + create session” with direct open-link after creation; regenerated OpenAPI + frontend client; backend tests cover create-session success + RBAC denial. **Selected-installation repo sync no longer requires manual refresh first:** `sync-from-github` now best-effort refreshes installation repository entitlements on demand before entitlement enforcement, allowing newly granted repos to sync immediately (with regression coverage in `test_sync_from_github_selected_installation_refreshes_entitlements_on_demand`). |
-| **Branch** | **`feat/workshop/create-session-flow`** |
-| **PR** | **[#43](https://github.com/justin-p/testing/pull/43)** OPEN: create sessions directly from lesson previews + auto-refresh selected-installation entitlements during sync (remove manual-refresh prerequisite). |
-=======
-| **Last synced** | **2026-05-08** — **Workshop create-session slice (in flight):** add **`POST /api/v1/workshop/sessions/`** (instructor/superuser) to create scheduled sessions from a lesson and auto-seat the creator as lead instructor; wire “Create session” actions into lesson preview rows on the workshops hub sync card; regenerate OpenAPI + frontend client; add backend API tests for create success + RBAC denial. Prior sync context retained: OAuth avatar parity, polling-only GitHub install model, stale branch/PR cleanup, and Markdown PLAN reorder for executor-first flow. |
-| **Branch** | **`feat/workshop/create-session-flow`** |
-| **PR** | _TBD (open after green checks for create-session slice)._ |
->>>>>>> main
+
+| **Last synced** | **2026-05-08** — **Workshop markdown render + private-repo assets:** workshop session detail now rewrites relative markdown assets to signed backend asset URLs; lesson-repo sync now prefetches and caches referenced assets in DB for private/public repo parity; workshop asset endpoint now serves cached bytes (no per-image GitHub fetch at view time) while markdown safe-rendering remains enforced. |
+| **Branch** | **`fix/workshop/markdown-rendering-and-images`** |
+| **PR** | _TBD (open after green checks for markdown render/image slice)._ |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -38,7 +33,7 @@
 
 - **Progress (shipped on `main`):** [`lesson_manifest.py`](backend/app/services/lesson_manifest.py) + [`lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py) (**L1**). DB **`github_app_installation`** + FK on **`LessonRepo`** (**L2**). [`github_app_tokens.py`](backend/app/services/github_app_tokens.py) (**L3**). [`lesson_github_fetch.py`](backend/app/services/lesson_github_fetch.py) + [`workshop_lesson_repos.py`](backend/app/api/routes/workshop_lesson_repos.py) — **`POST /api/v1/workshop/lesson-repos/sync-from-github`** and manual refresh endpoints (**L5**). Private-safe periodic poller runs from [`github_installation_poller.py`](backend/app/services/github_installation_poller.py).
 - **GitHub App mode:** webhook ingestion has been removed. Installation/repository freshness now comes from manual refresh APIs plus optional periodic polling.
-- **Sync + models (remaining product work):** **Sync-time rewrite** of relative markdown / simple HTML asset URLs → **`raw.githubusercontent.com`** (+ strip ``<script>`` / ``<iframe>`` outside fenced blocks) via [`lesson_markdown_pipeline.py`](backend/app/services/lesson_markdown_pipeline.py); **`lesson_markdown_to_safe_html`** (CommonMark `html=false` + **nh3**) is now wired in session detail API and workshop SPA current-part rendering. **Shipped in-flight local:** `LessonManifest` SHA rows persisted + surfaced in lesson-repo list metadata (`manifest_count`, `last_manifest_synced_at`) for instructor sync health visibility.
+- **Sync + models (remaining product work):** Lesson sync stores markdown source as authored (no raw-GitHub URL mutation) and caches markdown-referenced assets in DB by repo path; workshop session detail applies render-time relative asset rewriting to signed backend asset URLs that resolve against the cached asset store for private/public repo compatibility, then **`lesson_markdown_to_safe_html`** (CommonMark `html=false` + **nh3**) for safe display. **Shipped in-flight local:** `LessonManifest` SHA rows persisted + surfaced in lesson-repo list metadata (`manifest_count`, `last_manifest_synced_at`) for instructor sync health visibility.
 - **Instructor UX**: Repo list, Install/configure CTA (instructor-only — **[Product constraints](#product-constraints)**), Sync, health, parts preview — aligns with **[UI / UX](#ui--ux-specification)** IA. **Shipped in-flight local:** `GET /api/v1/workshop/lesson-repos/{lesson_repo_id}/preview` now returns lesson+part preview payloads and dashboard sync card can toggle per-repo parts previews.
 
 **3. Optional / polish (product + engineering)**
@@ -426,7 +421,7 @@ Authoritative handlers: **`enter_workshop_session`**, **`patch_workshop_session_
 
 ## Markdown
 
-**Implemented on backend:** Lesson sync applies **relative markdown link/image targets** and **`src` / `href` attributes on simple HTML tags** outside fenced blocks → **`https://raw.githubusercontent.com/{full_name}/{default_branch}/{path}`**; strips embedded **`<script>`** / **`<iframe>`** outside fences. **`lesson_markdown_to_safe_html`** renders CommonMark (tables enabled, **raw HTML disabled**) then **nh3** allowlists — use when returning part content to the SPA.
+**Implemented on backend:** Render path rewrites relative markdown link/image targets and simple HTML `src` / `href` attributes outside fenced blocks to signed backend asset URLs (`/workshop/sessions/{session_id}/parts/{part_id}/asset?path=...&token=...`); sync prefetches referenced repo assets into `lesson_repo_asset`, and the asset endpoint serves cached bytes directly so private repos work without runtime GitHub content fetches. **`lesson_markdown_to_safe_html`** renders CommonMark (tables enabled, **raw HTML disabled**) then **nh3** allowlists.
 
 **Wired now:** Session detail includes per-part **`body_html`** rendered server-side via `lesson_markdown_to_safe_html`; workshop SPA renders current part content from this sanitized HTML payload.
 
@@ -654,7 +649,7 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 
 - **Local Playwright:** follow [playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md) — **`scripts/e2e-backend-reset.sh`** and the commands there are the authoritative host workflow (CI defines green across the matrix).
 - Unit: install/repo refresh RBAC (**403** for non-instructor) and polling/refresh failure paths where covered; enter when scheduled; stale **part_generation** mutation; lesson sync safe-retry/idempotency where applicable; handoff **422** when target not instructor; **last-instructor removal blocked (409)** on non-ended sessions; add-member opposite-role invokes always-replace atomically; badge grant only on instructor verification; badge revocation requires reason.
-- Unit: manifest missing/invalid hard-fails sync + marks repo unhealthy; relative asset rewrite to raw GitHub URLs; avatar cleared on unlink; bulk verify can grant for arbitrary selected trainees (no finished-only guardrail).
+- Unit: manifest missing/invalid hard-fails sync + marks repo unhealthy; relative asset rewrite/canonicalization and markdown safety pipeline behavior; avatar cleared on unlink; bulk verify can grant for arbitrary selected trainees (no finished-only guardrail).
 - Playwright: two trainee profiles **cannot** observe each other's status or avatars in session views; instructor sees both; trainee GET/WS payloads snapshot-tested for absence of peer PII/live_status/avatar fields; badge appears only after instructor verify action; revocation removes badge from learner surfaces + leaderboard.
 - Playwright: in-app notifications appear as toast and in notification center for roster/session/badge events; live content drift prompt appears to instructor with default preselection **Switch to latest**.
 - Dashboard role-scope tests: trainee dashboard never renders instructor-only cards (roster, peer stats, revocation controls); instructor dashboard shows all applicable management cards.

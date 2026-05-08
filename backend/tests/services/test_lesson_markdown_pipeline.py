@@ -1,96 +1,72 @@
 """lesson_markdown_pipeline: raw GitHub URL rewrite + safe HTML rendering."""
 
-import pytest
-
 from app.services.lesson_markdown_pipeline import (
-    RelativeAssetRewriteError,
     lesson_markdown_to_safe_html,
     resolved_repo_path_for_asset,
-    sync_markdown_rewrite_relative_assets,
+    rewrite_relative_asset_urls,
     transform_markdown_outside_code_fences,
 )
 
 
-def test_sync_rewrite_relative_markdown_link_to_raw_github() -> None:
+def test_rewrite_relative_markdown_link_with_custom_resolver() -> None:
     md = "See [diagram](./diagram.png)."
-    got = sync_markdown_rewrite_relative_assets(
+    got = rewrite_relative_asset_urls(
         md,
         part_repo_path="lessons/a/part.md",
-        github_full_name="org/acme-repo",
-        default_branch="main",
+        rewrite_repo_relative_path=lambda p: f"/asset?path={p}",
     )
-    assert (
-        got
-        == "See [diagram](https://raw.githubusercontent.com/org/acme-repo/main/lessons/a/diagram.png)."
-    )
+    assert got == "See [diagram](/asset?path=lessons/a/diagram.png)."
 
 
-def test_sync_rewrite_preserves_https_and_mailto() -> None:
+def test_rewrite_preserves_https_and_mailto() -> None:
     md = "[u](mailto:a@b.com) [g](https://ex.com/z)"
-    got = sync_markdown_rewrite_relative_assets(
+    got = rewrite_relative_asset_urls(
         md,
         part_repo_path="lessons/a/part.md",
-        github_full_name="org/acme-repo",
-        default_branch="main",
+        rewrite_repo_relative_path=lambda p: f"/asset?path={p}",
     )
     assert got == md
 
 
-def test_sync_rewrite_root_relative_slash_paths_from_repo_root() -> None:
+def test_rewrite_root_relative_slash_paths_from_repo_root() -> None:
     md = "[a](/README.md)"
-    got = sync_markdown_rewrite_relative_assets(
+    got = rewrite_relative_asset_urls(
         md,
         part_repo_path="lessons/a/part.md",
-        github_full_name="org/acme-repo",
-        default_branch="main",
+        rewrite_repo_relative_path=lambda p: f"/asset?path={p}",
     )
-    assert got == "[a](https://raw.githubusercontent.com/org/acme-repo/main/README.md)"
+    assert got == "[a](/asset?path=README.md)"
 
 
-def test_sync_rewrite_inside_code_fence_untouched() -> None:
+def test_rewrite_inside_code_fence_untouched() -> None:
     md = "```text\n![](./in-fence.png)\n```"
-    got = sync_markdown_rewrite_relative_assets(
+    got = rewrite_relative_asset_urls(
         md,
         part_repo_path="lessons/a/part.md",
-        github_full_name="org/acme-repo",
-        default_branch="main",
+        rewrite_repo_relative_path=lambda p: f"/asset?path={p}",
     )
     assert got == md
 
 
-def test_sync_rewrite_optional_link_title_kept() -> None:
+def test_rewrite_optional_link_title_kept() -> None:
     md = '[x](./a.png "t")'
-    got = sync_markdown_rewrite_relative_assets(
+    got = rewrite_relative_asset_urls(
         md,
         part_repo_path="lessons/a/part.md",
-        github_full_name="org/acme-repo",
-        default_branch="main",
+        rewrite_repo_relative_path=lambda p: f"/asset?path={p}",
     )
-    expected = (
-        '[x](https://raw.githubusercontent.com/org/acme-repo/main/lessons/a/a.png "t")'
-    )
+    expected = '[x](/asset?path=lessons/a/a.png "t")'
     assert got == expected
-
-
-def test_invalid_full_name_raises() -> None:
-    with pytest.raises(RelativeAssetRewriteError):
-        sync_markdown_rewrite_relative_assets(
-            "x",
-            part_repo_path="a.md",
-            github_full_name="bad",
-            default_branch="main",
-        )
 
 
 def test_traversal_relative_link_raises() -> None:
     md = "[x](../../../../etc/passwd)"
-    with pytest.raises(RelativeAssetRewriteError, match="Unsafe"):
-        sync_markdown_rewrite_relative_assets(
-            md,
-            part_repo_path="lessons/a/part.md",
-            github_full_name="org/acme-repo",
-            default_branch="main",
-        )
+    got = rewrite_relative_asset_urls(
+        md,
+        part_repo_path="lessons/a/part.md",
+        rewrite_repo_relative_path=lambda p: f"/asset?path={p}",
+    )
+    assert got == md
 
 
 def test_resolved_repo_path_for_asset() -> None:

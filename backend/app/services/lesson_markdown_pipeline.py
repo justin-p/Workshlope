@@ -1,4 +1,4 @@
-"""Lesson markdown: sync-time URL rewrites and safe HTML rendering helpers."""
+"""Lesson markdown: render-time asset rewrites and safe HTML rendering helpers."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import posixpath
 import re
 from collections.abc import Callable
 from pathlib import PurePosixPath
-from urllib.parse import quote
 
 import nh3
 from markdown_it import MarkdownIt
@@ -22,26 +21,7 @@ _HTML_URL_ATTR_RE = re.compile(
 
 
 class RelativeAssetRewriteError(ValueError):
-    """Rejected relative asset URL in markdown (unsafe path or malformed repo coordinates)."""
-
-
-def _normalized_github_coordinates(
-    *,
-    github_full_name: str,
-    default_branch: str,
-) -> tuple[str, str]:
-    msg_repo = "Invalid GitHub repo full_name for markdown URL rewrite"
-    raw = github_full_name.strip().strip("/")
-    if raw.count("/") != 1 or ".." in raw or "//" in raw:
-        raise RelativeAssetRewriteError(msg_repo)
-    owner, repo = raw.split("/", 1)
-    if not owner or not repo:
-        raise RelativeAssetRewriteError(msg_repo)
-    branch = default_branch.strip()
-    msg_branch = "Invalid default branch for markdown URL rewrite"
-    if not branch or ".." in branch or branch.startswith("/"):
-        raise RelativeAssetRewriteError(msg_branch)
-    return raw, branch
+    """Rejected relative asset URL in markdown (unsafe path)."""
 
 
 def resolved_repo_path_for_asset(
@@ -67,15 +47,11 @@ def resolved_repo_path_for_asset(
     return norm
 
 
-def _raw_githubusercontent_url(
-    full_name: str, ref: str, repo_relative_path: str
-) -> str:
-    encoded_path = quote(repo_relative_path, safe="/")
-    return f"https://raw.githubusercontent.com/{full_name}/{ref}/{encoded_path}"
-
-
 def _rewrite_target_url(
-    raw: str, *, part_repo_path: str, full_name: str, ref: str
+    raw: str,
+    *,
+    part_repo_path: str,
+    rewrite_repo_relative_path: Callable[[str], str],
 ) -> str:
     u = raw.strip()
     lu = u.lower()
@@ -87,8 +63,14 @@ def _rewrite_target_url(
         return u
     if u.startswith("//"):
         return u
-    resolved = resolved_repo_path_for_asset(part_repo_path=part_repo_path, raw_href=u)
-    return _raw_githubusercontent_url(full_name, ref, resolved)
+    try:
+        resolved = resolved_repo_path_for_asset(
+            part_repo_path=part_repo_path, raw_href=u
+        )
+    except RelativeAssetRewriteError:
+        # Keep original markdown URL when normalization rejects it; do not fail render.
+        return u
+    return rewrite_repo_relative_path(resolved)
 
 
 def transform_markdown_outside_code_fences(text: str, fn: Callable[[str], str]) -> str:
@@ -141,8 +123,7 @@ def _rewrite_plain_segment_urls(
     segment: str,
     *,
     part_repo_path: str,
-    full_name: str,
-    ref: str,
+    rewrite_repo_relative_path: Callable[[str], str],
 ) -> str:
     seg = _scrub_plain_markdown_segment(segment)
 
@@ -152,8 +133,7 @@ def _rewrite_plain_segment_urls(
         new_url = _rewrite_target_url(
             url_raw,
             part_repo_path=part_repo_path,
-            full_name=full_name,
-            ref=ref,
+            rewrite_repo_relative_path=rewrite_repo_relative_path,
         )
         spacer = " " if remainder else ""
         return f"{prefix}({new_url}{spacer}{remainder})".rstrip()
@@ -171,40 +151,48 @@ def _rewrite_plain_segment_urls(
         new_url = _rewrite_target_url(
             raw_url,
             part_repo_path=part_repo_path,
-            full_name=full_name,
-            ref=ref,
+            rewrite_repo_relative_path=rewrite_repo_relative_path,
         )
         return f"{attr}={quote_mark}{new_url}{quote_mark}"
 
     return _HTML_URL_ATTR_RE.sub(repl_attr, seg_after_md)
 
 
-def sync_markdown_rewrite_relative_assets(
+def rewrite_relative_asset_urls(
     body_md: str,
     *,
     part_repo_path: str,
-    github_full_name: str,
-    default_branch: str,
+    rewrite_repo_relative_path: Callable[[str], str],
 ) -> str:
-    """
-    Rewrite relative markdown / simple HTML asset URLs to ``raw.githubusercontent.com``.
-
-    Applies outside fenced code blocks only. Strips embedded ``<script>`` / ``<iframe>`` blobs
-    outside fences (defense in depth if raw HTML is ever enabled in a renderer).
-    """
-    full_name, ref = _normalized_github_coordinates(
-        github_full_name=github_full_name,
-        default_branch=default_branch,
-    )
+    """Rewrite relative markdown/HTML asset URLs via ``rewrite_repo_relative_path``."""
     return transform_markdown_outside_code_fences(
         body_md,
         lambda s: _rewrite_plain_segment_urls(
             s,
             part_repo_path=part_repo_path,
-            full_name=full_name,
-            ref=ref,
+            rewrite_repo_relative_path=rewrite_repo_relative_path,
         ),
     )
+
+
+def collect_relative_asset_repo_paths(
+    body_md: str,
+    *,
+    part_repo_path: str,
+) -> set[str]:
+    """Collect repository-relative asset paths referenced by markdown/html URLs."""
+    collected: set[str] = set()
+
+    def _collect_path(repo_relative_path: str) -> str:
+        collected.add(repo_relative_path)
+        return repo_relative_path
+
+    rewrite_relative_asset_urls(
+        body_md,
+        part_repo_path=part_repo_path,
+        rewrite_repo_relative_path=_collect_path,
+    )
+    return collected
 
 
 _SAFE_HTML_TAGS = frozenset(

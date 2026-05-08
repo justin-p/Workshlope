@@ -1,14 +1,17 @@
 import json
+import posixpath
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
+from urllib.parse import quote
 
 import jwt
 from fastapi import (
     APIRouter,
     HTTPException,
     Query,
+    Response,
     WebSocket,
     WebSocketDisconnect,
     status,
@@ -27,6 +30,7 @@ from app.models import (
     LessonPart,
     LessonPrerequisite,
     LessonRepo,
+    LessonRepoAsset,
     Message,
     OAuthAccount,
     SessionInstructor,
@@ -56,7 +60,10 @@ from app.models import (
     WorkshopSessionTimerStart,
     WorkshopSessionUpsertMember,
 )
-from app.services.lesson_markdown_pipeline import lesson_markdown_to_safe_html
+from app.services.lesson_markdown_pipeline import (
+    lesson_markdown_to_safe_html,
+    rewrite_relative_asset_urls,
+)
 from app.services.workshop_realtime import (
     WorkshopWsConnection,
     workshop_hub,
@@ -886,20 +893,109 @@ def _workshop_session_detail_shared(
         .where(LessonPart.lesson_id == lesson.id)
         .order_by(col(LessonPart.ordering))
     ).all()
-    parts = [
-        WorkshopLessonPartBrief(
-            id=row.id,
-            ordering=int(row.ordering),
-            slug=row.slug,
-            title=row.title,
-            body_html=lesson_markdown_to_safe_html(row.body_md),
+    parts: list[WorkshopLessonPartBrief] = []
+    for row in part_rows:
+        row_id = row.id
+        part_repo_path = _canonical_part_repo_path(
+            lesson_slug=lesson.slug,
+            part_path=row.path,
         )
-        for row in part_rows
-    ]
+
+        def asset_url_for_repo_path(
+            repo_relative_path: str, *, row_id: uuid.UUID = row_id
+        ) -> str:
+            token = _issue_workshop_asset_token(
+                session_id=workshop_row.id,
+                part_id=row_id,
+                repo_path=repo_relative_path,
+            )
+            return (
+                f"{settings.FRONTEND_HOST.rstrip('/')}{settings.API_V1_STR}"
+                f"/workshop/sessions/{workshop_row.id}/parts/{row_id}/asset"
+                f"?path={quote(repo_relative_path, safe='/')}"
+                f"&token={quote(token, safe='')}"
+            )
+
+        body_md = rewrite_relative_asset_urls(
+            row.body_md,
+            part_repo_path=part_repo_path,
+            rewrite_repo_relative_path=asset_url_for_repo_path,
+        )
+        parts.append(
+            WorkshopLessonPartBrief(
+                id=row.id,
+                ordering=int(row.ordering),
+                slug=row.slug,
+                title=row.title,
+                body_html=lesson_markdown_to_safe_html(body_md),
+            )
+        )
     if len(parts) == 0:
         lesson_summary.lesson_content_available = False
         lesson_summary.lesson_content_issue = "no_parts_synced"
     return core, lesson_summary, parts
+
+
+def _normalize_repo_asset_path(path: str) -> str:
+    normalized = posixpath.normpath(path.strip().lstrip("/"))
+    if (
+        normalized == ""
+        or normalized == "."
+        or normalized.startswith("../")
+        or "/../" in f"/{normalized}/"
+    ):
+        raise HTTPException(status_code=400, detail="invalid asset path")
+    return normalized
+
+
+def _canonical_part_repo_path(*, lesson_slug: str, part_path: str) -> str:
+    cleaned = part_path.strip().lstrip("/")
+    if cleaned.startswith("lessons/"):
+        return cleaned
+    # Manifest part paths are usually lesson-relative (e.g. `01.md`), so anchor
+    # them under the conventional lesson directory to resolve ../../.img assets.
+    return f"lessons/{lesson_slug}/{cleaned}"
+
+
+def _issue_workshop_asset_token(
+    *,
+    session_id: uuid.UUID,
+    part_id: uuid.UUID,
+    repo_path: str,
+) -> str:
+    now = datetime.now(timezone.utc)
+    claims = {
+        "sub": "workshop.asset",
+        "sid": str(session_id),
+        "pid": str(part_id),
+        "path": repo_path,
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=30)).timestamp()),
+    }
+    token = jwt.encode(claims, settings.SECRET_KEY, algorithm=ALGORITHM)
+    if isinstance(token, bytes):
+        return token.decode("utf-8")
+    return token
+
+
+def _verify_workshop_asset_token(
+    *,
+    token: str,
+    session_id: uuid.UUID,
+    part_id: uuid.UUID,
+    repo_path: str,
+) -> None:
+    try:
+        decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+    except PyJWTError as exc:
+        raise HTTPException(status_code=403, detail="invalid asset token") from exc
+    if (
+        decoded.get("sub") != "workshop.asset"
+        or decoded.get("sid") != str(session_id)
+        or decoded.get("pid") != str(part_id)
+        or decoded.get("path") != repo_path
+    ):
+        raise HTTPException(status_code=403, detail="invalid asset token")
 
 
 def _github_avatar_urls_for_roster_users(
@@ -914,6 +1010,53 @@ def _github_avatar_urls_for_roster_users(
         )
     ).all()
     return dict(rows)
+
+
+@router.get("/{session_id}/parts/{part_id}/asset")
+def read_workshop_part_asset(
+    *,
+    session: SessionDep,
+    session_id: uuid.UUID,
+    part_id: uuid.UUID,
+    path: str = Query(min_length=1),
+    token: str = Query(min_length=1),
+) -> Response:
+    workshop_row = session.get(WorkshopSession, session_id)
+    if workshop_row is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    lesson = session.get(Lesson, workshop_row.lesson_id)
+    if lesson is None:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    lesson_repo = session.get(LessonRepo, lesson.repo_id)
+    if lesson_repo is None:
+        raise HTTPException(status_code=404, detail="Lesson repository not found")
+
+    part = session.get(LessonPart, part_id)
+    if part is None or part.lesson_id != lesson.id:
+        raise HTTPException(status_code=404, detail="Lesson part not found")
+
+    normalized_path = _normalize_repo_asset_path(path)
+    _verify_workshop_asset_token(
+        token=token,
+        session_id=session_id,
+        part_id=part_id,
+        repo_path=normalized_path,
+    )
+    asset_row = session.exec(
+        select(LessonRepoAsset).where(
+            LessonRepoAsset.repo_id == lesson_repo.id,
+            LessonRepoAsset.repo_path == normalized_path,
+        )
+    ).first()
+    if asset_row is None:
+        raise HTTPException(status_code=404, detail="Lesson asset not found")
+
+    return Response(
+        content=asset_row.content_bytes,
+        media_type=asset_row.content_type or "application/octet-stream",
+        headers={"Cache-Control": "private, max-age=300"},
+    )
 
 
 @router.get(

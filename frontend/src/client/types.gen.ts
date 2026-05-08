@@ -929,6 +929,15 @@ export type WorkshopSessionsCreateWorkshopSessionData = {
 
 export type WorkshopSessionsCreateWorkshopSessionResponse = (WorkshopSessionCreatedPublic);
 
+export type WorkshopSessionsReadWorkshopPartAssetData = {
+    partId: string;
+    path: string;
+    sessionId: string;
+    token: string;
+};
+
+export type WorkshopSessionsReadWorkshopPartAssetResponse = (unknown);
+
 export type WorkshopSessionsReadWorkshopSessionDetailData = {
     sessionId: string;
 };

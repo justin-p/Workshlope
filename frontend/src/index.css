@@ -122,3 +122,75 @@
     cursor: pointer;
   }
 }
+
+@layer components {
+  .workshop-markdown {
+    @apply text-sm leading-6 text-foreground;
+  }
+
+  .workshop-markdown h1 {
+    @apply mt-0 mb-3 text-2xl font-semibold;
+  }
+
+  .workshop-markdown h2 {
+    @apply mt-6 mb-2 text-xl font-semibold;
+  }
+
+  .workshop-markdown h3 {
+    @apply mt-5 mb-2 text-lg font-semibold;
+  }
+
+  .workshop-markdown p {
+    @apply my-3;
+  }
+
+  .workshop-markdown ul,
+  .workshop-markdown ol {
+    @apply my-3 ml-6;
+  }
+
+  .workshop-markdown ul {
+    @apply list-disc;
+  }
+
+  .workshop-markdown ol {
+    @apply list-decimal;
+  }
+
+  .workshop-markdown li {
+    @apply my-1;
+  }
+
+  .workshop-markdown a {
+    @apply text-primary underline underline-offset-4;
+  }
+
+  .workshop-markdown code {
+    @apply rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em];
+  }
+
+  .workshop-markdown pre {
+    @apply my-4 overflow-x-auto rounded-md border bg-muted/40 p-3 text-xs;
+  }
+
+  .workshop-markdown pre code {
+    @apply bg-transparent p-0 text-inherit;
+  }
+
+  .workshop-markdown blockquote {
+    @apply my-4 border-l-4 border-border pl-4 italic text-muted-foreground;
+  }
+
+  .workshop-markdown img {
+    @apply my-4 h-auto max-w-full rounded-md border;
+  }
+
+  .workshop-markdown table {
+    @apply my-4 w-full border-collapse text-left text-sm;
+  }
+
+  .workshop-markdown th,
+  .workshop-markdown td {
+    @apply border px-2 py-1 align-top;
+  }
+}

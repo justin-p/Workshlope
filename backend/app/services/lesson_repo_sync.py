@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import posixpath
 from collections.abc import Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import PurePosixPath
 
@@ -16,10 +16,6 @@ from app.models import (
     get_datetime_utc,
 )
 from app.services.lesson_manifest import ManifestValidationError, parse_lesson_manifest
-from app.services.lesson_markdown_pipeline import (
-    RelativeAssetRewriteError,
-    sync_markdown_rewrite_relative_assets,
-)
 
 
 class LessonRepoSyncError(RuntimeError):
@@ -34,34 +30,6 @@ class _PreparedLessonSync:
     title: str
     summary: str | None
     parts: list[tuple[int, str, str, str, str]]  # ordering, slug, title, path, body_md
-
-
-def _apply_sync_markdown_to_prepared(
-    prepared: list[_PreparedLessonSync],
-    *,
-    github_full_name: str,
-    default_branch: str,
-) -> list[_PreparedLessonSync]:
-    out: list[_PreparedLessonSync] = []
-    for item in prepared:
-        new_parts: list[tuple[int, str, str, str, str]] = []
-        for ordering, slug, title, path, body_md in item.parts:
-            blob_key = _part_file_key(
-                manifest_repo_path=item.manifest_repo_path,
-                part_relative_path=path,
-            )
-            try:
-                new_body = sync_markdown_rewrite_relative_assets(
-                    body_md,
-                    part_repo_path=blob_key,
-                    github_full_name=github_full_name,
-                    default_branch=default_branch,
-                )
-            except RelativeAssetRewriteError as exc:
-                raise LessonRepoSyncError(str(exc)) from exc
-            new_parts.append((ordering, slug, title, path, new_body))
-        out.append(replace(item, parts=new_parts))
-    return out
 
 
 def _reject_unsafe_repo_path(path: str) -> None:
@@ -246,11 +214,6 @@ def sync_lesson_repo_from_path_map(
     """
     try:
         prepared = prepare_lesson_sync_ops_from_path_map(path_to_content)
-        prepared = _apply_sync_markdown_to_prepared(
-            prepared,
-            github_full_name=lesson_repo.full_name,
-            default_branch=lesson_repo.default_branch,
-        )
         apply_prepared_lesson_sync_to_repo(
             session=session,
             lesson_repo=lesson_repo,
