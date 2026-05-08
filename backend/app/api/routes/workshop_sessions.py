@@ -41,6 +41,8 @@ from app.models import (
     WorkshopRosterParticipantRowPublic,
     WorkshopSession,
     WorkshopSessionCorePublic,
+    WorkshopSessionCreate,
+    WorkshopSessionCreatedPublic,
     WorkshopSessionListItem,
     WorkshopSessionPatch,
     WorkshopSessionPublicInstructor,
@@ -764,6 +766,57 @@ def read_workshop_sessions_for_user(
         )
 
     return WorkshopSessionsPublic(data=data, count=count)
+
+
+@router.post("/", response_model=WorkshopSessionCreatedPublic)
+def create_workshop_session(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    body: WorkshopSessionCreate,
+) -> WorkshopSessionCreatedPublic:
+    if not (current_user.is_superuser or current_user.is_instructor):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Instructor privileges required",
+        )
+    lesson = session.get(Lesson, body.lesson_id)
+    if lesson is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found",
+        )
+
+    first_part = session.exec(
+        select(LessonPart)
+        .where(LessonPart.lesson_id == lesson.id)
+        .order_by(col(LessonPart.ordering))
+        .limit(1)
+    ).first()
+    created = WorkshopSession(
+        lesson_id=lesson.id,
+        status="scheduled",
+        current_part_index=0,
+        current_part_slug=(first_part.slug if first_part is not None else None),
+        part_generation=1,
+    )
+    session.add(created)
+    session.commit()
+    session.refresh(created)
+
+    seat = SessionInstructor(
+        session_id=created.id,
+        user_id=current_user.id,
+        role="lead",
+    )
+    session.add(seat)
+    session.commit()
+
+    return WorkshopSessionCreatedPublic(
+        session_id=created.id,
+        lesson_id=created.lesson_id,
+        status=created.status,
+    )
 
 
 def _workshop_session_detail_shared(

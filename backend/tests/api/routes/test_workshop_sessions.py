@@ -6,7 +6,7 @@ import pytest
 from fastapi import WebSocketDisconnect
 from fastapi.testclient import TestClient
 from sqlalchemy import update
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app import crud
 from app.api.routes import workshop_sessions as workshop_sessions_routes
@@ -1794,6 +1794,69 @@ def test_list_workshop_sessions_empty_without_membership(
     body = response.json()
     assert body["count"] == 0
     assert body["data"] == []
+
+
+def test_create_workshop_session_creates_scheduled_session_and_lead_seat(
+    client: TestClient, db: Session
+) -> None:
+    existing = _create_scheduled_session(db)
+    lesson = db.get(Lesson, existing.lesson_id)
+    assert lesson is not None
+
+    instructor_email = f"instr-create-session-{uuid.uuid4()}@example.com"
+    password = "testpass123"
+    instructor = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password=password,
+            is_instructor=True,
+        ),
+    )
+    headers = user_authentication_headers(
+        client=client, email=instructor_email, password=password
+    )
+
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/",
+        headers=headers,
+        json={"lesson_id": str(lesson.id)},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "scheduled"
+    created_id = uuid.UUID(body["session_id"])
+
+    created = db.get(WorkshopSession, created_id)
+    assert created is not None
+    assert created.lesson_id == lesson.id
+    assert created.status == "scheduled"
+
+    seat = db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == created_id,
+            SessionInstructor.user_id == instructor.id,
+            col(SessionInstructor.removed_at).is_(None),
+        )
+    ).first()
+    assert seat is not None
+    assert seat.role == "lead"
+
+
+def test_create_workshop_session_requires_instructor_or_superuser(
+    client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
+) -> None:
+    existing = _create_scheduled_session(db)
+    lesson = db.get(Lesson, existing.lesson_id)
+    assert lesson is not None
+
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/",
+        headers=normal_user_token_headers,
+        json={"lesson_id": str(lesson.id)},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Instructor privileges required"
 
 
 def test_list_workshop_sessions_includes_participant_membership(

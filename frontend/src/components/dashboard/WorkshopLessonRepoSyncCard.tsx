@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-import { ApiError, WorkshopLessonReposService } from "@/client"
+import {
+  ApiError,
+  WorkshopLessonReposService,
+  WorkshopSessionsService,
+} from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -132,6 +137,12 @@ export function WorkshopLessonRepoSyncCard() {
   const [repoSearch, setRepoSearch] = useState("")
   const [refreshError, setRefreshError] = useState<string | null>(null)
   const [advancedManualOpen, setAdvancedManualOpen] = useState(false)
+  const [createSessionErrorByLessonId, setCreateSessionErrorByLessonId] =
+    useState<Record<string, string | undefined>>({})
+  const [createdSessionByLessonId, setCreatedSessionByLessonId] = useState<
+    Record<string, string | undefined>
+  >({})
+  const [creatingLessonId, setCreatingLessonId] = useState<string | null>(null)
 
   useEffect(() => {
     try {
@@ -183,6 +194,48 @@ export function WorkshopLessonRepoSyncCard() {
         return
       }
       setErrorDetail(e instanceof Error ? e.message : "Sync request failed")
+    },
+  })
+  const createSessionMutation = useMutation({
+    mutationFn: (lessonId: string) =>
+      WorkshopSessionsService.createWorkshopSession({
+        requestBody: { lesson_id: lessonId },
+      }),
+    onMutate: (lessonId) => {
+      setCreatingLessonId(lessonId)
+      setCreateSessionErrorByLessonId((prev) => ({
+        ...prev,
+        [lessonId]: undefined,
+      }))
+      setCreatedSessionByLessonId((prev) => ({
+        ...prev,
+        [lessonId]: undefined,
+      }))
+    },
+    onSuccess: async (data, lessonId) => {
+      setCreatedSessionByLessonId((prev) => ({
+        ...prev,
+        [lessonId]: data.session_id,
+      }))
+      await queryClient.invalidateQueries({
+        queryKey: ["workshopSessionsForUser"],
+      })
+    },
+    onError: (error, lessonId) => {
+      const detail =
+        error instanceof ApiError
+          ? ((error.body as { detail?: string } | undefined)?.detail ??
+            error.message)
+          : error instanceof Error
+            ? error.message
+            : "Could not create session"
+      setCreateSessionErrorByLessonId((prev) => ({
+        ...prev,
+        [lessonId]: detail,
+      }))
+    },
+    onSettled: () => {
+      setCreatingLessonId(null)
     },
   })
   const normalizedRepo = fullName.trim()
@@ -1259,7 +1312,7 @@ export function WorkshopLessonRepoSyncCard() {
                         ? "Loading..."
                         : expandedPreviewRepoIds[repo.lesson_repo_id]
                           ? "Hide parts"
-                          : "Preview parts"}
+                          : "Preview parts + create session"}
                     </Button>
                   </div>
                 </li>
@@ -1283,29 +1336,81 @@ export function WorkshopLessonRepoSyncCard() {
                   <p className="text-destructive">{previewError}</p>
                 ) : preview ? (
                   preview.lessons.length > 0 ? (
-                    <ul className="mt-1 space-y-1">
-                      {preview.lessons.map((lesson) => (
-                        <li key={lesson.lesson_id}>
-                          <p className="font-medium">
-                            {lesson.lesson_title} ({lesson.lesson_slug})
-                          </p>
-                          {lesson.parts.length > 0 ? (
-                            <p className="text-muted-foreground">
-                              {lesson.parts
-                                .map(
-                                  (part) =>
-                                    `${part.ordering + 1}. ${part.title}`,
-                                )
-                                .join(" | ")}
-                            </p>
-                          ) : (
-                            <p className="text-muted-foreground">
-                              No parts in lesson.
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+                    <>
+                      <p
+                        className="mt-1 text-muted-foreground"
+                        data-testid="workshop-session-create-hint"
+                      >
+                        Create a scheduled workshop session directly from any
+                        synced lesson below.
+                      </p>
+                      <ul className="mt-1 space-y-1">
+                        {preview.lessons.map((lesson) => (
+                          <li key={lesson.lesson_id}>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium">
+                                {lesson.lesson_title} ({lesson.lesson_slug})
+                              </p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-6 px-2 text-[11px]"
+                                onClick={() =>
+                                  createSessionMutation.mutate(lesson.lesson_id)
+                                }
+                                disabled={
+                                  createSessionMutation.isPending &&
+                                  creatingLessonId === lesson.lesson_id
+                                }
+                                data-testid="workshop-create-session"
+                              >
+                                {createSessionMutation.isPending &&
+                                creatingLessonId === lesson.lesson_id
+                                  ? "Creating..."
+                                  : "Create session"}
+                              </Button>
+                            </div>
+                            {lesson.parts.length > 0 ? (
+                              <p className="text-muted-foreground">
+                                {lesson.parts
+                                  .map(
+                                    (part) =>
+                                      `${part.ordering + 1}. ${part.title}`,
+                                  )
+                                  .join(" | ")}
+                              </p>
+                            ) : (
+                              <p className="text-muted-foreground">
+                                No parts in lesson.
+                              </p>
+                            )}
+                            {createdSessionByLessonId[lesson.lesson_id] ? (
+                              <p className="text-emerald-700 dark:text-emerald-400">
+                                Session created.{" "}
+                                <Link
+                                  to="/workshop/$sessionId"
+                                  params={{
+                                    sessionId:
+                                      createdSessionByLessonId[
+                                        lesson.lesson_id
+                                      ]!,
+                                  }}
+                                  className="underline underline-offset-4"
+                                >
+                                  Open
+                                </Link>
+                              </p>
+                            ) : null}
+                            {createSessionErrorByLessonId[lesson.lesson_id] ? (
+                              <p className="text-destructive">
+                                {createSessionErrorByLessonId[lesson.lesson_id]}
+                              </p>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
                   ) : (
                     <p className="text-muted-foreground">
                       No lessons synced yet.
