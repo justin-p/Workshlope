@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-08** — **`main`:** [#48](https://github.com/justin-p/testing/pull/48) merged — manifest-backed timers + extend + E2E bootstrap `estimated_minutes`. **In flight:** stop session timer on WS `part.advance` on branch **`feat/workshop/timer-stop-on-part-advance`**. |
-| **Branch** | **`feat/workshop/timer-stop-on-part-advance`** |
-| **PR** | [#49](https://github.com/justin-p/testing/pull/49) — stop timer on WS `part.advance` + tests |
+| **Last synced** | **2026-05-09** — **`main`:** [#48](https://github.com/justin-p/testing/pull/48) landed — manifest-backed timers + extend + E2E bootstrap `estimated_minutes`. **[#49](https://github.com/justin-p/testing/pull/49)** — stop session timer when instructor **`part.advance`** over WS (**open**, CI green — merge next). **After #49 merges:** peel **two slices** off checkpoint **`feat/workshop/p0-manifest-timers`** (see `WorkshopLessonRepoSyncCard.tsx` + `dashboard-routing.spec.ts` for hub/session UX; `workshop.$sessionId.tsx` + Playwright for **add trainee**). |
+| **Branch** | **`main`** (integrate branch); slice work = one branch per row — next hub slice from updated `main` after #49. |
+| **PR** | **Active:** [#49](https://github.com/justin-p/testing/pull/49) — timer stops on **`part.advance`**. **Next:** open hub PR, then roster PR (**no stacking unrelated scopes**). |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -30,6 +30,7 @@
     - The "advance part" button does not work
     - ✅ Timers should use the manifest
     - ✅ Start "5m countdown" should be replaced with a "extend with X" where X can be set by the instructor.
+    - ✅ **Timer resets on WS part advance** — **[#49](https://github.com/justin-p/testing/pull/49)** (pending merge onto `main`).
     - The flow to create a session on the "Workshops hub" is confoluted with buttons behind multiple actions. Make this a lot more user friendly and polished.
       - e.q.
         - There are 2 repo menus. 1 with a drop down and 1 with a cstom overwrite. This should be the same form, allow seclecitng from a list, but allow users to type and thus overwrite in the same form.
