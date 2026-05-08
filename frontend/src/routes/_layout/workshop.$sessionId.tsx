@@ -504,7 +504,9 @@ function WorkshopSessionPage() {
     realtimePartIndex ?? detailQuery.data?.session.current_part_index ?? 0
   const currentPart = detailQuery.data?.parts[currentPartIndex] ?? null
   const totalParts = detailQuery.data?.parts.length ?? 0
+  const previousPartIndex = currentPartIndex - 1
   const nextPartIndex = currentPartIndex + 1
+  const canReturnToPreviousPart = previousPartIndex >= 0
   const canAdvanceToNextPart = nextPartIndex < totalParts
   const lessonRepoHealth =
     detailQuery.data?.lesson.lesson_repo_health ?? "healthy"
@@ -525,26 +527,9 @@ function WorkshopSessionPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          data-testid="workshop-back-button"
-          onClick={() => {
-            if (window.history.length > 1) {
-              window.history.back()
-              return
-            }
-            window.location.assign("/workshops")
-          }}
-        >
-          Back
-        </Button>
-        <h1 className="text-2xl font-semibold">
-          {detailQuery.data?.lesson.title ?? "Workshop session"}
-        </h1>
-      </div>
+      <h1 className="text-2xl font-semibold">
+        {detailQuery.data?.lesson.title ?? "Workshop session"}
+      </h1>
       <p className="text-muted-foreground text-sm">
         Session <code className="text-xs">{sessionId}</code>
         {detailQuery.data?.lesson.slug ? (
@@ -839,6 +824,26 @@ function WorkshopSessionPage() {
             onClick={() => sendWsJson({ type: "session.resume" })}
           >
             Resume room
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-instructor-back-part"
+            disabled={
+              !instructorReady ||
+              roomStatus !== "live" ||
+              !canRunLiveDelivery ||
+              !canReturnToPreviousPart
+            }
+            onClick={() =>
+              sendWsJson({
+                type: "part.advance",
+                part_index: previousPartIndex,
+              })
+            }
+          >
+            Back to part {previousPartIndex + 1}
           </Button>
           <Button
             type="button"
