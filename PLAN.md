@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-08** — **`main`:** [#48](https://github.com/justin-p/testing/pull/48) merged — manifest-backed timers + extend + E2E bootstrap `estimated_minutes`. **In flight:** stop session timer on WS `part.advance` on branch **`feat/workshop/timer-stop-on-part-advance`**. |
 | **Branch** | **`feat/workshop/timer-stop-on-part-advance`** |
-| **PR** | _Open after CI green._ |
+| **PR** | [#49](https://github.com/justin-p/testing/pull/49) — stop timer on WS `part.advance` + tests |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
