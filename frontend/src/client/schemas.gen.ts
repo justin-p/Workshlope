@@ -2209,6 +2209,41 @@ export const WorkshopSessionCorePublicSchema = {
     title: 'WorkshopSessionCorePublic'
 } as const;
 
+export const WorkshopSessionCreateSchema = {
+    properties: {
+        lesson_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Id'
+        }
+    },
+    type: 'object',
+    required: ['lesson_id'],
+    title: 'WorkshopSessionCreate'
+} as const;
+
+export const WorkshopSessionCreatedPublicSchema = {
+    properties: {
+        session_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Session Id'
+        },
+        lesson_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Lesson Id'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        }
+    },
+    type: 'object',
+    required: ['session_id', 'lesson_id', 'status'],
+    title: 'WorkshopSessionCreatedPublic'
+} as const;
+
 export const WorkshopSessionInstructorSeatRoleUpdateSchema = {
     properties: {
         user_id: {
