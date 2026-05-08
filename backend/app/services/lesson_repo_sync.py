@@ -29,7 +29,8 @@ class _PreparedLessonSync:
     lesson_slug: str
     title: str
     summary: str | None
-    parts: list[tuple[int, str, str, str, str]]  # ordering, slug, title, path, body_md
+    parts: list[tuple[int, str, str, str, int | None, str]]
+    # ordering, slug, title, path, estimated_minutes, body_md
 
 
 def _reject_unsafe_repo_path(path: str) -> None:
@@ -95,7 +96,7 @@ def prepare_lesson_sync_ops_from_path_map(
             )
         seen_lesson_slugs.add(slug)
 
-        parts_out: list[tuple[int, str, str, str, str]] = []
+        parts_out: list[tuple[int, str, str, str, int | None, str]] = []
         for ordering, part in enumerate(manifest.parts):
             blob_key = _part_file_key(
                 manifest_repo_path=manifest_path,
@@ -107,7 +108,14 @@ def prepare_lesson_sync_ops_from_path_map(
                     f"Referenced markdown missing for lesson {slug!r}: path {blob_key!r}",
                 )
             parts_out.append(
-                (ordering, part.slug, part.title, part.path, body_md),
+                (
+                    ordering,
+                    part.slug,
+                    part.title,
+                    part.path,
+                    part.estimated_minutes,
+                    body_md,
+                ),
             )
 
         prepared.append(
@@ -166,7 +174,7 @@ def apply_prepared_lesson_sync_to_repo(
             session.delete(stale)
         session.flush()
 
-        for ordering, slug, title, path, body_md in item.parts:
+        for ordering, slug, title, path, estimated_minutes, body_md in item.parts:
             session.add(
                 LessonPart(
                     lesson_id=lesson.id,
@@ -174,6 +182,7 @@ def apply_prepared_lesson_sync_to_repo(
                     slug=slug,
                     title=title,
                     path=path,
+                    estimated_minutes=estimated_minutes,
                     body_md=body_md,
                 ),
             )

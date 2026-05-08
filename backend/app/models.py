@@ -244,6 +244,7 @@ class LessonPart(SQLModel, table=True):
     slug: str = Field(max_length=255)
     title: str = Field(max_length=255)
     path: str = Field(max_length=512)
+    estimated_minutes: int | None = Field(default=None, ge=0)
     body_md: str = Field(default="")
     lesson: Lesson | None = Relationship(back_populates="parts")
 
@@ -654,12 +655,17 @@ class WorkshopLessonPartBrief(SQLModel):
     ordering: int
     slug: str
     title: str
+    estimated_minutes: int | None = None
     body_html: str | None = None
 
 
 class WorkshopSessionTimerStart(SQLModel):
     mode: Literal["countdown", "countup"] = "countdown"
     target_seconds: int | None = Field(default=None, ge=1, le=86_400)
+
+
+class WorkshopSessionTimerExtend(SQLModel):
+    additional_seconds: int = Field(ge=60, le=86_400)
 
 
 class WorkshopSessionTimerPublic(SQLModel):
@@ -677,7 +683,7 @@ class WorkshopSessionTimerEventPublic(SQLModel):
     id: uuid.UUID
     session_id: uuid.UUID
     actor_user_id: uuid.UUID
-    action: Literal["start", "pause", "resume", "stop"]
+    action: Literal["start", "pause", "resume", "stop", "extend"]
     mode: Literal["countdown", "countup"] | None = None
     target_seconds: int | None = None
     created_at: datetime | None = None

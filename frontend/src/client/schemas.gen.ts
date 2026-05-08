@@ -1435,6 +1435,17 @@ export const WorkshopLessonPartBriefSchema = {
             type: 'string',
             title: 'Title'
         },
+        estimated_minutes: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Estimated Minutes'
+        },
         body_html: {
             anyOf: [
                 {
@@ -2512,7 +2523,7 @@ export const WorkshopSessionTimerEventPublicSchema = {
         },
         action: {
             type: 'string',
-            enum: ['start', 'pause', 'resume', 'stop'],
+            enum: ['start', 'pause', 'resume', 'stop', 'extend'],
             title: 'Action'
         },
         mode: {
@@ -2573,6 +2584,20 @@ export const WorkshopSessionTimerEventsPublicSchema = {
     type: 'object',
     required: ['data', 'count'],
     title: 'WorkshopSessionTimerEventsPublic'
+} as const;
+
+export const WorkshopSessionTimerExtendSchema = {
+    properties: {
+        additional_seconds: {
+            type: 'integer',
+            maximum: 86400,
+            minimum: 60,
+            title: 'Additional Seconds'
+        }
+    },
+    type: 'object',
+    required: ['additional_seconds'],
+    title: 'WorkshopSessionTimerExtend'
 } as const;
 
 export const WorkshopSessionTimerPublicSchema = {

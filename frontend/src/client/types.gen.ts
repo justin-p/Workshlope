@@ -316,6 +316,7 @@ export type WorkshopLessonPartBrief = {
     ordering: number;
     slug: string;
     title: string;
+    estimated_minutes?: (number | null);
     body_html?: (string | null);
 };
 
@@ -563,17 +564,21 @@ export type WorkshopSessionTimerEventPublic = {
     id: string;
     session_id: string;
     actor_user_id: string;
-    action: 'start' | 'pause' | 'resume' | 'stop';
+    action: 'start' | 'pause' | 'resume' | 'stop' | 'extend';
     mode?: ('countdown' | 'countup' | null);
     target_seconds?: (number | null);
     created_at?: (string | null);
 };
 
-export type action = 'start' | 'pause' | 'resume' | 'stop';
+export type action = 'start' | 'pause' | 'resume' | 'stop' | 'extend';
 
 export type WorkshopSessionTimerEventsPublic = {
     data: Array<WorkshopSessionTimerEventPublic>;
     count: number;
+};
+
+export type WorkshopSessionTimerExtend = {
+    additional_seconds: number;
 };
 
 export type WorkshopSessionTimerPublic = {
@@ -1010,6 +1015,13 @@ export type WorkshopSessionsStartWorkshopSessionTimerData = {
 };
 
 export type WorkshopSessionsStartWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
+
+export type WorkshopSessionsExtendWorkshopSessionTimerData = {
+    requestBody: WorkshopSessionTimerExtend;
+    sessionId: string;
+};
+
+export type WorkshopSessionsExtendWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
 
 export type WorkshopSessionsPauseWorkshopSessionTimerData = {
     sessionId: string;

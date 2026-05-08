@@ -198,7 +198,31 @@ function WorkshopSessionPage() {
     mutationFn: () =>
       WorkshopSessionsService.startWorkshopSessionTimer({
         sessionId,
-        requestBody: { mode: "countdown", target_seconds: 300 },
+        requestBody: { mode: "countdown" },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimer", sessionId],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["workshopSessionTimerEvents", sessionId],
+      })
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
+  const extendTimerMutation = useMutation({
+    mutationFn: () =>
+      WorkshopSessionsService.extendWorkshopSessionTimer({
+        sessionId,
+        requestBody: { additional_seconds: timerExtendMinutes * 60 },
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -290,6 +314,7 @@ function WorkshopSessionPage() {
   const [realtimePartIndex, setRealtimePartIndex] = useState<number | null>(
     null,
   )
+  const [timerExtendMinutes, setTimerExtendMinutes] = useState<number>(5)
   const [connectedRole, setConnectedRole] = useState<
     "participant" | "instructor" | null
   >(null)
@@ -875,7 +900,40 @@ function WorkshopSessionPage() {
             }
             onClick={() => startTimerMutation.mutate()}
           >
-            Start 5m countdown
+            Start part countdown
+          </Button>
+          <label className="text-xs text-muted-foreground self-center">
+            Extend by (min)
+            <input
+              type="number"
+              min={1}
+              max={120}
+              step={1}
+              value={timerExtendMinutes}
+              data-testid="workshop-timer-extend-minutes"
+              className="ml-2 h-8 w-20 rounded border bg-background px-2 text-foreground"
+              onChange={(event) => {
+                const nextValue = Number.parseInt(event.target.value, 10)
+                if (Number.isNaN(nextValue)) return
+                setTimerExtendMinutes(Math.min(120, Math.max(1, nextValue)))
+              }}
+            />
+          </label>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid="workshop-timer-extend"
+            disabled={
+              !instructorReady ||
+              timerStatus === "inactive" ||
+              timerMode !== "countdown" ||
+              !canRunLiveDelivery ||
+              extendTimerMutation.isPending
+            }
+            onClick={() => extendTimerMutation.mutate()}
+          >
+            Extend +{timerExtendMinutes}m
           </Button>
           <Button
             type="button"
