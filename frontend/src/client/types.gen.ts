@@ -472,6 +472,16 @@ export type WorkshopSessionCorePublic = {
     created_at: (string | null);
 };
 
+export type WorkshopSessionCreate = {
+    lesson_id: string;
+};
+
+export type WorkshopSessionCreatedPublic = {
+    session_id: string;
+    lesson_id: string;
+    status: string;
+};
+
 /**
  * Update an active instructor seat's role (e.g. co_instructor → lead).
  */
@@ -912,6 +922,12 @@ export type WorkshopSessionsReadWorkshopSessionsForUserData = {
 };
 
 export type WorkshopSessionsReadWorkshopSessionsForUserResponse = (WorkshopSessionsPublic);
+
+export type WorkshopSessionsCreateWorkshopSessionData = {
+    requestBody: WorkshopSessionCreate;
+};
+
+export type WorkshopSessionsCreateWorkshopSessionResponse = (WorkshopSessionCreatedPublic);
 
 export type WorkshopSessionsReadWorkshopSessionDetailData = {
     sessionId: string;

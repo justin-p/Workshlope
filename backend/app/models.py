@@ -488,6 +488,16 @@ class WorkshopSessionsPublic(SQLModel):
     count: int
 
 
+class WorkshopSessionCreate(SQLModel):
+    lesson_id: uuid.UUID
+
+
+class WorkshopSessionCreatedPublic(SQLModel):
+    session_id: uuid.UUID
+    lesson_id: uuid.UUID
+    status: str
+
+
 class WorkshopSessionUpsertMember(SQLModel):
     """Assign a user as participant or instructor for one session."""
 
