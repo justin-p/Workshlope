@@ -194,6 +194,38 @@ def _require_installation_repo_entitlement(
     )
 
 
+def _refresh_installation_repo_entitlements_from_github(
+    *,
+    session: Session,
+    installation: GithubAppInstallation,
+) -> None:
+    """Best-effort on-demand entitlement refresh for selected installations."""
+    if installation.repository_selection != "selected":
+        return
+    repo_names, selection_mode = fetch_installation_repositories(
+        settings=settings,
+        installation_id=installation.id,
+    )
+    if selection_mode:
+        installation.repository_selection = selection_mode
+        session.add(installation)
+    if (selection_mode or installation.repository_selection) == "selected":
+        _reconcile_installation_repositories(
+            session=session,
+            installation_id=installation.id,
+            full_names=repo_names,
+        )
+    else:
+        rows = session.exec(
+            select(GithubInstallationRepository).where(
+                GithubInstallationRepository.installation_id == installation.id
+            )
+        ).all()
+        for existing in rows:
+            session.delete(existing)
+    session.commit()
+
+
 def _resolve_github_app_install_url(
     installations: list[GithubAppInstallation],
 ) -> str | None:
@@ -783,6 +815,22 @@ def sync_lesson_repo_from_github(
             status_code=status.HTTP_409_CONFLICT,
             detail="Installation is suspended",
         )
+    if inst.repository_selection == "selected":
+        try:
+            _refresh_installation_repo_entitlements_from_github(
+                session=session,
+                installation=inst,
+            )
+        except GithubInstallationPollingError as exc:
+            logger.warning(
+                "lesson_repo_sync entitlement refresh failed; using local cache",
+                extra={
+                    "full_name": body.full_name,
+                    "installation_id": body.installation_id,
+                    "actor_user_id": str(current_user.id),
+                    "error": str(exc),
+                },
+            )
     _require_installation_repo_entitlement(
         session=session,
         installation=inst,

@@ -10,9 +10,15 @@
 
 | Field | Value |
 | ------ | ------ |
+<<<<<<< fix/workshop/sync-entitlement-autorefresh
+| **Last synced** | **2026-05-08** — **Workshop create-session + entitlement UX:** added **`POST /api/v1/workshop/sessions/`** (instructor/superuser) to create scheduled sessions from lesson previews and auto-seat creator as lead instructor; workshops sync card exposes “Preview parts + create session” with direct open-link after creation; regenerated OpenAPI + frontend client; backend tests cover create-session success + RBAC denial. **Selected-installation repo sync no longer requires manual refresh first:** `sync-from-github` now best-effort refreshes installation repository entitlements on demand before entitlement enforcement, allowing newly granted repos to sync immediately (with regression coverage in `test_sync_from_github_selected_installation_refreshes_entitlements_on_demand`). |
+| **Branch** | **`feat/workshop/create-session-flow`** |
+| **PR** | **[#43](https://github.com/justin-p/testing/pull/43)** OPEN: create sessions directly from lesson previews + auto-refresh selected-installation entitlements during sync (remove manual-refresh prerequisite). |
+=======
 | **Last synced** | **2026-05-08** — **Workshop create-session slice (in flight):** add **`POST /api/v1/workshop/sessions/`** (instructor/superuser) to create scheduled sessions from a lesson and auto-seat the creator as lead instructor; wire “Create session” actions into lesson preview rows on the workshops hub sync card; regenerate OpenAPI + frontend client; add backend API tests for create success + RBAC denial. Prior sync context retained: OAuth avatar parity, polling-only GitHub install model, stale branch/PR cleanup, and Markdown PLAN reorder for executor-first flow. |
 | **Branch** | **`feat/workshop/create-session-flow`** |
 | **PR** | _TBD (open after green checks for create-session slice)._ |
+>>>>>>> main
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 

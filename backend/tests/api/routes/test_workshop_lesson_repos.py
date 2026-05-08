@@ -537,6 +537,59 @@ def test_sync_from_github_selected_installation_allows_entitled_repo(
     assert response.status_code == 200
 
 
+def test_sync_from_github_selected_installation_refreshes_entitlements_on_demand(
+    client: TestClient,
+) -> None:
+    install_id = 907_500_000 + (uuid.uuid4().int % 1_000_000)
+    full_name = f"selected-refresh/repo-{uuid.uuid4()}"
+    with Session(engine) as session:
+        session.add(
+            GithubAppInstallation(
+                id=install_id,
+                account_id=1,
+                account_login="trainer",
+                account_type="User",
+                target_type="User",
+                repository_selection="selected",
+                app_slug="x",
+                suspended_at=None,
+            ),
+        )
+        session.commit()
+
+    mocked_token = InstallationAccessToken(token="mock-github-token", expires_at=None)
+    headers = get_superuser_token_headers(client)
+    with (
+        patch(
+            "app.api.routes.workshop_lesson_repos.fetch_installation_repositories",
+            return_value=([full_name], "selected"),
+        ),
+        patch(
+            "app.api.routes.workshop_lesson_repos.mint_installation_access_token",
+            return_value=mocked_token,
+        ),
+        patch(
+            "app.api.routes.workshop_lesson_repos.fetch_lesson_repo_path_map_from_github",
+            return_value=(_tree(), "main"),
+        ),
+    ):
+        response = client.post(
+            f"{settings.API_V1_STR}/workshop/lesson-repos/sync-from-github",
+            headers=headers,
+            json={"full_name": full_name, "installation_id": install_id},
+        )
+    assert response.status_code == 200
+
+    with Session(engine) as session:
+        entitled = session.exec(
+            select(GithubInstallationRepository).where(
+                GithubInstallationRepository.installation_id == install_id,
+                GithubInstallationRepository.full_name == full_name,
+            )
+        ).first()
+        assert entitled is not None
+
+
 def test_sync_from_github_logs_completion(
     client: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:
