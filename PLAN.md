@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-08** — **Workshop markdown render + private-repo assets:** workshop session detail now rewrites relative markdown assets to signed backend asset URLs; lesson-repo sync now prefetches and caches referenced assets in DB for private/public repo parity; workshop asset endpoint now serves cached bytes (no per-image GitHub fetch at view time) while markdown safe-rendering remains enforced. |
-| **Branch** | **`fix/workshop/markdown-rendering-and-images`** |
-| **PR** | _TBD (open after green checks for markdown render/image slice)._ |
+| **Last synced** | **2026-05-08** — **P0 manifest-backed timers (this PR):** sync persists `part.estimated_minutes` on `lesson_part`; countdown start defaults `target_seconds` from the current part when omitted; `POST .../timer/extend` adds time with audit `extend` event; OpenAPI + SPA client updated; instructor UI uses “Start part countdown” plus extend controls. |
+| **Branch** | **`feat/workshop/p0-lesson-estimated-timers`** |
+| **PR** | _TBD — open after CI green._ |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -28,8 +28,8 @@
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
   - P0 issues
     - The "advance part" button does not work
-    - Timers should use the manifest
-    - Start "5m countdown" should be replaced with a "extend with X" where X can be set by the instructor.
+    - ✅ Timers should use the manifest
+    - ✅ Start "5m countdown" should be replaced with a "extend with X" where X can be set by the instructor.
     - The flow to create a session on the "Workshops hub" is confoluted with buttons behind multiple actions. Make this a lot more user friendly and polished.
       - e.q.
         - There are 2 repo menus. 1 with a drop down and 1 with a cstom overwrite. This should be the same form, allow seclecitng from a list, but allow users to type and thus overwrite in the same form.

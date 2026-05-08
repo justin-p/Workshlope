@@ -3550,6 +3550,14 @@ def test_timer_lifecycle_for_instructor(client: TestClient, db: Session) -> None
     assert start.json()["target_seconds"] == 300
     assert isinstance(start.json()["elapsed_seconds"], int)
 
+    extend = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/extend",
+        headers=headers,
+        json={"additional_seconds": 120},
+    )
+    assert extend.status_code == 200
+    assert extend.json()["target_seconds"] == 420
+
     pause = client.post(
         f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/pause",
         headers=headers,
@@ -3671,6 +3679,49 @@ def test_timer_validation_and_conflict_paths(client: TestClient, db: Session) ->
     )
     assert bad_resume.status_code == 409
     assert bad_resume.json()["detail"] == "timer_not_paused"
+
+
+def test_timer_countdown_uses_manifest_estimate_when_target_missing(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    _add_two_parts_to_session_lesson(db, session_row)
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    first_part = db.exec(
+        select(LessonPart).where(
+            LessonPart.lesson_id == lesson.id,
+            LessonPart.ordering == 0,
+        )
+    ).first()
+    assert first_part is not None
+    first_part.estimated_minutes = 12
+    db.add(first_part)
+
+    instructor_email = f"timer-manifest-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    start = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=headers,
+        json={"mode": "countdown"},
+    )
+    assert start.status_code == 200
+    assert start.json()["target_seconds"] == 720
 
 
 def test_timer_writes_audit_events(client: TestClient, db: Session) -> None:

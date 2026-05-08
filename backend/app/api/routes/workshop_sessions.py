@@ -56,6 +56,7 @@ from app.models import (
     WorkshopSessionTimerEvent,
     WorkshopSessionTimerEventPublic,
     WorkshopSessionTimerEventsPublic,
+    WorkshopSessionTimerExtend,
     WorkshopSessionTimerPublic,
     WorkshopSessionTimerStart,
     WorkshopSessionUpsertMember,
@@ -927,6 +928,7 @@ def _workshop_session_detail_shared(
                 ordering=int(row.ordering),
                 slug=row.slug,
                 title=row.title,
+                estimated_minutes=row.estimated_minutes,
                 body_html=lesson_markdown_to_safe_html(body_md),
             )
         )
@@ -955,6 +957,23 @@ def _canonical_part_repo_path(*, lesson_slug: str, part_path: str) -> str:
     # Manifest part paths are usually lesson-relative (e.g. `01.md`), so anchor
     # them under the conventional lesson directory to resolve ../../.img assets.
     return f"lessons/{lesson_slug}/{cleaned}"
+
+
+def _current_part_manifest_target_seconds(
+    session: Session, *, workshop_session: WorkshopSession
+) -> int | None:
+    lesson_row = session.get(Lesson, workshop_session.lesson_id)
+    if lesson_row is None:
+        return None
+    current_part = session.exec(
+        select(LessonPart).where(
+            LessonPart.lesson_id == lesson_row.id,
+            LessonPart.ordering == workshop_session.current_part_index,
+        )
+    ).first()
+    if current_part is None or current_part.estimated_minutes is None:
+        return None
+    return int(current_part.estimated_minutes) * 60
 
 
 def _issue_workshop_asset_token(
@@ -1691,7 +1710,12 @@ async def start_workshop_session_timer(
         session_db=session, session_id=session_id, current_user=current_user
     )
     _require_timer_allowed_session_status(workshop_session)
-    if body.mode == "countdown" and body.target_seconds is None:
+    target_seconds = body.target_seconds
+    if body.mode == "countdown" and target_seconds is None:
+        target_seconds = _current_part_manifest_target_seconds(
+            session, workshop_session=workshop_session
+        )
+    if body.mode == "countdown" and target_seconds is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="countdown_requires_target_seconds",
@@ -1711,7 +1735,7 @@ async def start_workshop_session_timer(
         timer_row = WorkshopSessionTimer(session_id=session_id)
     timer_row.status = "running"
     timer_row.mode = body.mode
-    timer_row.target_seconds = body.target_seconds
+    timer_row.target_seconds = target_seconds
     timer_row.started_at = now
     timer_row.paused_at = None
     timer_row.updated_at = now
@@ -1721,6 +1745,63 @@ async def start_workshop_session_timer(
         session_id=session_id,
         actor_user_id=current_user.id,
         action="start",
+        mode=timer_row.mode,
+        target_seconds=timer_row.target_seconds,
+    )
+    session.commit()
+    session.refresh(timer_row)
+    return _timer_public(session_id, timer_row)
+
+
+@router.post("/{session_id}/timer/extend", response_model=WorkshopSessionTimerPublic)
+async def extend_workshop_session_timer(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    session_id: uuid.UUID,
+    body: WorkshopSessionTimerExtend,
+) -> WorkshopSessionTimerPublic:
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+    _require_timer_allowed_session_status(workshop_session)
+    timer_row = session.exec(
+        select(WorkshopSessionTimer).where(
+            WorkshopSessionTimer.session_id == session_id
+        )
+    ).first()
+    if timer_row is None or timer_row.status == "inactive":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="timer_not_active",
+        )
+    if timer_row.mode != "countdown":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="timer_not_countdown",
+        )
+    if timer_row.target_seconds is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="timer_target_missing",
+        )
+
+    now = datetime.now(timezone.utc)
+    timer_row.target_seconds = min(
+        86_400, int(timer_row.target_seconds) + int(body.additional_seconds)
+    )
+    timer_row.updated_at = now
+    session.add(timer_row)
+    _record_timer_event(
+        session,
+        session_id=session_id,
+        actor_user_id=current_user.id,
+        action="extend",
         mode=timer_row.mode,
         target_seconds=timer_row.target_seconds,
     )
