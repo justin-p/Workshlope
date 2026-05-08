@@ -44,6 +44,7 @@ test.describe("Workshop live session", () => {
     await participantPage.waitForURL(/\/dashboard\/(trainee|instructor|admin)/)
 
     await page.goto(`/workshop/${session_id}`)
+    await expect(page.getByTestId("workshop-back-button")).toBeVisible()
     await expect(page.getByTestId("workshop-ws-status")).toHaveText(
       /connected/i,
       {
@@ -80,6 +81,7 @@ test.describe("Workshop live session", () => {
     await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
       "part.advance.ack",
     )
+    await expect(page.getByTestId("workshop-instructor-advance")).toBeDisabled()
 
     await page.getByTestId("workshop-instructor-end").click()
     await expect(page.getByTestId("workshop-ws-last-raw")).toContainText(

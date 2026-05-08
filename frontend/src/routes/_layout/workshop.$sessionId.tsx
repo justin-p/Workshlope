@@ -287,6 +287,9 @@ function WorkshopSessionPage() {
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
   const [lastEvent, setLastEvent] = useState<string>("")
   const [lastAckEvent, setLastAckEvent] = useState<string>("")
+  const [realtimePartIndex, setRealtimePartIndex] = useState<number | null>(
+    null,
+  )
   const [connectedRole, setConnectedRole] = useState<
     "participant" | "instructor" | null
   >(null)
@@ -313,6 +316,7 @@ function WorkshopSessionPage() {
       setConnectedRole(null)
       setRoomStatus("live")
       setLastAckEvent("")
+      setRealtimePartIndex(null)
       wsSessionReadyRef.current = false
       let reconnectingBecauseStaleGeneration = false
       try {
@@ -350,6 +354,7 @@ function WorkshopSessionPage() {
               role?: string
               status?: string
               detail?: string
+              part_index?: number
             }
             if (
               msg.type === "error" &&
@@ -369,6 +374,14 @@ function WorkshopSessionPage() {
             }
             if (typeof msg.type === "string" && msg.type.endsWith(".ack")) {
               setLastAckEvent(raw)
+            }
+            if (
+              (msg.type === "part.advance.ack" ||
+                msg.type === "session.part_changed") &&
+              typeof msg.part_index === "number" &&
+              msg.part_index >= 0
+            ) {
+              setRealtimePartIndex(msg.part_index)
             }
             if (msg.type === "session.connected") {
               if (msg.role === "participant" || msg.role === "instructor") {
@@ -487,8 +500,12 @@ function WorkshopSessionPage() {
   const isPreworkGateError = errorDetail === "Required prerequisites incomplete"
   const participantRemainingRequiredCount = overdueRequiredPrerequisites.length
   const instructorBlockedTraineesCount = gapsQuery.data?.count ?? 0
-  const currentPartIndex = detailQuery.data?.session.current_part_index ?? 0
+  const currentPartIndex =
+    realtimePartIndex ?? detailQuery.data?.session.current_part_index ?? 0
   const currentPart = detailQuery.data?.parts[currentPartIndex] ?? null
+  const totalParts = detailQuery.data?.parts.length ?? 0
+  const nextPartIndex = currentPartIndex + 1
+  const canAdvanceToNextPart = nextPartIndex < totalParts
   const lessonRepoHealth =
     detailQuery.data?.lesson.lesson_repo_health ?? "healthy"
   const showLessonSourceWarning = lessonRepoHealth !== "healthy"
@@ -508,9 +525,26 @@ function WorkshopSessionPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">
-        {detailQuery.data?.lesson.title ?? "Workshop session"}
-      </h1>
+      <div className="flex items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="workshop-back-button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              window.history.back()
+              return
+            }
+            window.location.assign("/workshops")
+          }}
+        >
+          Back
+        </Button>
+        <h1 className="text-2xl font-semibold">
+          {detailQuery.data?.lesson.title ?? "Workshop session"}
+        </h1>
+      </div>
       <p className="text-muted-foreground text-sm">
         Session <code className="text-xs">{sessionId}</code>
         {detailQuery.data?.lesson.slug ? (
@@ -812,11 +846,16 @@ function WorkshopSessionPage() {
             size="sm"
             data-testid="workshop-instructor-advance"
             disabled={
-              !instructorReady || roomStatus !== "live" || !canRunLiveDelivery
+              !instructorReady ||
+              roomStatus !== "live" ||
+              !canRunLiveDelivery ||
+              !canAdvanceToNextPart
             }
-            onClick={() => sendWsJson({ type: "part.advance", part_index: 1 })}
+            onClick={() =>
+              sendWsJson({ type: "part.advance", part_index: nextPartIndex })
+            }
           >
-            Advance to part 1
+            Advance to part {nextPartIndex + 1}
           </Button>
           <Button
             type="button"

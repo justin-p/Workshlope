@@ -26,6 +26,16 @@
 **1. Workshop-runnable functionality (blocking first)**
 
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
+  - P0 issues
+    - The "advance part" button does not work
+    - Timers should use the manifest
+    - Start "5m countdown" should be replaced with a "extend with X" where X can be set by the instructor.
+    - The flow to create a session on the "Workshops hub" is confoluted with buttons behind multiple actions. Make this a lot more user friendly and polished.
+      - e.q.
+        - There are 2 repo menus. 1 with a drop down and 1 with a cstom overwrite. This should be the same form, allow seclecitng from a list, but allow users to type and thus overwrite in the same form.
+        - 'Synced lesson repositories" has a "use" button, which has no real use, as it will just fill in the forms that allow you to setup a new sycn. This never happens, als that thing is already synced. A more logical thing would be that "use" is a "use lesson" button. This logic is currently behinf "preview + create session"
+        - After clicking "preview + create session", only then a button apears to start a session, this is not user friendly and hidden to deep in menus.
+    - There is no way to add trainees to a session.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
 
