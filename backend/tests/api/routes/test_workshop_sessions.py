@@ -1,5 +1,7 @@
+import html
 import uuid
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs, urlparse
 
 import jwt
 import pytest
@@ -17,6 +19,7 @@ from app.models import (
     LessonPart,
     LessonPrerequisite,
     LessonRepo,
+    LessonRepoAsset,
     SessionInstructor,
     User,
     UserCreate,
@@ -2293,6 +2296,106 @@ def test_get_workshop_session_detail_part_html_is_sanitized(
     html = body["parts"][0]["body_html"]
     assert "<script>" not in html
     assert "<strong>safe</strong>" in html
+
+
+def test_get_workshop_session_detail_rewrites_relative_markdown_image_urls(
+    client: TestClient, db: Session
+) -> None:
+    iso_email = f"detail-img-rewrite-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+    session_row = _create_live_session(db)
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    repo = db.get(LessonRepo, lesson.repo_id)
+    assert repo is not None
+    repo.full_name = f"acme-org/workshop-lessons-{uuid.uuid4()}"
+    repo.default_branch = "main"
+    db.add(repo)
+    db.add(
+        LessonPart(
+            lesson_id=lesson.id,
+            ordering=0,
+            slug=f"part-img-{uuid.uuid4()}",
+            title="Part Image",
+            path="01.md",
+            body_md="![dotfiles diagram](../../.img/lesson_1_01.gif)",
+        )
+    )
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=user.id))
+    db.commit()
+
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    html = body["parts"][0]["body_html"]
+    part_id = body["parts"][0]["id"]
+    assert (
+        f'src="{settings.FRONTEND_HOST}{settings.API_V1_STR}/workshop/sessions/{session_row.id}/parts/{part_id}/asset?path=.img/lesson_1_01.gif&amp;token='
+        in html
+    )
+
+
+def test_get_workshop_part_asset_uses_installation_token(
+    client: TestClient, db: Session
+) -> None:
+    iso_email = f"detail-asset-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(client=client, email=iso_email, db=db)
+    user = db.exec(select(User).where(User.email == iso_email)).first()
+    assert user is not None
+    session_row = _create_live_session(db)
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    repo = db.get(LessonRepo, lesson.repo_id)
+    assert repo is not None
+    repo.full_name = f"acme-org/workshop-lessons-{uuid.uuid4()}"
+    repo.default_branch = "main"
+    db.add(repo)
+    db.add(
+        LessonRepoAsset(
+            repo_id=repo.id,
+            repo_path=".img/lesson_1_01.gif",
+            content_type="image/gif",
+            content_sha256="dummy",
+            content_bytes=b"GIF89a",
+        )
+    )
+    part = LessonPart(
+        lesson_id=lesson.id,
+        ordering=0,
+        slug=f"part-asset-{uuid.uuid4()}",
+        title="Part Asset",
+        path="lessons/linux-cli-dotfiles-fundamentals/01.md",
+        body_md="![dotfiles](../../.img/lesson_1_01.gif)",
+    )
+    db.add(part)
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=user.id))
+    db.commit()
+    db.refresh(part)
+
+    detail = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert detail.status_code == 200
+    html_body = html.unescape(detail.json()["parts"][0]["body_html"])
+    marker = f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/parts/{part.id}/asset?"
+    start = html_body.index(marker)
+    href = html_body[start:]
+    href = href[: href.index('"')]
+    parsed = urlparse(href)
+    qs = parse_qs(parsed.query)
+    response = client.get(
+        f"{parsed.path}?{parsed.query}",
+    )
+    assert qs.get("token")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/gif")
+    assert response.content == b"GIF89a"
 
 
 def test_get_workshop_session_detail_forbidden(client: TestClient, db: Session) -> None:

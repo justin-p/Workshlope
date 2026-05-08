@@ -3,7 +3,14 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import ConfigDict, EmailStr
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    DateTime,
+    ForeignKey,
+    LargeBinary,
+    UniqueConstraint,
+)
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -263,6 +270,28 @@ class LessonManifestSync(SQLModel, table=True):
     lesson_slug: str = Field(max_length=255)
     manifest_repo_path: str = Field(max_length=512)
     manifest_sha256: str = Field(max_length=64)
+    synced_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+
+
+class LessonRepoAsset(SQLModel, table=True):
+    __tablename__ = "lesson_repo_asset"
+    __table_args__ = (
+        UniqueConstraint("repo_id", "repo_path", name="uq_lesson_repo_asset_repo_path"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    repo_id: uuid.UUID = Field(
+        foreign_key="lesson_repo.id", nullable=False, ondelete="CASCADE"
+    )
+    repo_path: str = Field(max_length=512)
+    content_type: str | None = Field(default=None, max_length=255)
+    content_sha256: str = Field(max_length=64)
+    content_bytes: bytes = Field(
+        sa_column=Column(LargeBinary, nullable=False),
+    )
     synced_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore

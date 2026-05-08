@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import datetime
+from hashlib import sha256
 from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -16,7 +17,9 @@ from app.models import (
     LessonManifestSync,
     LessonPart,
     LessonRepo,
+    LessonRepoAsset,
     User,
+    get_datetime_utc,
 )
 from app.services.github_app_tokens import (
     GithubAppTokenError,
@@ -35,7 +38,9 @@ from app.services.github_installation_polling import (
 from app.services.lesson_github_fetch import (
     GithubContentsFetchError,
     fetch_lesson_repo_path_map_from_github,
+    fetch_repo_file_bytes_from_github,
 )
+from app.services.lesson_markdown_pipeline import collect_relative_asset_repo_paths
 from app.services.lesson_repo_sync import (
     LessonRepoSyncError,
     sync_lesson_repo_from_path_map,
@@ -192,6 +197,66 @@ def _require_installation_repo_entitlement(
             "grant repository access in GitHub App settings and retry"
         ),
     )
+
+
+def _sync_lesson_repo_asset_cache(
+    *,
+    session: Session,
+    lesson_repo: LessonRepo,
+    token: str,
+    ref: str,
+    path_map: dict[str, str],
+) -> None:
+    asset_paths: set[str] = set()
+    for repo_path, body in path_map.items():
+        if not repo_path.endswith(".md"):
+            continue
+        asset_paths |= collect_relative_asset_repo_paths(
+            body,
+            part_repo_path=repo_path,
+        )
+
+    existing_rows = {
+        row.repo_path: row
+        for row in session.exec(
+            select(LessonRepoAsset).where(LessonRepoAsset.repo_id == lesson_repo.id)
+        ).all()
+    }
+    touched_paths: set[str] = set()
+
+    for repo_path in sorted(asset_paths):
+        try:
+            content_bytes, content_type = fetch_repo_file_bytes_from_github(
+                token=token,
+                full_name=lesson_repo.full_name,
+                ref=ref,
+                path=repo_path,
+            )
+        except GithubContentsFetchError:
+            # Keep sync resilient: missing/non-file links should not abort lesson sync.
+            continue
+        digest = sha256(content_bytes).hexdigest()
+        row = existing_rows.get(repo_path)
+        if row is None:
+            row = LessonRepoAsset(
+                repo_id=lesson_repo.id,
+                repo_path=repo_path,
+                content_type=content_type,
+                content_sha256=digest,
+                content_bytes=content_bytes,
+            )
+        else:
+            row.content_type = content_type
+            row.content_sha256 = digest
+            row.content_bytes = content_bytes
+            row.synced_at = get_datetime_utc()
+        session.add(row)
+        touched_paths.add(repo_path)
+
+    for repo_path, row in existing_rows.items():
+        if repo_path not in touched_paths:
+            session.delete(row)
+    session.commit()
 
 
 def _refresh_installation_repo_entitlements_from_github(
@@ -795,12 +860,13 @@ def sync_lesson_repo_from_github(
 ) -> LessonRepoGithubSyncPublic:
     """Pull ``lessons/`` content from GitHub using an installation token and upsert DB rows."""
     _require_lesson_github_editor(current_user)
+    actor_user_id = str(current_user.id)
     logger.info(
         "lesson_repo_sync requested",
         extra={
             "full_name": body.full_name,
             "installation_id": body.installation_id,
-            "actor_user_id": str(current_user.id),
+            "actor_user_id": actor_user_id,
         },
     )
 
@@ -827,7 +893,7 @@ def sync_lesson_repo_from_github(
                 extra={
                     "full_name": body.full_name,
                     "installation_id": body.installation_id,
-                    "actor_user_id": str(current_user.id),
+                    "actor_user_id": actor_user_id,
                     "error": str(exc),
                 },
             )
@@ -848,7 +914,7 @@ def sync_lesson_repo_from_github(
             extra={
                 "full_name": body.full_name,
                 "installation_id": body.installation_id,
-                "actor_user_id": str(current_user.id),
+                "actor_user_id": actor_user_id,
                 "error": str(exc),
             },
         )
@@ -869,7 +935,7 @@ def sync_lesson_repo_from_github(
             extra={
                 "full_name": body.full_name,
                 "installation_id": body.installation_id,
-                "actor_user_id": str(current_user.id),
+                "actor_user_id": actor_user_id,
                 "error": str(exc),
             },
         )
@@ -910,7 +976,7 @@ def sync_lesson_repo_from_github(
             extra={
                 "full_name": body.full_name,
                 "installation_id": body.installation_id,
-                "actor_user_id": str(current_user.id),
+                "actor_user_id": actor_user_id,
                 "error": str(exc),
             },
         )
@@ -919,13 +985,21 @@ def sync_lesson_repo_from_github(
             detail=str(exc),
         ) from exc
 
+    _sync_lesson_repo_asset_cache(
+        session=session,
+        lesson_repo=lesson_repo,
+        token=installation_token.token,
+        ref=branch_ref,
+        path_map=path_map,
+    )
+
     session.refresh(lesson_repo)
     logger.info(
         "lesson_repo_sync completed",
         extra={
             "full_name": lesson_repo.full_name,
             "installation_id": body.installation_id,
-            "actor_user_id": str(current_user.id),
+            "actor_user_id": actor_user_id,
             "lessons_synced": synced,
             "health": lesson_repo.health,
             "default_branch": lesson_repo.default_branch,

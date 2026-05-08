@@ -591,7 +591,7 @@ function WorkshopSessionPage() {
             </span>
           </div>
           <article
-            className="prose prose-sm max-w-none dark:prose-invert"
+            className="workshop-markdown max-w-none"
             data-testid="workshop-current-part-body"
             // biome-ignore lint/security/noDangerouslySetInnerHtml: server sends nh3-sanitized html.
             dangerouslySetInnerHTML={{ __html: currentPart.body_html ?? "" }}

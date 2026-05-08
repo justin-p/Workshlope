@@ -65,6 +65,33 @@ def _fetch_file_text(
     return _decode_contents_payload(payload_body)
 
 
+def fetch_repo_file_bytes_from_github(
+    *,
+    token: str,
+    full_name: str,
+    ref: str,
+    path: str,
+) -> tuple[bytes, str | None]:
+    """Fetch repository file bytes via GitHub Contents API using installation auth."""
+    owner, repo = parse_full_name(full_name)
+    encoded = _encode_path_segments(path)
+    headers = {
+        **_auth_headers(token),
+        "Accept": "application/vnd.github.raw",
+    }
+    with httpx.Client(timeout=120.0, follow_redirects=True) as client:
+        response = client.get(
+            f"https://api.github.com/repos/{owner}/{repo}/contents/{encoded}",
+            params={"ref": ref},
+            headers=headers,
+        )
+    if response.status_code != 200:
+        raise GithubContentsFetchError(
+            f"Failed to read binary asset {path!r}: HTTP {response.status_code}",
+        )
+    return response.content, response.headers.get("content-type")
+
+
 def fetch_lesson_repo_path_map_from_github(
     *,
     token: str,
