@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-11** — **`main`:** [#49](https://github.com/justin-p/testing/pull/49), [#51](https://github.com/justin-p/testing/pull/51), and [#52](https://github.com/justin-p/testing/pull/52) landed — timer stop on `part.advance`; hub **Use lesson** + routing test; instructor **add trainee** (user ID) on session view + workshop E2E. **Next:** hub polish (unified repo field, shallower start-session UX) per remaining bullets. |
 | **Branch** | **`feat/workshop/sync-card-preview-only`** |
-| **PR** | _Open after push — preview-only toggle + tests._ |
+| **PR** | **[#54](https://github.com/justin-p/testing/pull/54)** — preview-only parts toggle; **Use lesson** inline session feedback. |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
