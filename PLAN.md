@@ -11,7 +11,7 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — Rostered trainees may **GET** the session **timer snapshot** (`status`, `remaining_seconds` / `elapsed_seconds`, mode) for pacing; **timer mutations** and **`GET …/timer/events`** (audit with **actor**) remain **instructor-only**. |
+| **Last synced** | **2026-05-12** — Rostered trainees may **GET** the session **timer snapshot** for pacing; **timer mutations** and **`GET …/timer/events`** remain **instructor-only**. **Client:** while the workshop is **live** or **paused**, the timer query uses a **~3s poll** when the server timer is **inactive** so trainees see an instructor-started countdown without reload; **1s / 2s** intervals while the timer is **running / paused**; **`refetchIntervalInBackground`** keeps ticks in background tabs; **`session.status_changed`** over WS invalidates the timer query. |
 | **Branch** | **`feat/workshop/trainee-timer-read`** |
 | **PR** | **[#65](https://github.com/justin-p/testing/pull/65)** |
 | **Integrate against** | **`main`** |
