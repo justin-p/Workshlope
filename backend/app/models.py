@@ -536,6 +536,46 @@ class WorkshopSessionUpsertMember(SQLModel):
     instructor_role: str = Field(default="co_instructor", max_length=32)
 
 
+class WorkshopRosterUserPickerRowPublic(SQLModel):
+    """One row for instructor roster user picker (browse + fuzzy search)."""
+
+    user_id: uuid.UUID
+    email: str
+    full_name: str | None = None
+    is_superuser: bool
+    is_instructor: bool
+    is_active: bool
+    match_score: float | None = Field(
+        default=None,
+        description="Best trigram similarity when search q is set; omitted in browse mode.",
+    )
+
+
+class WorkshopRosterUserPickerPublic(SQLModel):
+    data: list[WorkshopRosterUserPickerRowPublic]
+    count: int
+
+
+class WorkshopSessionMembersBatchBody(SQLModel):
+    """Add multiple participants in one request (instructor-only)."""
+
+    user_ids: list[uuid.UUID] = Field(
+        ...,
+        max_length=100,
+        description="At most 100 user IDs per request; client may chunk larger selections.",
+    )
+
+
+class WorkshopSessionMemberBatchResultItem(SQLModel):
+    user_id: uuid.UUID
+    status: Literal["added", "already", "not_found", "error"]
+    detail: str | None = None
+
+
+class WorkshopSessionMembersBatchResponse(SQLModel):
+    results: list[WorkshopSessionMemberBatchResultItem]
+
+
 class WorkshopParticipantPatch(SQLModel):
     """Instructor override fields for a participant seat."""
 

@@ -464,6 +464,27 @@ export type WorkshopRosterParticipantRowPublic = {
     live_status: string;
 };
 
+export type WorkshopRosterUserPickerPublic = {
+    data: Array<WorkshopRosterUserPickerRowPublic>;
+    count: number;
+};
+
+/**
+ * One row for instructor roster user picker (browse + fuzzy search).
+ */
+export type WorkshopRosterUserPickerRowPublic = {
+    user_id: string;
+    email: string;
+    full_name?: (string | null);
+    is_superuser: boolean;
+    is_instructor: boolean;
+    is_active: boolean;
+    /**
+     * Best trigram similarity when search q is set; omitted in browse mode.
+     */
+    match_score?: (number | null);
+};
+
 export type WorkshopSessionCorePublic = {
     id: string;
     status: string;
@@ -520,6 +541,28 @@ export type WorkshopSessionListItem = {
      * Roster trainees still missing at least one required prerequisite; only included for instructor/admin visibility.
      */
     blocked_required_prereq_count?: (number | null);
+};
+
+export type WorkshopSessionMemberBatchResultItem = {
+    user_id: string;
+    status: 'added' | 'already' | 'not_found' | 'error';
+    detail?: (string | null);
+};
+
+export type status2 = 'added' | 'already' | 'not_found' | 'error';
+
+/**
+ * Add multiple participants in one request (instructor-only).
+ */
+export type WorkshopSessionMembersBatchBody = {
+    /**
+     * At most 100 user IDs per request; client may chunk larger selections.
+     */
+    user_ids: Array<(string)>;
+};
+
+export type WorkshopSessionMembersBatchResponse = {
+    results: Array<WorkshopSessionMemberBatchResultItem>;
 };
 
 /**
@@ -592,7 +635,7 @@ export type WorkshopSessionTimerPublic = {
     remaining_seconds?: (number | null);
 };
 
-export type status2 = 'inactive' | 'running' | 'paused';
+export type status3 = 'inactive' | 'running' | 'paused';
 
 export type WorkshopSessionTimerStart = {
     mode?: 'countdown' | 'countup';
@@ -955,6 +998,22 @@ export type WorkshopSessionsPatchWorkshopSessionData = {
 };
 
 export type WorkshopSessionsPatchWorkshopSessionResponse = (Message);
+
+export type WorkshopSessionsReadWorkshopSessionRosterUserPickerData = {
+    limit?: number;
+    q?: (string | null);
+    sessionId: string;
+    skip?: number;
+};
+
+export type WorkshopSessionsReadWorkshopSessionRosterUserPickerResponse = (WorkshopRosterUserPickerPublic);
+
+export type WorkshopSessionsBatchUpsertWorkshopSessionParticipantsData = {
+    requestBody: WorkshopSessionMembersBatchBody;
+    sessionId: string;
+};
+
+export type WorkshopSessionsBatchUpsertWorkshopSessionParticipantsResponse = (WorkshopSessionMembersBatchResponse);
 
 export type WorkshopSessionsUpsertWorkshopSessionMemberData = {
     requestBody: WorkshopSessionUpsertMember;
