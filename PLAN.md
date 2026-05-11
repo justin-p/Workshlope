@@ -23,33 +23,14 @@
 
 **Priority rule:** until the app can run a real workshop end-to-end, do **functionality before polish/test expansion**. If you encounter non-blocking polish, record it in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and continue with blocking functionality.
 
-**1. Workshop-runnable functionality (blocking first)**
+**1. Workshop end-to-end (blocking)**
 
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
-  - Most [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) flows seed via **`POST /api/v1/private/workshop/e2e-live-session/`** (local-only bootstrap), not one continuous **UI-only** create/prepare → live path from the workshops hub; hub UI session creation is covered separately in [`dashboard-routing.spec.ts`](frontend/tests/dashboard-routing.spec.ts).
-  - The serial **`Workshop live session`** `describe` does not chain **roster picker** add/search/batch/remove; those live in [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts).
-  - **`POST /enter`** while **scheduled** sets **`joined_at`** (after the same prerequisite check as live) so the client can obtain a **ws-ticket**, stay on the socket for **`session.status_changed`**, and leave the lobby when the instructor starts without a manual refresh.
-  - **`scheduled session can be started from instructor page`** covers instructor lobby (realtime may read **waiting for start** or **connected** while WS is up) → **Start** → lobby clears + **current part** + WS **connected**; **`trainee sees lobby while scheduled then live after instructor starts`** adds rostered trainee lobby → **Start** → part surface + WS **connected** via **lobby WebSocket** + narrow **`workshopSessionDetail`** cache updates ([`workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py), [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx), [`workshop.spec.ts`](frontend/tests/workshop.spec.ts)).
-  - **Baseline serial** in the spirit of §1 still spans **multiple spec files**, not one uninterrupted suite for the full spelled-out journey.
-  - Green CI does **not** replace **in-product** validation outside bootstrap (real GitHub sync, timing, multi-browser). Re-open **P0 issues** when a regression is confirmed in-product or in tests.
   - P0 issues
-    - Nwhen setting up a new session from a lesson, the instructor should be prompted to invite trainees and set pre work and any other things that are needed for the session.
+    - When setting up a new session from a lesson, the instructor should be prompted to invite trainees and set prerequisite gates and any other things that are needed for the session.
+    -
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
-
-**2. Lesson source pipeline hardening** (core scope shipped on `main`; follow-ups are polish/ops only)
-
-- **Progress (shipped on `main`):** [`lesson_manifest.py`](backend/app/services/lesson_manifest.py) + [`lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py) (**L1**). DB **`github_app_installation`** + FK on **`LessonRepo`** (**L2**). [`github_app_tokens.py`](backend/app/services/github_app_tokens.py) (**L3**). [`lesson_github_fetch.py`](backend/app/services/lesson_github_fetch.py) + [`workshop_lesson_repos.py`](backend/app/api/routes/workshop_lesson_repos.py) — **`POST /api/v1/workshop/lesson-repos/sync-from-github`** and manual refresh endpoints (**L5**). Private-safe periodic poller runs from [`github_installation_poller.py`](backend/app/services/github_installation_poller.py).
-- **GitHub App mode:** webhook ingestion has been removed. Installation/repository freshness now comes from manual refresh APIs plus optional periodic polling.
-- **Sync + models (remaining product work):** Lesson sync stores markdown source as authored (no raw-GitHub URL mutation) and caches markdown-referenced assets in DB by repo path; workshop session detail applies render-time relative asset rewriting to signed backend asset URLs that resolve against the cached asset store for private/public repo compatibility, then **`lesson_markdown_to_safe_html`** (CommonMark `html=false` + **nh3**) for safe display. **Shipped in-flight local:** `LessonManifest` SHA rows persisted + surfaced in lesson-repo list metadata (`manifest_count`, `last_manifest_synced_at`) for instructor sync health visibility.
-- **Instructor UX**: Repo list, Install/configure CTA (instructor-only — **[Product constraints](#product-constraints)**), Sync, health, parts preview — aligns with **[UI / UX](#ui--ux-specification)** IA. **Shipped in-flight local:** `GET /api/v1/workshop/lesson-repos/{lesson_repo_id}/preview` now returns lesson+part preview payloads and dashboard sync card can toggle per-repo parts previews.
-
-**3. Optional / polish (product + engineering)**
-
-- If product wants **more HTTP surface**, implement **FastAPI routes and response/request models first**, then regenerate the emitted **OpenAPI** snapshot + **`frontend/src/client`**; use the published spec **only as documentation** of what shipped—never as a backlog you “fill in” ahead of backend code (this stack is code-first).
-- **[Realtime](#realtime)** multi-instance (**Redis**/shared broker) remains explicitly deferred ([Locked decisions](#locked-decisions) single-process path).
-- Richer dashboard cards / trainee–instructor **Playwright** breadth ([Testing](#testing)); deeper prerequisite roster analytics (beyond current dashboard summaries).
-- **Polish stop condition (loop guard):** once a slice has green targeted + full Playwright and at least one analytics/dashboard enhancement landed, pause further optional polish and switch to PR merge-readiness unless a concrete bug/regression is reported.
 
 ## Deferred polish backlog (skip log)
 
