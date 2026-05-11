@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-11** — **`feat/workshop/e2e-scheduled-trainee-after-start`:** Playwright **scheduled → live** path for rostered **trainee** (lobby → instructor **Start** → trainee `reload` → `workshop-current-part` + WS **connected**); §1 bullet updated in [`PLAN.md`](PLAN.md). |
 | **Branch** | **`feat/workshop/e2e-scheduled-trainee-after-start`** |
-| **PR** | — |
+| **PR** | **[#63](https://github.com/justin-p/testing/pull/63)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
