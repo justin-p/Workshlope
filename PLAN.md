@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **`feat/workshop/roster-live-status-realtime`:** instructor roster **busy/done** from WS **`participant.live_status`** + React Query cache patch ([`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx)); `workshop-roster-live-status-{user_id}`; Playwright in [`workshop.spec.ts`](frontend/tests/workshop.spec.ts). `main` already includes **#60** session lobby + WS deferral until live/paused. |
-| **Branch** | **`feat/workshop/roster-live-status-realtime`** |
-| **PR** | **[#61](https://github.com/justin-p/testing/pull/61)** |
+| **Last synced** | **2026-05-11** — **§1 gap notes:** workshop-runnable **coverage vs automation** (private bootstrap vs hub UI path; serial path split across specs; scheduled→live without trainee assertion; manual in-product sign-off still required). **Shipped on `main`:** roster **`participant.live_status`** instructor badges — **[#61](https://github.com/justin-p/testing/pull/61)**; session lobby + WS deferral — **[#60](https://github.com/justin-p/testing/pull/60)**. |
+| **Branch** | **`docs/plan/section1-e2e-coverage-gaps`** |
+| **PR** | — |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -26,6 +26,12 @@
 **1. Workshop-runnable functionality (blocking first)**
 
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
+  - **§1 vs current Playwright / automation (gap notes — backlog until closed or promoted to P0):**
+    - Most [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) flows seed via **`POST /api/v1/private/workshop/e2e-live-session/`** (local-only bootstrap), not one continuous **UI-only** create/prepare → live path from the workshops hub; hub UI session creation is covered separately in [`dashboard-routing.spec.ts`](frontend/tests/dashboard-routing.spec.ts).
+    - The serial **`Workshop live session`** `describe` does not chain **roster picker** add/search/batch/remove; those live in [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts).
+    - **`scheduled session can be started from instructor page`** covers instructor lobby → **Start** → WS **connected** only; it does **not** exercise a **trainee** through scheduled → live (entry, WS, lesson surface).
+    - **Baseline serial** in the spirit of §1 still spans **multiple spec files**, not one uninterrupted suite for the full spelled-out journey.
+    - Green CI does **not** replace **in-product** validation outside bootstrap (real GitHub sync, timing, multi-browser). **`P0 issues`** below tracks **known broken product**, not missing test integration alone.
   - P0 issues
     - The "advance part" button does not work
     - ✅ Timers should use the manifest
