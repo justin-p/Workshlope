@@ -304,6 +304,22 @@ def _workshop_session_detail_view_kind(
     return None
 
 
+def _require_workshop_timer_read(
+    *, session_db: Session, session_id: uuid.UUID, current_user: User
+) -> None:
+    """Instructors and rostered participants may read the session timer snapshot."""
+    if (
+        _workshop_session_detail_view_kind(
+            session_db, session_id=session_id, current_user=current_user
+        )
+        is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not a member of this session",
+        )
+
+
 def _validate_workshop_session_status_transition(
     *, current_status: str, target_status: str
 ) -> None:
@@ -1934,7 +1950,7 @@ async def read_workshop_session_timer(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
-    _require_workshop_instructor(
+    _require_workshop_timer_read(
         session_db=session, session_id=session_id, current_user=current_user
     )
     timer_row = session.exec(

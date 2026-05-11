@@ -195,14 +195,30 @@ function WorkshopSessionPage() {
     },
   })
 
+  const sessionStatusForTimerPoll = detail?.session.status
+
   const timerQuery = useQuery({
     queryKey: ["workshopSessionTimer", sessionId],
     queryFn: () =>
       WorkshopSessionsService.readWorkshopSessionTimer({ sessionId }),
-    enabled: uuidOk && detailView === "instructor",
+    enabled:
+      uuidOk && (detailView === "instructor" || detailView === "participant"),
     retry: false,
-    refetchInterval: (query) =>
-      query.state.data?.status === "running" ? 1_000 : false,
+    // Fast tick while running; slow poll when inactive during live/paused workshop
+    // so roster clients pick up instructor-started timers without a full reload.
+    refetchIntervalInBackground: true,
+    refetchInterval: (query) => {
+      const timerStatus = query.state.data?.status
+      if (timerStatus === "running") return 1_000
+      if (timerStatus === "paused") return 2_000
+      if (
+        sessionStatusForTimerPoll === "scheduled" ||
+        sessionStatusForTimerPoll === "ended"
+      ) {
+        return false
+      }
+      return 3_000
+    },
   })
 
   const timerEventsQuery = useQuery({
@@ -594,6 +610,9 @@ function WorkshopSessionPage() {
             ) {
               const nextStatus = msg.status as "live" | "paused" | "ended"
               setRoomStatus(nextStatus)
+              void queryClient.invalidateQueries({
+                queryKey: ["workshopSessionTimer", sessionId],
+              })
               // Only patch HTTP-shaped detail when leaving the scheduled lobby or
               // when the session ends. live↔paused is carried by `roomStatus` alone;
               // mirroring pause into the query cache re-triggers the WS effect deps
@@ -886,6 +905,20 @@ function WorkshopSessionPage() {
           data-testid="workshop-prework-header-count"
         >
           Required pre-work remaining: {participantRemainingRequiredCount}
+        </p>
+      ) : null}
+      {detailView === "participant" && timerStatus !== "inactive" ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="workshop-trainee-timer-status"
+        >
+          Timer: {timerStatus}
+          {timerMode ? ` (${timerMode})` : ""}
+          {typeof timerRemainingSeconds === "number"
+            ? ` (${formatTimerRemainingSeconds(timerRemainingSeconds)} left)`
+            : typeof timerElapsedSeconds === "number"
+              ? ` (${formatTimerRemainingSeconds(timerElapsedSeconds)} elapsed)`
+              : ""}
         </p>
       ) : null}
       {detailView === "instructor" ? (

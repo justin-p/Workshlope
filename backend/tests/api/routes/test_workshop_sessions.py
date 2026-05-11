@@ -4220,6 +4220,98 @@ def test_timer_countdown_includes_remaining_seconds(
     assert 0 <= remaining <= 120
 
 
+def test_participant_can_get_timer_when_instructor_started_countdown(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-participant-instr-{uuid.uuid4()}@example.com"
+    instr_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    participant_email = f"timer-participant-trainee-{uuid.uuid4()}@example.com"
+    participant_headers = authentication_token_from_email(
+        client=client, email=participant_email, db=db
+    )
+    participant_user = db.exec(
+        select(User).where(User.email == participant_email)
+    ).first()
+    assert participant_user is not None
+    db.add(WorkshopParticipant(session_id=session_row.id, user_id=participant_user.id))
+    db.commit()
+
+    start = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=instr_headers,
+        json={"mode": "countdown", "target_seconds": 300},
+    )
+    assert start.status_code == 200
+
+    read = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer",
+        headers=participant_headers,
+    )
+    assert read.status_code == 200
+    body = read.json()
+    assert body["status"] == "running"
+    assert body["mode"] == "countdown"
+    assert isinstance(body["remaining_seconds"], int)
+    assert 0 <= body["remaining_seconds"] <= 300
+
+    events = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/events",
+        headers=participant_headers,
+    )
+    assert events.status_code == 403
+    assert events.json()["detail"] == "User is not an instructor for this session"
+
+
+def test_timer_get_returns_403_for_non_member(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+    instructor_email = f"timer-nonmember-instr-{uuid.uuid4()}@example.com"
+    instr_headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    instructor = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert instructor is not None
+    instructor.is_instructor = True
+    db.add(instructor)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer/start",
+        headers=instr_headers,
+        json={"mode": "countdown", "target_seconds": 60},
+    )
+
+    outsider_headers = authentication_token_from_email(
+        client=client, email=f"timer-outsider-{uuid.uuid4()}@example.com", db=db
+    )
+    denied = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/timer",
+        headers=outsider_headers,
+    )
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "Not a member of this session"
+
+
 def test_ws_superuser_instructor_handshake_without_instructor_seat(
     client: TestClient, db: Session
 ) -> None:
