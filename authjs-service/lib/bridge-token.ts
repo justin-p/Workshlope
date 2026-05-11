@@ -4,6 +4,8 @@ export interface BridgeIdentity {
   providerAccountId: string
   providerLogin?: string | null
   email?: string | null
+  /** GitHub display name (Auth.js `session.user.name`). */
+  name?: string | null
   /** GitHub profile image URL (Auth.js `session.user.image`). */
   avatarUrl?: string | null
 }
@@ -30,6 +32,7 @@ export async function signBridgeToken(
     provider_account_id: identity.providerAccountId,
     provider_login: identity.providerLogin ?? null,
     email: identity.email ?? null,
+    name: identity.name ?? null,
     avatar_url: identity.avatarUrl ?? null,
   })
     .setProtectedHeader({ alg: "HS256" })

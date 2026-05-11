@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **Dashboard roster push:** **`UserWorkshopFeedHub`** + **`POST …/user-workshop-feed/ws-ticket`** / **`/user-workshop-feed/ws`**; roster **batch / upsert / remove** schedule **`workshop_sessions_list_changed`** to affected users + session instructors; **`DashboardWorkshopSessions`** subscribes and **`invalidateQueries(['workshopSessionsForUser'])`**; session page roster mutations also invalidate that query; OpenAPI + client regen; **`test_user_workshop_feed_*`** in **`test_workshop_sessions.py`**. (Prior slice on this branch: scheduled lobby WS + **PR [#63](https://github.com/justin-p/testing/pull/63)**.) |
-| **Branch** | **`feat/workshop/e2e-scheduled-trainee-after-start`** |
-| **PR** | **[#63](https://github.com/justin-p/testing/pull/63)** |
+| **Last synced** | **2026-05-11** — **GitHub OAuth display name:** Auth.js **bridge JWT** now includes **`name`**; FastAPI **pending approve (link existing)** and **linked bridge** set **`User.full_name`** from GitHub when the user has no display name (existing non-empty name is left unchanged). **`create_bridge_token`** accepts **`name`** / **`full_name`** for tests. |
+| **Branch** | **`feat/oauth/github-full-name-on-approval`** |
+| **PR** | *(open after push — replace when `gh pr create` returns URL)* |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -133,6 +133,7 @@ Rough themes to revisit **only after** **[Remaining work](#remaining-work-author
 | Entitlement scope       | **Instructor-bound** by default; instructors can invite other instructors explicitly.                                                                                                                                                                                                                                                   |
 | Realtime scaling path   | **Single-process** WS hub on `main` today; defer Redis/multi-process fan-out until measured scale/concurrency requires it.                                                                                                                                                                                                               |
 | Avatar refresh          | Refresh stored avatar_url on each successful GitHub sign-in/link event (no periodic background refresh).                                                                                                                                                                                                                                |
+| GitHub display name     | When **`User.full_name`** is unset, set it from the GitHub profile on **admin approve (link or create)** and on **linked bridge** sign-in; bridge JWT carries **`name`**. Do not overwrite a non-empty local display name on approve or bridge.                                                                                                                                                     |
 | Avatar unlink           | On GitHub unlink, clear stored avatar_url and fall back to initials/default avatar.                                                                                                                                                                                                                                                     |
 | API contract gate       | Emitted OpenAPI + TS client regeneration is **required after every backend route/schema change** (artifacts must match FastAPI output; CI blocks drift).                                                                                                                                                                                                                                                          |
 | CI branch gate          | Critical workflows (backend tests, docker-compose tests, Playwright, staging deploy checks) must run on default branch **main** and PRs; no `master`-only gaps.                                                                                                                                                                         |
@@ -173,7 +174,7 @@ Keep PRs merge-ready via **`AGENTS.md`** loops—especially **`gh pr checks --wa
 | Admin users (`is_instructor`) | [`frontend/src/components/Admin/AddUser.tsx`](frontend/src/components/Admin/AddUser.tsx), [`frontend/src/components/Admin/EditUser.tsx`](frontend/src/components/Admin/EditUser.tsx), [`frontend/src/components/Admin/columns.tsx`](frontend/src/components/Admin/columns.tsx); E2E [`frontend/tests/admin.spec.ts`](frontend/tests/admin.spec.ts) |
 | Playwright harness (backend reset / env) | [`scripts/e2e-backend-reset.sh`](scripts/e2e-backend-reset.sh), [`frontend/playwright.global-setup.ts`](frontend/playwright.global-setup.ts), [`frontend/playwright.config.ts`](frontend/playwright.config.ts) |
 | ORM / domain models | [`backend/app/models.py`](backend/app/models.py) |
-| Auth.js login + FastAPI bridge | [`authjs-service/auth.ts`](authjs-service/auth.ts), [`authjs-service/app/api/bridge/route.ts`](authjs-service/app/api/bridge/route.ts); backend bridge/JWT helpers [`backend/app/core/security.py`](backend/app/core/security.py) |
+| Auth.js login + FastAPI bridge | [`authjs-service/auth.ts`](authjs-service/auth.ts), [`authjs-service/app/api/bridge/route.ts`](authjs-service/app/api/bridge/route.ts), [`authjs-service/lib/bridge-token.ts`](authjs-service/lib/bridge-token.ts); backend [`backend/app/api/routes/oauth.py`](backend/app/api/routes/oauth.py), JWT helpers [`backend/app/core/security.py`](backend/app/core/security.py) |
 
 ## Workshop HTTP vs realtime — delivery audit
 

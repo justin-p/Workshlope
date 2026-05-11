@@ -59,6 +59,8 @@ def create_bridge_token(
     provider_account_id: str,
     provider_login: str | None = None,
     email: str | None = None,
+    name: str | None = None,
+    full_name: str | None = None,
     avatar_url: str | None = None,
     picture: str | None = None,
     expires_delta: timedelta | None = None,
@@ -83,6 +85,10 @@ def create_bridge_token(
         payload["provider_login"] = provider_login
     if email is not None:
         payload["email"] = email
+    if name is not None:
+        payload["name"] = name
+    if full_name is not None:
+        payload["full_name"] = full_name
     if avatar_url is not None:
         payload["avatar_url"] = avatar_url
     if picture is not None:
