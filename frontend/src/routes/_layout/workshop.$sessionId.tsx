@@ -123,6 +123,8 @@ function WorkshopSessionPage() {
   const lessonId = detailQuery.data?.lesson.id
   const detailView = detailQuery.data?.view
   const detail = detailQuery.data
+  const sessionInLobby =
+    Boolean(detailQuery.isSuccess) && detail?.session.status === "scheduled"
   /** HTTP detail is instructor-first when user has both seats; WS still uses participant. */
   const userSeesTraineePrework =
     detail?.view === "participant" ||
@@ -461,10 +463,32 @@ function WorkshopSessionPage() {
     if (!UUID_V4_RE.test(sessionId)) {
       setPhase("error")
       setErrorDetail("Invalid session id")
-      return
+      return () => {}
     }
 
     let cancelled = false
+
+    if (!detailQuery.isSuccess || detailQuery.data === undefined) {
+      return () => {
+        cancelled = true
+        wsRef.current?.close()
+        wsRef.current = null
+      }
+    }
+
+    const sessionStatus = detailQuery.data.session.status
+    if (sessionStatus !== "live" && sessionStatus !== "paused") {
+      setPhase("idle")
+      setErrorDetail(null)
+      setConnectedRole(null)
+      wsRef.current?.close()
+      wsRef.current = null
+      return () => {
+        cancelled = true
+        wsRef.current?.close()
+        wsRef.current = null
+      }
+    }
 
     async function connect() {
       setPhase("entering")
@@ -596,7 +620,12 @@ function WorkshopSessionPage() {
       wsRef.current?.close()
       wsRef.current = null
     }
-  }, [sessionId])
+  }, [
+    sessionId,
+    detailQuery.isSuccess,
+    detailQuery.data?.session.status,
+    detailQuery.data,
+  ])
 
   const sendLiveStatus = (liveStatus: "busy" | "done") => {
     const ws = wsRef.current
@@ -811,7 +840,33 @@ function WorkshopSessionPage() {
           {instructorBlockedTraineesCount}
         </p>
       ) : null}
-      {currentPart ? (
+      {sessionInLobby ? (
+        <Alert
+          variant="default"
+          className="border-primary/25 bg-muted/50"
+          data-testid="workshop-session-lobby"
+        >
+          <AlertTitle>Session not started</AlertTitle>
+          <AlertDescription className="space-y-3">
+            <p>
+              {detailView === "instructor"
+                ? "Start the workshop when you are ready. Live controls and lesson delivery unlock after you start."
+                : "The instructor has not started this workshop yet. You can complete required pre-work below while you wait."}
+            </p>
+            {detailView === "instructor" ? (
+              <Button
+                type="button"
+                size="sm"
+                data-testid="workshop-instructor-start"
+                onClick={() => void startSession()}
+              >
+                Start session
+              </Button>
+            ) : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {currentPart && !sessionInLobby ? (
         <section
           className="rounded-lg border bg-card p-4 space-y-3"
           data-testid="workshop-current-part"
@@ -1330,15 +1385,17 @@ function WorkshopSessionPage() {
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-sm text-muted-foreground">Realtime:</span>
         <span data-testid="workshop-ws-status" className="text-sm font-medium">
-          {phase === "ready"
-            ? "connected"
-            : phase === "error"
-              ? isPreworkGateError
-                ? "gated"
-                : "error"
-              : phase === "idle"
-                ? "…"
-                : "connecting"}
+          {sessionInLobby
+            ? "waiting for start"
+            : phase === "ready"
+              ? "connected"
+              : phase === "error"
+                ? isPreworkGateError
+                  ? "gated"
+                  : "error"
+                : phase === "idle"
+                  ? "…"
+                  : "connecting"}
         </span>
       </div>
 
@@ -1355,18 +1412,6 @@ function WorkshopSessionPage() {
             session to connect.
           </AlertDescription>
         </Alert>
-      ) : null}
-      {errorDetail === "Session not started yet" ? (
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            size="sm"
-            data-testid="workshop-instructor-start"
-            onClick={() => void startSession()}
-          >
-            Start session
-          </Button>
-        </div>
       ) : null}
 
       {connectedRole === "participant" ? (
