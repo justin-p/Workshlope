@@ -150,14 +150,23 @@ def test_authorize_ws_handshake_rejects_missing_workshop_session_row(
     )
 
 
-def test_authorize_ws_handshake_rejects_non_active_session(db: Session) -> None:
+def test_authorize_ws_handshake_allows_scheduled_session_with_participant(
+    db: Session,
+) -> None:
     session = _make_live_session_and_lesson(db)
     session.status = "scheduled"
     db.add(session)
     db.commit()
 
-    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
-    assert user is not None
+    email = f"sched-ws-{uuid.uuid4()}@example.com"
+    user = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password="testtest88",
+            full_name="Sched WS",
+        ),
+    )
     db.add(
         WorkshopParticipant(
             session_id=session.id,
@@ -173,14 +182,13 @@ def test_authorize_ws_handshake_rejects_non_active_session(db: Session) -> None:
         "role": "participant",
         "pg": session.part_generation,
     }
-    assert (
-        ws_mod._authorize_workshop_ws_handshake(
-            db,
-            route_session_id=session.id,
-            claims=claims,
-        )
-        is None
+    handshake = ws_mod._authorize_workshop_ws_handshake(
+        db,
+        route_session_id=session.id,
+        claims=claims,
     )
+    assert handshake is not None
+    assert handshake.role == "participant"
 
 
 def test_authorize_ws_handshake_rejects_stale_ticket_part_generation(

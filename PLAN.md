@@ -11,7 +11,7 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **`feat/workshop/e2e-scheduled-trainee-after-start`:** Playwright **scheduled → live** path for rostered **trainee** (lobby → instructor **Start** → trainee `reload` → `workshop-current-part` + WS **connected**); §1 bullet updated in [`PLAN.md`](PLAN.md). |
+| **Last synced** | **2026-05-11** — **`feat/workshop/e2e-scheduled-trainee-after-start`:** **WS ticket + handshake** allow **`scheduled`** (lobby listener); **`session.status_changed`** patches **`workshopSessionDetail`** only for **`scheduled` → `live`** (live↔pause uses **`roomStatus`**); trainees leave the lobby without HTTP polling or **`reload()`**; instructor **Start** uses **`detailQuery.refetch()`** instead of full-page reload; **PR [#63](https://github.com/justin-p/testing/pull/63)**; **`workshop.spec.ts`** (instructor scheduled) asserts post-**Start** lobby clears + part visible. |
 | **Branch** | **`feat/workshop/e2e-scheduled-trainee-after-start`** |
 | **PR** | **[#63](https://github.com/justin-p/testing/pull/63)** |
 | **Integrate against** | **`main`** |
@@ -28,7 +28,7 @@
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
   - Most [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) flows seed via **`POST /api/v1/private/workshop/e2e-live-session/`** (local-only bootstrap), not one continuous **UI-only** create/prepare → live path from the workshops hub; hub UI session creation is covered separately in [`dashboard-routing.spec.ts`](frontend/tests/dashboard-routing.spec.ts).
   - The serial **`Workshop live session`** `describe` does not chain **roster picker** add/search/batch/remove; those live in [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts).
-  - **`scheduled session can be started from instructor page`** covers instructor lobby → **Start** → WS **connected** only; **`trainee sees lobby while scheduled then live after instructor starts`** adds rostered trainee lobby → reload after **Start** → part surface + WS **connected** ([`workshop.spec.ts`](frontend/tests/workshop.spec.ts)).
+  - **`scheduled session can be started from instructor page`** covers instructor lobby (realtime may read **waiting for start** or **connected** while WS is up) → **Start** → lobby clears + **current part** + WS **connected**; **`trainee sees lobby while scheduled then live after instructor starts`** adds rostered trainee lobby → **Start** → part surface + WS **connected** via **lobby WebSocket** + narrow **`workshopSessionDetail`** cache updates ([`workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py), [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx), [`workshop.spec.ts`](frontend/tests/workshop.spec.ts)).
   - **Baseline serial** in the spirit of §1 still spans **multiple spec files**, not one uninterrupted suite for the full spelled-out journey.
   - Green CI does **not** replace **in-product** validation outside bootstrap (real GitHub sync, timing, multi-browser). Re-open **P0 issues** when a regression is confirmed in-product or in tests.
   - P0 issues
@@ -414,7 +414,7 @@ flowchart TD
 
 Implementation lives in **[`backend/app/services/workshop_realtime.py`](backend/app/services/workshop_realtime.py)** (**`WorkshopRealtimeHub`**) and **[`backend/app/api/routes/workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py)** (**`POST …/ws-ticket`**, WebSocket handler).
 
-- **Ws-ticket auth:** Short-lived JWT from **`POST …/ws-ticket`**; connect via **`Sec-WebSocket-Protocol`** (`ticket,<jwt>`). Never put long-lived session JWT in query strings.
+- **Ws-ticket auth:** Short-lived JWT from **`POST …/ws-ticket`**; connect via **`Sec-WebSocket-Protocol`** (`ticket,<jwt>`). Never put long-lived session JWT in query strings. Tickets are minted when the session is **`scheduled`**, **`live`**, or **`paused`** ( **`ended`** rejected) so rostered clients can attach to the hub before **`Start`**; **`part.advance`** and trainee **`live_status`** writes still require **`live`** per dispatch rules.
 - **Privacy fan-out:** **`session.part_changed`** and **`session.status_changed`** go to **all** connections in the room; **`participant.live_status`** deltas go **only** to **`role=instructor`**; trainees get **`live_status.ack`** for self. **`part_generation`** increments on **`part.advance`**, synced on connections before **`session.part_changed`** fan-out; stale sockets get **`part_generation_stale`**. Pause blocks trainee **`live_status`** and instructor **`part.advance`** WS paths while session REST (roster PATCH, audits) stays as coded.
 - **Single-process room (MVP):** One shared **`/ws`** room per session with **broadcast-time filtering** (not separate trainee vs instructor websocket URLs). **Redis / multi-worker** coordination is deferred.
 

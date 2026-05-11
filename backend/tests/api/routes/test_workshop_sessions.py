@@ -1512,7 +1512,7 @@ def test_http_enter_403_when_required_prerequisites_incomplete(
     assert resp.json()["detail"] == "Required prerequisites incomplete"
 
 
-def test_http_ws_ticket_rejects_when_session_scheduled(
+def test_http_ws_ticket_allows_instructor_when_session_scheduled(
     client: TestClient, db: Session
 ) -> None:
     session_row = _create_live_session(db)
@@ -1541,8 +1541,8 @@ def test_http_ws_ticket_rejects_when_session_scheduled(
         f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
         headers=i_headers,
     )
-    assert resp.status_code == 403
-    assert resp.json()["detail"] == "Session not started yet"
+    assert resp.status_code == 200
+    assert "ticket" in resp.json()
 
 
 def test_http_ws_ticket_403_when_required_prerequisites_incomplete(

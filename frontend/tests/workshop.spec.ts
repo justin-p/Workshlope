@@ -361,12 +361,19 @@ test.describe("Workshop live session", () => {
     await page.goto(`/workshop/${session_id}`)
     await expect(page.getByTestId("workshop-session-lobby")).toBeVisible()
     await expect(page.getByTestId("workshop-current-part")).toHaveCount(0)
+    // Scheduled lobby may already show realtime as connected (WS handshake before start).
     await expect(page.getByTestId("workshop-ws-status")).toHaveText(
-      /waiting for start/i,
+      /waiting for start|connected/i,
     )
     await expect(page.getByTestId("workshop-error")).toHaveCount(0)
 
     await page.getByTestId("workshop-instructor-start").click()
+    await expect(page.getByTestId("workshop-session-lobby")).toHaveCount(0, {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId("workshop-current-part")).toBeVisible({
+      timeout: 15_000,
+    })
     await expect(page.getByTestId("workshop-ws-status")).toHaveText(
       /connected/i,
       { timeout: 15_000 },
@@ -416,14 +423,12 @@ test.describe("Workshop live session", () => {
       },
     )
 
-    await participantPage.reload()
-    await participantPage.waitForLoadState("networkidle")
     await expect(
       participantPage.getByTestId("workshop-current-part"),
-    ).toBeVisible({ timeout: 15_000 })
+    ).toBeVisible({ timeout: 20_000 })
     await expect(participantPage.getByTestId("workshop-ws-status")).toHaveText(
       /connected/i,
-      { timeout: 15_000 },
+      { timeout: 20_000 },
     )
 
     await participantContext.close()

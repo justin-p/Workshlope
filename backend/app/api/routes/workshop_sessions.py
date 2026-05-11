@@ -81,8 +81,10 @@ router = APIRouter(prefix="/workshop/sessions", tags=["workshop-sessions"])
 ALLOWED_WS_LIVE_STATUSES = frozenset({"busy", "done"})
 # Part moves are frozen unless the workshop is actively running (`live`).
 WS_PART_ADVANCE_REQUIRES_STATUS = frozenset({"live"})
-# Enter, ws-ticket, and websocket handshake only when the session is running or paused.
+# Enter only when the session is running or paused (scheduled uses lobby-only HTTP).
 WORKSHOP_ACTIVE_STATUSES = frozenset({"live", "paused"})
+# WebSocket ticket + handshake: scheduled allows lobby listeners (status fan-out).
+WORKSHOP_WS_HANDSHAKE_STATUSES = frozenset({"scheduled", "live", "paused"})
 
 
 def _workshop_session_start_content_issue(
@@ -160,7 +162,7 @@ def _authorize_workshop_ws_handshake(
     workshop_session = db.get(WorkshopSession, route_session_id)
     if workshop_session is None:
         return None
-    if workshop_session.status not in WORKSHOP_ACTIVE_STATUSES:
+    if workshop_session.status not in WORKSHOP_WS_HANDSHAKE_STATUSES:
         return None
     if token_part_generation != workshop_session.part_generation:
         return None
@@ -2161,15 +2163,14 @@ def create_workshop_ws_ticket(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
-    if workshop_session.status not in WORKSHOP_ACTIVE_STATUSES:
-        if workshop_session.status == "scheduled":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Session not started yet",
-            )
+    if workshop_session.status not in WORKSHOP_WS_HANDSHAKE_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session has ended",
+            detail=(
+                "Session has ended"
+                if workshop_session.status == "ended"
+                else "Session not available for realtime"
+            ),
         )
 
     role = None
