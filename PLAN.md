@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-11** — **`main`:** [#48](https://github.com/justin-p/testing/pull/48) landed; **[#49](https://github.com/justin-p/testing/pull/49)** (timer stop on `part.advance`) remains open/green. **In flight:** hub UX slice restores **Use lesson** action to create session directly from synced repo row + routing coverage update (`dashboard-routing.spec.ts`). |
 | **Branch** | **`feat/workshop/hub-use-lesson-flow`** |
-| **PR** | _TBD — open after push for this slice; keep #49 separate._ |
+| **PR** | [#50](https://github.com/justin-p/testing/pull/50) — hub "Use lesson" flow (stacked on #49) |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
