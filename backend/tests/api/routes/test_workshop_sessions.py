@@ -125,9 +125,10 @@ def _add_two_parts_to_session_lesson(db: Session, session: WorkshopSession) -> N
     db.commit()
 
 
-def test_enter_rejected_when_session_scheduled(
+def test_enter_allowed_when_session_scheduled_sets_joined_at(
     client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
 ) -> None:
+    """Lobby enter must work while scheduled so trainees can WS-ticket and receive go-live."""
     session = _create_live_session(db)
     session.status = "scheduled"
     db.add(session)
@@ -138,7 +139,57 @@ def test_enter_rejected_when_session_scheduled(
         f"{settings.API_V1_STR}/workshop/sessions/{session.id}/enter",
         headers=normal_user_token_headers,
     )
-    assert response.status_code == 403
+    assert response.status_code == 200
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    participant = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session.id,
+            WorkshopParticipant.user_id == user.id,
+        )
+    ).first()
+    assert participant is not None
+    assert participant.joined_at is not None
+
+
+def test_http_ws_ticket_after_enter_on_scheduled_session(
+    client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
+) -> None:
+    session_row = _create_live_session(db)
+    session_row.status = "scheduled"
+    db.add(session_row)
+    db.commit()
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+            invited_at=datetime.now(timezone.utc),
+            joined_at=None,
+        )
+    )
+    db.commit()
+
+    r_ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=normal_user_token_headers,
+    )
+    assert r_ticket.status_code == 403
+    assert r_ticket.json()["detail"] == "User must enter session first"
+
+    r_enter = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/enter",
+        headers=normal_user_token_headers,
+    )
+    assert r_enter.status_code == 200
+
+    r_ticket2 = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=normal_user_token_headers,
+    )
+    assert r_ticket2.status_code == 200
+    assert "ticket" in r_ticket2.json()
 
 
 def test_enter_rejected_when_session_ended(

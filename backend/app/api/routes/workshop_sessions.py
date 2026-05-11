@@ -81,7 +81,7 @@ router = APIRouter(prefix="/workshop/sessions", tags=["workshop-sessions"])
 ALLOWED_WS_LIVE_STATUSES = frozenset({"busy", "done"})
 # Part moves are frozen unless the workshop is actively running (`live`).
 WS_PART_ADVANCE_REQUIRES_STATUS = frozenset({"live"})
-# Enter only when the session is running or paused (scheduled uses lobby-only HTTP).
+# Live delivery + timer mutations (exclude scheduled lobby).
 WORKSHOP_ACTIVE_STATUSES = frozenset({"live", "paused"})
 # WebSocket ticket + handshake: scheduled allows lobby listeners (status fan-out).
 WORKSHOP_WS_HANDSHAKE_STATUSES = frozenset({"scheduled", "live", "paused"})
@@ -1737,15 +1737,14 @@ def enter_workshop_session(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
 
-    if workshop_session.status not in WORKSHOP_ACTIVE_STATUSES:
-        if workshop_session.status == "scheduled":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Session not started yet",
-            )
+    if workshop_session.status not in WORKSHOP_WS_HANDSHAKE_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session has ended",
+            detail=(
+                "Session has ended"
+                if workshop_session.status == "ended"
+                else "Session not available for entry"
+            ),
         )
 
     if not _required_prerequisites_complete_for_user(

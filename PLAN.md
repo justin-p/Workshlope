@@ -11,7 +11,7 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **`feat/workshop/e2e-scheduled-trainee-after-start`:** **WS ticket + handshake** allow **`scheduled`** (lobby listener); **`session.status_changed`** patches **`workshopSessionDetail`** only for **`scheduled` → `live`** (live↔pause uses **`roomStatus`**); trainees leave the lobby without HTTP polling or **`reload()`**; instructor **Start** uses **`detailQuery.refetch()`** instead of full-page reload; **PR [#63](https://github.com/justin-p/testing/pull/63)**; **`workshop.spec.ts`** (instructor scheduled) asserts post-**Start** lobby clears + part visible. |
+| **Last synced** | **2026-05-11** — **`feat/workshop/e2e-scheduled-trainee-after-start`:** **WS ticket + handshake** allow **`scheduled`**; **`POST /enter`** also allows **`scheduled`** so **`createWorkshopWsTicketWithOptionalEnter`** can set **`joined_at`** and open the lobby WebSocket; **`session.status_changed`** patches **`workshopSessionDetail`** only for **`scheduled` → `live`**; instructor **Start** uses **`detailQuery.refetch()`**; **PR [#63](https://github.com/justin-p/testing/pull/63)**. |
 | **Branch** | **`feat/workshop/e2e-scheduled-trainee-after-start`** |
 | **PR** | **[#63](https://github.com/justin-p/testing/pull/63)** |
 | **Integrate against** | **`main`** |
@@ -28,6 +28,7 @@
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
   - Most [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) flows seed via **`POST /api/v1/private/workshop/e2e-live-session/`** (local-only bootstrap), not one continuous **UI-only** create/prepare → live path from the workshops hub; hub UI session creation is covered separately in [`dashboard-routing.spec.ts`](frontend/tests/dashboard-routing.spec.ts).
   - The serial **`Workshop live session`** `describe` does not chain **roster picker** add/search/batch/remove; those live in [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts).
+  - **`POST /enter`** while **scheduled** sets **`joined_at`** (after the same prerequisite check as live) so the client can obtain a **ws-ticket**, stay on the socket for **`session.status_changed`**, and leave the lobby when the instructor starts without a manual refresh.
   - **`scheduled session can be started from instructor page`** covers instructor lobby (realtime may read **waiting for start** or **connected** while WS is up) → **Start** → lobby clears + **current part** + WS **connected**; **`trainee sees lobby while scheduled then live after instructor starts`** adds rostered trainee lobby → **Start** → part surface + WS **connected** via **lobby WebSocket** + narrow **`workshopSessionDetail`** cache updates ([`workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py), [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx), [`workshop.spec.ts`](frontend/tests/workshop.spec.ts)).
   - **Baseline serial** in the spirit of §1 still spans **multiple spec files**, not one uninterrupted suite for the full spelled-out journey.
   - Green CI does **not** replace **in-product** validation outside bootstrap (real GitHub sync, timing, multi-browser). Re-open **P0 issues** when a regression is confirmed in-product or in tests.
@@ -636,7 +637,7 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 ### Empty, error, and permission states
 
 - **403** roster not invited: friendly “Ask your instructor to add you.”
-- **Enter** rejected (scheduled): “Session not started yet.”
+- **Enter** allowed while **scheduled** (lobby) when the session is in handshake-eligible states, so rostered trainees can obtain a WebSocket ticket and receive **go-live** without refreshing.
 - **Repo sync failed**: instructor sees error on repo row + retry **Sync**.
 - Loading skeletons on session open while fetching session + WS ticket.
 

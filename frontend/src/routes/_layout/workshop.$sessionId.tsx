@@ -461,6 +461,7 @@ function WorkshopSessionPage() {
       }),
   })
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reconnect only when `session.status` changes; listing full `detailQuery.data` reconnects on roster-only cache patches.
   useEffect(() => {
     if (!UUID_V4_RE.test(sessionId)) {
       setPhase("error")
@@ -673,7 +674,6 @@ function WorkshopSessionPage() {
     queryClient,
     detailQuery.isSuccess,
     detailQuery.data?.session.status,
-    detailQuery.data,
   ])
 
   const sendLiveStatus = (liveStatus: "busy" | "done") => {
