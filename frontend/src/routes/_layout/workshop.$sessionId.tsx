@@ -341,6 +341,9 @@ function WorkshopSessionPage() {
         detailQuery.refetch(),
         gapsQuery.refetch(),
         aggregatesQuery.refetch(),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopSessionsForUser"],
+        }),
       ])
     },
     onError: (e: unknown) => {
@@ -366,6 +369,9 @@ function WorkshopSessionPage() {
         detailQuery.refetch(),
         gapsQuery.refetch(),
         aggregatesQuery.refetch(),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopSessionsForUser"],
+        }),
       ])
     },
     onError: (e: unknown) => {
@@ -786,6 +792,9 @@ function WorkshopSessionPage() {
         detailQuery.refetch(),
         gapsQuery.refetch(),
         aggregatesQuery.refetch(),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopSessionsForUser"],
+        }),
       ])
 
       setSelectedUserIds(new Set())

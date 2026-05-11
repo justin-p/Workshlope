@@ -570,6 +570,14 @@ def _workshop_ws_path(session_id: uuid.UUID) -> str:
     return f"{settings.API_V1_STR}/workshop/sessions/{session_id}/ws"
 
 
+_USER_WORKSHOP_FEED_WS_PATH = (
+    f"{settings.API_V1_STR}/workshop/sessions/user-workshop-feed/ws"
+)
+_USER_WORKSHOP_FEED_TICKET_PATH = (
+    f"{settings.API_V1_STR}/workshop/sessions/user-workshop-feed/ws-ticket"
+)
+
+
 def test_ws_connect_accepts_ticket_subprotocol(client: TestClient, db: Session) -> None:
     session_row = _create_live_session(db)
     user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
@@ -604,6 +612,83 @@ def test_ws_connect_accepts_ticket_subprotocol(client: TestClient, db: Session) 
         assert hello["session_id"] == str(session_row.id)
         assert hello["role"] == "participant"
         assert hello["part_generation"] == session_row.part_generation
+
+
+def test_user_workshop_feed_ws_ticket_and_connect(
+    client: TestClient, db: Session
+) -> None:
+    headers = authentication_token_from_email(
+        client=client, email=settings.EMAIL_TEST_USER, db=db
+    )
+    ticket_resp = client.post(_USER_WORKSHOP_FEED_TICKET_PATH, headers=headers)
+    assert ticket_resp.status_code == 200
+    ticket = ticket_resp.json()["ticket"]
+    decoded = jwt.decode(
+        ticket,
+        settings.SECRET_KEY,
+        algorithms=[ALGORITHM],
+        audience="workshop-user-feed",
+    )
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    assert decoded["uid"] == str(user.id)
+
+    with client.websocket_connect(
+        _USER_WORKSHOP_FEED_WS_PATH,
+        subprotocols=["ticket", ticket],
+    ) as websocket:
+        assert websocket.accepted_subprotocol == "ticket"
+        hello = websocket.receive_json()
+        assert hello["type"] == "user_workshop_feed.connected"
+        assert hello["user_id"] == str(user.id)
+
+
+def test_user_workshop_feed_receives_push_after_batch_roster_add(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"feed-batch-lead-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email, password="pw123456", is_instructor=True
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    trainee_email = f"feed-batch-trainee-{uuid.uuid4()}@example.com"
+    trainee = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=trainee_email, password="pw123456", full_name="Trainee Feed"
+        ),
+    )
+    db.commit()
+
+    trainee_headers = user_authentication_headers(
+        client=client, email=trainee_email, password="pw123456"
+    )
+    ticket_resp = client.post(_USER_WORKSHOP_FEED_TICKET_PATH, headers=trainee_headers)
+    assert ticket_resp.status_code == 200
+    ticket = ticket_resp.json()["ticket"]
+
+    with client.websocket_connect(
+        _USER_WORKSHOP_FEED_WS_PATH,
+        subprotocols=["ticket", ticket],
+    ) as ws:
+        assert ws.receive_json()["type"] == "user_workshop_feed.connected"
+        lead_headers = user_authentication_headers(
+            client=client, email=lead_email, password="pw123456"
+        )
+        batch = client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members/batch",
+            headers=lead_headers,
+            json={"user_ids": [str(trainee.id)]},
+        )
+        assert batch.status_code == 200
+        msg = ws.receive_json()
+        assert msg["type"] == "workshop_sessions_list_changed"
+        assert msg["reason"] == "roster"
+        assert msg["session_id"] == str(session_row.id)
 
 
 def test_ws_connect_denies_without_ticket_marker(

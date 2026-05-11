@@ -1100,6 +1100,8 @@ export type WorkshopSessionsStopWorkshopSessionTimerData = {
 
 export type WorkshopSessionsStopWorkshopSessionTimerResponse = (WorkshopSessionTimerPublic);
 
+export type WorkshopSessionsCreateUserWorkshopFeedWsTicketResponse = (WorkshopWsTicket);
+
 export type WorkshopSessionsCreateWorkshopWsTicketData = {
     sessionId: string;
 };

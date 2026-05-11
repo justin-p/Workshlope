@@ -1,9 +1,15 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { type ComponentProps, useMemo, useState } from "react"
+import {
+  type ComponentProps,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import type { WorkshopSessionListItem } from "@/client"
-import { WorkshopSessionsService } from "@/client"
+import { ApiError, WorkshopSessionsService } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -12,7 +18,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
+
+function httpToWsBase(httpBase: string): string {
+  if (httpBase.startsWith("https://")) {
+    return `wss://${httpBase.slice("https://".length)}`
+  }
+  if (httpBase.startsWith("http://")) {
+    return `ws://${httpBase.slice("http://".length)}`
+  }
+  return httpBase
+}
+
+function apiErrorDetail(error: unknown): string | undefined {
+  if (!(error instanceof ApiError)) return undefined
+  const body = error.body as { detail?: unknown } | undefined
+  const d = body?.detail
+  return typeof d === "string" ? d : undefined
+}
 
 function statusBadgeVariant(
   status: string,
@@ -48,7 +72,10 @@ export function DashboardWorkshopSessions({
   /** Instructor / admin: link from card header to the workshops hub route */
   workshopsHubLink?: boolean
 }) {
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [blockedOnly, setBlockedOnly] = useState(false)
+  const reconnectAttemptRef = useRef(0)
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["workshopSessionsForUser"],
     queryFn: () =>
@@ -56,7 +83,123 @@ export function DashboardWorkshopSessions({
         skip: 0,
         limit: 50,
       }),
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status === 404) return false
+      return failureCount < 3
+    },
   })
+
+  const detail = isError ? apiErrorDetail(error) : undefined
+  const isUserAccount404 =
+    error instanceof ApiError &&
+    error.status === 404 &&
+    detail === "User not found"
+  /** API returns 200 with count 0 for an empty roster; 404 usually means mis-routed client or static host, not "no rows". */
+  const showEmptyRosterCopy =
+    (data !== undefined && data.count === 0) ||
+    (isError &&
+      error instanceof ApiError &&
+      error.status === 404 &&
+      !isUserAccount404)
+  const showWorkshopQueryError = isError && !showEmptyRosterCopy
+  useEffect(() => {
+    if (!user) return
+
+    let cancelled = false
+    let socket: WebSocket | null = null
+    let reconnectTimer: number | undefined
+
+    const clearReconnect = () => {
+      if (reconnectTimer !== undefined) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = undefined
+      }
+    }
+
+    const scheduleReconnect = () => {
+      if (cancelled) return
+      reconnectAttemptRef.current += 1
+      const delay = Math.min(
+        30_000,
+        1000 * 2 ** Math.min(reconnectAttemptRef.current, 5),
+      )
+      clearReconnect()
+      reconnectTimer = window.setTimeout(() => {
+        void connect()
+      }, delay)
+    }
+
+    async function connect() {
+      clearReconnect()
+      if (socket && socket.readyState !== WebSocket.CLOSED) {
+        if (socket.readyState === WebSocket.OPEN) {
+          return
+        }
+        socket.close()
+        socket = null
+      }
+      try {
+        const ticketRes =
+          await WorkshopSessionsService.createUserWorkshopFeedWsTicket()
+        if (cancelled) return
+
+        const rawBase = (
+          import.meta.env.VITE_API_URL as string | undefined
+        )?.trim()
+        const apiHttpBase =
+          rawBase !== undefined && rawBase !== ""
+            ? rawBase
+            : window.location.origin
+        const wsUrl = `${httpToWsBase(apiHttpBase)}/api/v1/workshop/sessions/user-workshop-feed/ws`
+        socket = new WebSocket(wsUrl, ["ticket", ticketRes.ticket])
+
+        socket.onopen = () => {
+          reconnectAttemptRef.current = 0
+        }
+
+        socket.onmessage = (ev) => {
+          try {
+            const msg = JSON.parse(String(ev.data)) as { type?: string }
+            if (msg.type === "workshop_sessions_list_changed") {
+              void queryClient.invalidateQueries({
+                queryKey: ["workshopSessionsForUser"],
+              })
+            }
+          } catch {
+            /* ignore non-JSON */
+          }
+        }
+
+        socket.onclose = () => {
+          socket = null
+          if (!cancelled) scheduleReconnect()
+        }
+      } catch (e) {
+        if (cancelled) return
+        if (e instanceof ApiError && e.status === 401) {
+          return
+        }
+        scheduleReconnect()
+      }
+    }
+
+    void connect()
+
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || cancelled) return
+      if (!socket || socket.readyState === WebSocket.CLOSED) {
+        void connect()
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible)
+
+    return () => {
+      cancelled = true
+      clearReconnect()
+      document.removeEventListener("visibilitychange", onVisible)
+      socket?.close()
+    }
+  }, [user, queryClient])
   const totalBlockedTrainees =
     data?.data.reduce(
       (sum, row) => sum + (row.blocked_required_prereq_count ?? 0),
@@ -101,12 +244,14 @@ export function DashboardWorkshopSessions({
         {isLoading ? (
           <p className="text-muted-foreground text-sm">Loading sessions…</p>
         ) : null}
-        {isError ? (
+        {showWorkshopQueryError ? (
           <p className="text-destructive text-sm">
-            {(error as Error)?.message ?? "Could not load sessions"}
+            {isUserAccount404
+              ? "Your account was not found. Try signing out and back in."
+              : ((error as Error)?.message ?? "Could not load sessions")}
           </p>
         ) : null}
-        {data && data.count === 0 ? (
+        {showEmptyRosterCopy ? (
           <p className="text-muted-foreground text-sm">
             No workshops yet - you'll see sessions once you're on a roster.
           </p>
