@@ -126,6 +126,7 @@ function WorkshopSessionPage() {
   const detail = detailQuery.data
   const sessionInLobby =
     Boolean(detailQuery.isSuccess) && detail?.session.status === "scheduled"
+
   /** HTTP detail is instructor-first when user has both seats; WS still uses participant. */
   const userSeesTraineePrework =
     detail?.view === "participant" ||
@@ -340,6 +341,9 @@ function WorkshopSessionPage() {
         detailQuery.refetch(),
         gapsQuery.refetch(),
         aggregatesQuery.refetch(),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopSessionsForUser"],
+        }),
       ])
     },
     onError: (e: unknown) => {
@@ -365,6 +369,9 @@ function WorkshopSessionPage() {
         detailQuery.refetch(),
         gapsQuery.refetch(),
         aggregatesQuery.refetch(),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopSessionsForUser"],
+        }),
       ])
     },
     onError: (e: unknown) => {
@@ -460,6 +467,7 @@ function WorkshopSessionPage() {
       }),
   })
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reconnect only when `session.status` changes; listing full `detailQuery.data` reconnects on roster-only cache patches.
   useEffect(() => {
     if (!UUID_V4_RE.test(sessionId)) {
       setPhase("error")
@@ -478,7 +486,11 @@ function WorkshopSessionPage() {
     }
 
     const sessionStatus = detailQuery.data.session.status
-    if (sessionStatus !== "live" && sessionStatus !== "paused") {
+    if (
+      sessionStatus !== "live" &&
+      sessionStatus !== "paused" &&
+      sessionStatus !== "scheduled"
+    ) {
       setPhase("idle")
       setErrorDetail(null)
       setConnectedRole(null)
@@ -580,7 +592,23 @@ function WorkshopSessionPage() {
                 msg.status === "paused" ||
                 msg.status === "ended")
             ) {
-              setRoomStatus(msg.status)
+              const nextStatus = msg.status as "live" | "paused" | "ended"
+              setRoomStatus(nextStatus)
+              // Only patch HTTP-shaped detail when leaving the scheduled lobby or
+              // when the session ends. live↔paused is carried by `roomStatus` alone;
+              // mirroring pause into the query cache re-triggers the WS effect deps
+              // and tears down the socket while `instructorReady` is briefly false.
+              queryClient.setQueryData<
+                WorkshopSessionsReadWorkshopSessionDetailResponse | undefined
+              >(["workshopSessionDetail", sessionId], (cached) => {
+                if (!cached) return cached
+                const cur = cached.session.status
+                if (cur !== "scheduled" || nextStatus !== "live") return cached
+                return {
+                  ...cached,
+                  session: { ...cached.session, status: "live" },
+                }
+              })
             }
             if (msg.type === "participant.live_status") {
               const userId = msg.user_id
@@ -652,7 +680,6 @@ function WorkshopSessionPage() {
     queryClient,
     detailQuery.isSuccess,
     detailQuery.data?.session.status,
-    detailQuery.data,
   ])
 
   const sendLiveStatus = (liveStatus: "busy" | "done") => {
@@ -684,8 +711,7 @@ function WorkshopSessionPage() {
   const startSession = async () => {
     try {
       await WorkshopSessionsService.startWorkshopSession({ sessionId })
-      // Force a clean reconnect path after scheduled->live transition.
-      window.location.reload()
+      await detailQuery.refetch()
     } catch (e: unknown) {
       if (e instanceof ApiError) {
         const body = e.body as { detail?: string } | undefined
@@ -766,6 +792,9 @@ function WorkshopSessionPage() {
         detailQuery.refetch(),
         gapsQuery.refetch(),
         aggregatesQuery.refetch(),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopSessionsForUser"],
+        }),
       ])
 
       setSelectedUserIds(new Set())
@@ -1414,7 +1443,7 @@ function WorkshopSessionPage() {
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-sm text-muted-foreground">Realtime:</span>
         <span data-testid="workshop-ws-status" className="text-sm font-medium">
-          {sessionInLobby
+          {sessionInLobby && phase !== "ready"
             ? "waiting for start"
             : phase === "ready"
               ? "connected"
@@ -1470,7 +1499,7 @@ function WorkshopSessionPage() {
         </div>
       ) : null}
 
-      {connectedRole === "instructor" ? (
+      {detailView === "instructor" ? (
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"

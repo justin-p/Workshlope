@@ -1,6 +1,7 @@
 import json
 import posixpath
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
@@ -9,6 +10,7 @@ from urllib.parse import quote
 import jwt
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     HTTPException,
     Query,
     Response,
@@ -71,6 +73,7 @@ from app.services.lesson_markdown_pipeline import (
     lesson_markdown_to_safe_html,
     rewrite_relative_asset_urls,
 )
+from app.services.user_workshop_feed import user_workshop_feed_hub
 from app.services.workshop_realtime import (
     WorkshopWsConnection,
     workshop_hub,
@@ -81,8 +84,10 @@ router = APIRouter(prefix="/workshop/sessions", tags=["workshop-sessions"])
 ALLOWED_WS_LIVE_STATUSES = frozenset({"busy", "done"})
 # Part moves are frozen unless the workshop is actively running (`live`).
 WS_PART_ADVANCE_REQUIRES_STATUS = frozenset({"live"})
-# Enter, ws-ticket, and websocket handshake only when the session is running or paused.
+# Live delivery + timer mutations (exclude scheduled lobby).
 WORKSHOP_ACTIVE_STATUSES = frozenset({"live", "paused"})
+# WebSocket ticket + handshake: scheduled allows lobby listeners (status fan-out).
+WORKSHOP_WS_HANDSHAKE_STATUSES = frozenset({"scheduled", "live", "paused"})
 
 
 def _workshop_session_start_content_issue(
@@ -139,6 +144,44 @@ def _decode_workshop_ws_ticket(token: str) -> dict[str, Any]:
     )
 
 
+WORKSHOP_USER_FEED_JWT_AUD = "workshop-user-feed"
+
+
+async def _notify_workshop_sessions_list_changed(
+    user_ids: list[uuid.UUID], session_id: uuid.UUID
+) -> None:
+    await user_workshop_feed_hub.notify_workshop_sessions_list_changed(
+        user_ids, session_id=session_id
+    )
+
+
+def _active_instructor_user_ids_for_session(
+    session_db: Session, *, session_id: uuid.UUID
+) -> list[uuid.UUID]:
+    raw = session_db.exec(
+        select(SessionInstructor.user_id).where(
+            SessionInstructor.session_id == session_id,
+            col(SessionInstructor.removed_at).is_(None),
+        )
+    ).all()
+    out: list[uuid.UUID] = []
+    for row in raw:
+        uid = row[0] if isinstance(row, tuple) else row
+        out.append(uid)  # type: ignore[arg-type]
+    return out
+
+
+def _dedupe_user_ids(*parts: Iterable[uuid.UUID]) -> list[uuid.UUID]:
+    seen: set[uuid.UUID] = set()
+    out: list[uuid.UUID] = []
+    for part in parts:
+        for uid in part:
+            if uid not in seen:
+                seen.add(uid)
+                out.append(uid)
+    return out
+
+
 def _authorize_workshop_ws_handshake(
     db: Session,
     *,
@@ -160,7 +203,7 @@ def _authorize_workshop_ws_handshake(
     workshop_session = db.get(WorkshopSession, route_session_id)
     if workshop_session is None:
         return None
-    if workshop_session.status not in WORKSHOP_ACTIVE_STATUSES:
+    if workshop_session.status not in WORKSHOP_WS_HANDSHAKE_STATUSES:
         return None
     if token_part_generation != workshop_session.part_generation:
         return None
@@ -675,9 +718,12 @@ async def _dispatch_workshop_ws_text(
                     col(WorkshopParticipant.removed_at).is_(None),
                 )
             ).all()
+            live_status_reset_user_ids: list[uuid.UUID] = []
             for participant in participants:
                 participant.live_status = "busy"
                 db.add(participant)
+                if participant.user_id is not None:
+                    live_status_reset_user_ids.append(participant.user_id)
             db.commit()
             next_generation = int(workshop_session.part_generation)
 
@@ -697,6 +743,12 @@ async def _dispatch_workshop_ws_text(
             part_slug=target_part_slug,
             part_generation=next_generation,
         )
+        for uid in live_status_reset_user_ids:
+            await workshop_hub.publish_participant_live_status(
+                session_id=session_id,
+                user_id=uid,
+                live_status="busy",
+            )
         return True
 
     if msg_type == "session.pause":
@@ -1508,6 +1560,7 @@ def batch_upsert_workshop_session_participants(
     *,
     session: SessionDep,
     current_user: CurrentUser,
+    background_tasks: BackgroundTasks,
     session_id: uuid.UUID,
     body: WorkshopSessionMembersBatchBody,
 ) -> WorkshopSessionMembersBatchResponse:
@@ -1569,6 +1622,17 @@ def batch_upsert_workshop_session_participants(
                 )
             )
     session.commit()
+    affected_participants = [
+        r.user_id for r in results if r.status in ("added", "already")
+    ]
+    if affected_participants:
+        instructors = _active_instructor_user_ids_for_session(
+            session, session_id=session_id
+        )
+        recipients = _dedupe_user_ids(affected_participants, instructors)
+        background_tasks.add_task(
+            _notify_workshop_sessions_list_changed, recipients, session_id
+        )
     return WorkshopSessionMembersBatchResponse(results=results)
 
 
@@ -1577,6 +1641,7 @@ def upsert_workshop_session_member(
     *,
     session: SessionDep,
     current_user: CurrentUser,
+    background_tasks: BackgroundTasks,
     session_id: uuid.UUID,
     body: WorkshopSessionUpsertMember,
 ) -> Message:
@@ -1605,6 +1670,13 @@ def upsert_workshop_session_member(
             target_user=target_user,
         )
         session.commit()
+        instructors = _active_instructor_user_ids_for_session(
+            session, session_id=session_id
+        )
+        recipients = _dedupe_user_ids([body.user_id], instructors)
+        background_tasks.add_task(
+            _notify_workshop_sessions_list_changed, recipients, session_id
+        )
         return Message(message="Member upserted as participant")
 
     if not target_user.is_instructor:
@@ -1642,6 +1714,13 @@ def upsert_workshop_session_member(
         instructor.role = body.instructor_role
     session.add(instructor)
     session.commit()
+    instructors = _active_instructor_user_ids_for_session(
+        session, session_id=session_id
+    )
+    recipients = _dedupe_user_ids([body.user_id], instructors)
+    background_tasks.add_task(
+        _notify_workshop_sessions_list_changed, recipients, session_id
+    )
     return Message(message="Member upserted as instructor")
 
 
@@ -1650,6 +1729,7 @@ def remove_workshop_session_participant(
     *,
     session: SessionDep,
     current_user: CurrentUser,
+    background_tasks: BackgroundTasks,
     session_id: uuid.UUID,
     user_id: uuid.UUID,
 ) -> Message:
@@ -1679,6 +1759,13 @@ def remove_workshop_session_participant(
     participant.removed_at = datetime.now(timezone.utc)
     session.add(participant)
     session.commit()
+    instructors = _active_instructor_user_ids_for_session(
+        session, session_id=session_id
+    )
+    recipients = _dedupe_user_ids([user_id], instructors)
+    background_tasks.add_task(
+        _notify_workshop_sessions_list_changed, recipients, session_id
+    )
     return Message(message="Participant removed")
 
 
@@ -1735,15 +1822,14 @@ def enter_workshop_session(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
 
-    if workshop_session.status not in WORKSHOP_ACTIVE_STATUSES:
-        if workshop_session.status == "scheduled":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Session not started yet",
-            )
+    if workshop_session.status not in WORKSHOP_WS_HANDSHAKE_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session has ended",
+            detail=(
+                "Session has ended"
+                if workshop_session.status == "ended"
+                else "Session not available for entry"
+            ),
         )
 
     if not _required_prerequisites_complete_for_user(
@@ -2152,6 +2238,62 @@ async def stop_workshop_session_timer(
     return WorkshopSessionTimerPublic(session_id=session_id, status="inactive")
 
 
+@router.post("/user-workshop-feed/ws-ticket", response_model=WorkshopWsTicket)
+def create_user_workshop_feed_ws_ticket(
+    *, current_user: CurrentUser
+) -> WorkshopWsTicket:
+    """Short-lived JWT for ``/user-workshop-feed/ws`` (dashboard workshop list push)."""
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+    payload = {
+        "uid": str(current_user.id),
+        "aud": WORKSHOP_USER_FEED_JWT_AUD,
+        "exp": expires_at,
+    }
+    ticket = jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
+    return WorkshopWsTicket(ticket=ticket, expires_at=expires_at)
+
+
+@router.websocket("/user-workshop-feed/ws")
+async def user_workshop_feed_websocket(websocket: WebSocket) -> None:
+    """Per-user feed: roster changes invalidate ``workshopSessionsForUser`` on clients.
+
+    Subprotocol: ``ticket, <jwt>`` from ``POST …/user-workshop-feed/ws-ticket``.
+    """
+    raw_token = _extract_ws_ticket_from_subprotocols(
+        websocket.headers.get("sec-websocket-protocol")
+    )
+    if raw_token is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+    try:
+        claims = jwt.decode(
+            raw_token,
+            settings.SECRET_KEY,
+            algorithms=[ALGORITHM],
+            audience=WORKSHOP_USER_FEED_JWT_AUD,
+        )
+        user_id = uuid.UUID(str(claims["uid"]))
+    except (PyJWTError, ValueError, KeyError):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await websocket.accept(subprotocol="ticket")
+    await user_workshop_feed_hub.attach(user_id, websocket)
+    try:
+        await websocket.send_json(
+            {
+                "type": "user_workshop_feed.connected",
+                "user_id": str(user_id),
+            }
+        )
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        return
+    finally:
+        await user_workshop_feed_hub.detach(user_id, websocket)
+
+
 @router.post("/{session_id}/ws-ticket", response_model=WorkshopWsTicket)
 def create_workshop_ws_ticket(
     *, session: SessionDep, current_user: CurrentUser, session_id: uuid.UUID
@@ -2161,15 +2303,14 @@ def create_workshop_ws_ticket(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
-    if workshop_session.status not in WORKSHOP_ACTIVE_STATUSES:
-        if workshop_session.status == "scheduled":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Session not started yet",
-            )
+    if workshop_session.status not in WORKSHOP_WS_HANDSHAKE_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session has ended",
+            detail=(
+                "Session has ended"
+                if workshop_session.status == "ended"
+                else "Session not available for realtime"
+            ),
         )
 
     role = None

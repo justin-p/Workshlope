@@ -125,9 +125,10 @@ def _add_two_parts_to_session_lesson(db: Session, session: WorkshopSession) -> N
     db.commit()
 
 
-def test_enter_rejected_when_session_scheduled(
+def test_enter_allowed_when_session_scheduled_sets_joined_at(
     client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
 ) -> None:
+    """Lobby enter must work while scheduled so trainees can WS-ticket and receive go-live."""
     session = _create_live_session(db)
     session.status = "scheduled"
     db.add(session)
@@ -138,7 +139,57 @@ def test_enter_rejected_when_session_scheduled(
         f"{settings.API_V1_STR}/workshop/sessions/{session.id}/enter",
         headers=normal_user_token_headers,
     )
-    assert response.status_code == 403
+    assert response.status_code == 200
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    participant = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session.id,
+            WorkshopParticipant.user_id == user.id,
+        )
+    ).first()
+    assert participant is not None
+    assert participant.joined_at is not None
+
+
+def test_http_ws_ticket_after_enter_on_scheduled_session(
+    client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
+) -> None:
+    session_row = _create_live_session(db)
+    session_row.status = "scheduled"
+    db.add(session_row)
+    db.commit()
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+            invited_at=datetime.now(timezone.utc),
+            joined_at=None,
+        )
+    )
+    db.commit()
+
+    r_ticket = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=normal_user_token_headers,
+    )
+    assert r_ticket.status_code == 403
+    assert r_ticket.json()["detail"] == "User must enter session first"
+
+    r_enter = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/enter",
+        headers=normal_user_token_headers,
+    )
+    assert r_enter.status_code == 200
+
+    r_ticket2 = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
+        headers=normal_user_token_headers,
+    )
+    assert r_ticket2.status_code == 200
+    assert "ticket" in r_ticket2.json()
 
 
 def test_enter_rejected_when_session_ended(
@@ -519,6 +570,14 @@ def _workshop_ws_path(session_id: uuid.UUID) -> str:
     return f"{settings.API_V1_STR}/workshop/sessions/{session_id}/ws"
 
 
+_USER_WORKSHOP_FEED_WS_PATH = (
+    f"{settings.API_V1_STR}/workshop/sessions/user-workshop-feed/ws"
+)
+_USER_WORKSHOP_FEED_TICKET_PATH = (
+    f"{settings.API_V1_STR}/workshop/sessions/user-workshop-feed/ws-ticket"
+)
+
+
 def test_ws_connect_accepts_ticket_subprotocol(client: TestClient, db: Session) -> None:
     session_row = _create_live_session(db)
     user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
@@ -553,6 +612,83 @@ def test_ws_connect_accepts_ticket_subprotocol(client: TestClient, db: Session) 
         assert hello["session_id"] == str(session_row.id)
         assert hello["role"] == "participant"
         assert hello["part_generation"] == session_row.part_generation
+
+
+def test_user_workshop_feed_ws_ticket_and_connect(
+    client: TestClient, db: Session
+) -> None:
+    headers = authentication_token_from_email(
+        client=client, email=settings.EMAIL_TEST_USER, db=db
+    )
+    ticket_resp = client.post(_USER_WORKSHOP_FEED_TICKET_PATH, headers=headers)
+    assert ticket_resp.status_code == 200
+    ticket = ticket_resp.json()["ticket"]
+    decoded = jwt.decode(
+        ticket,
+        settings.SECRET_KEY,
+        algorithms=[ALGORITHM],
+        audience="workshop-user-feed",
+    )
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    assert decoded["uid"] == str(user.id)
+
+    with client.websocket_connect(
+        _USER_WORKSHOP_FEED_WS_PATH,
+        subprotocols=["ticket", ticket],
+    ) as websocket:
+        assert websocket.accepted_subprotocol == "ticket"
+        hello = websocket.receive_json()
+        assert hello["type"] == "user_workshop_feed.connected"
+        assert hello["user_id"] == str(user.id)
+
+
+def test_user_workshop_feed_receives_push_after_batch_roster_add(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"feed-batch-lead-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email, password="pw123456", is_instructor=True
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    trainee_email = f"feed-batch-trainee-{uuid.uuid4()}@example.com"
+    trainee = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=trainee_email, password="pw123456", full_name="Trainee Feed"
+        ),
+    )
+    db.commit()
+
+    trainee_headers = user_authentication_headers(
+        client=client, email=trainee_email, password="pw123456"
+    )
+    ticket_resp = client.post(_USER_WORKSHOP_FEED_TICKET_PATH, headers=trainee_headers)
+    assert ticket_resp.status_code == 200
+    ticket = ticket_resp.json()["ticket"]
+
+    with client.websocket_connect(
+        _USER_WORKSHOP_FEED_WS_PATH,
+        subprotocols=["ticket", ticket],
+    ) as ws:
+        assert ws.receive_json()["type"] == "user_workshop_feed.connected"
+        lead_headers = user_authentication_headers(
+            client=client, email=lead_email, password="pw123456"
+        )
+        batch = client.post(
+            f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members/batch",
+            headers=lead_headers,
+            json={"user_ids": [str(trainee.id)]},
+        )
+        assert batch.status_code == 200
+        msg = ws.receive_json()
+        assert msg["type"] == "workshop_sessions_list_changed"
+        assert msg["reason"] == "roster"
+        assert msg["session_id"] == str(session_row.id)
 
 
 def test_ws_connect_denies_without_ticket_marker(
@@ -833,10 +969,17 @@ def test_ws_instructor_can_advance_part_and_broadcast_to_participants(
             assert instructor_ws.receive_json()["type"] == "session.connected"
             instructor_ws.send_json({"type": "part.advance", "part_index": 1})
             ack = instructor_ws.receive_json()
+            inst_part_changed = instructor_ws.receive_json()
+            inst_live = instructor_ws.receive_json()
             broadcast = participant_ws.receive_json()
 
     assert ack["type"] == "part.advance.ack"
     assert ack["part_index"] == 1
+    assert inst_part_changed["type"] == "session.part_changed"
+    assert inst_part_changed["part_index"] == 1
+    assert inst_live["type"] == "participant.live_status"
+    assert inst_live["live_status"] == "busy"
+    assert inst_live["user_id"] == str(participant_user.id)
     assert broadcast["type"] == "session.part_changed"
     assert broadcast["part_index"] == 1
     db.refresh(timer_row)
@@ -1512,7 +1655,7 @@ def test_http_enter_403_when_required_prerequisites_incomplete(
     assert resp.json()["detail"] == "Required prerequisites incomplete"
 
 
-def test_http_ws_ticket_rejects_when_session_scheduled(
+def test_http_ws_ticket_allows_instructor_when_session_scheduled(
     client: TestClient, db: Session
 ) -> None:
     session_row = _create_live_session(db)
@@ -1541,8 +1684,8 @@ def test_http_ws_ticket_rejects_when_session_scheduled(
         f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/ws-ticket",
         headers=i_headers,
     )
-    assert resp.status_code == 403
-    assert resp.json()["detail"] == "Session not started yet"
+    assert resp.status_code == 200
+    assert "ticket" in resp.json()
 
 
 def test_http_ws_ticket_403_when_required_prerequisites_incomplete(

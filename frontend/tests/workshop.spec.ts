@@ -361,16 +361,77 @@ test.describe("Workshop live session", () => {
     await page.goto(`/workshop/${session_id}`)
     await expect(page.getByTestId("workshop-session-lobby")).toBeVisible()
     await expect(page.getByTestId("workshop-current-part")).toHaveCount(0)
+    // Scheduled lobby may already show realtime as connected (WS handshake before start).
     await expect(page.getByTestId("workshop-ws-status")).toHaveText(
-      /waiting for start/i,
+      /waiting for start|connected/i,
     )
     await expect(page.getByTestId("workshop-error")).toHaveCount(0)
 
     await page.getByTestId("workshop-instructor-start").click()
+    await expect(page.getByTestId("workshop-session-lobby")).toHaveCount(0, {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId("workshop-current-part")).toBeVisible({
+      timeout: 15_000,
+    })
     await expect(page.getByTestId("workshop-ws-status")).toHaveText(
       /connected/i,
       { timeout: 15_000 },
     )
+  })
+
+  test("trainee sees lobby while scheduled then live after instructor starts", async ({
+    browser,
+    page,
+    request,
+  }) => {
+    const participant = await createParticipantUserForWorkshop()
+    const br = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?initial_status=scheduled&participant_email=${encodeURIComponent(participant.email)}`,
+    )
+    expect(br.ok()).toBeTruthy()
+    const { session_id } = await br.json()
+
+    const participantContext = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    })
+    const participantPage = await participantContext.newPage()
+    await participantPage.goto("/login")
+    await participantPage.getByTestId("email-input").fill(participant.email)
+    await participantPage
+      .getByTestId("password-input")
+      .fill(participant.password)
+    await participantPage.getByRole("button", { name: "Log In" }).click()
+    await participantPage.waitForURL(/\/dashboard\/(trainee|instructor|admin)/)
+
+    await participantPage.goto(`/workshop/${session_id}`)
+    await participantPage.waitForLoadState("networkidle")
+    await expect(
+      participantPage.getByTestId("workshop-session-lobby"),
+    ).toBeVisible({ timeout: 15_000 })
+    await expect(
+      participantPage.getByTestId("workshop-current-part"),
+    ).toHaveCount(0)
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(page.getByTestId("workshop-session-lobby")).toBeVisible()
+    await page.getByTestId("workshop-instructor-start").click()
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      {
+        timeout: 15_000,
+      },
+    )
+
+    await expect(
+      participantPage.getByTestId("workshop-current-part"),
+    ).toBeVisible({ timeout: 20_000 })
+    await expect(participantPage.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      { timeout: 20_000 },
+    )
+
+    await participantContext.close()
   })
 
   test("shows fallback banner when lesson repo health is degraded", async ({

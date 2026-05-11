@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **§1** coverage notes flattened + **P0** cleared (code-checked); **#62** merged: gap bullets + deferred hub/roster polish. Restored **§2 / §3** remaining-work sections in doc pass. |
-| **Branch** | **`main`** |
-| **PR** | — |
+| **Last synced** | **2026-05-11** — **Dashboard roster push:** **`UserWorkshopFeedHub`** + **`POST …/user-workshop-feed/ws-ticket`** / **`/user-workshop-feed/ws`**; roster **batch / upsert / remove** schedule **`workshop_sessions_list_changed`** to affected users + session instructors; **`DashboardWorkshopSessions`** subscribes and **`invalidateQueries(['workshopSessionsForUser'])`**; session page roster mutations also invalidate that query; OpenAPI + client regen; **`test_user_workshop_feed_*`** in **`test_workshop_sessions.py`**. (Prior slice on this branch: scheduled lobby WS + **PR [#63](https://github.com/justin-p/testing/pull/63)**.) |
+| **Branch** | **`feat/workshop/e2e-scheduled-trainee-after-start`** |
+| **PR** | **[#63](https://github.com/justin-p/testing/pull/63)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -28,7 +28,8 @@
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
   - Most [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) flows seed via **`POST /api/v1/private/workshop/e2e-live-session/`** (local-only bootstrap), not one continuous **UI-only** create/prepare → live path from the workshops hub; hub UI session creation is covered separately in [`dashboard-routing.spec.ts`](frontend/tests/dashboard-routing.spec.ts).
   - The serial **`Workshop live session`** `describe` does not chain **roster picker** add/search/batch/remove; those live in [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts).
-  - **`scheduled session can be started from instructor page`** covers instructor lobby → **Start** → WS **connected** only; it does **not** exercise a **trainee** through scheduled → live (entry, WS, lesson surface).
+  - **`POST /enter`** while **scheduled** sets **`joined_at`** (after the same prerequisite check as live) so the client can obtain a **ws-ticket**, stay on the socket for **`session.status_changed`**, and leave the lobby when the instructor starts without a manual refresh.
+  - **`scheduled session can be started from instructor page`** covers instructor lobby (realtime may read **waiting for start** or **connected** while WS is up) → **Start** → lobby clears + **current part** + WS **connected**; **`trainee sees lobby while scheduled then live after instructor starts`** adds rostered trainee lobby → **Start** → part surface + WS **connected** via **lobby WebSocket** + narrow **`workshopSessionDetail`** cache updates ([`workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py), [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx), [`workshop.spec.ts`](frontend/tests/workshop.spec.ts)).
   - **Baseline serial** in the spirit of §1 still spans **multiple spec files**, not one uninterrupted suite for the full spelled-out journey.
   - Green CI does **not** replace **in-product** validation outside bootstrap (real GitHub sync, timing, multi-browser). Re-open **P0 issues** when a regression is confirmed in-product or in tests.
   - P0 issues
@@ -414,9 +415,10 @@ flowchart TD
 
 Implementation lives in **[`backend/app/services/workshop_realtime.py`](backend/app/services/workshop_realtime.py)** (**`WorkshopRealtimeHub`**) and **[`backend/app/api/routes/workshop_sessions.py`](backend/app/api/routes/workshop_sessions.py)** (**`POST …/ws-ticket`**, WebSocket handler).
 
-- **Ws-ticket auth:** Short-lived JWT from **`POST …/ws-ticket`**; connect via **`Sec-WebSocket-Protocol`** (`ticket,<jwt>`). Never put long-lived session JWT in query strings.
-- **Privacy fan-out:** **`session.part_changed`** and **`session.status_changed`** go to **all** connections in the room; **`participant.live_status`** deltas go **only** to **`role=instructor`**; trainees get **`live_status.ack`** for self. **`part_generation`** increments on **`part.advance`**, synced on connections before **`session.part_changed`** fan-out; stale sockets get **`part_generation_stale`**. Pause blocks trainee **`live_status`** and instructor **`part.advance`** WS paths while session REST (roster PATCH, audits) stays as coded.
+- **Ws-ticket auth:** Short-lived JWT from **`POST …/ws-ticket`**; connect via **`Sec-WebSocket-Protocol`** (`ticket,<jwt>`). Never put long-lived session JWT in query strings. Tickets are minted when the session is **`scheduled`**, **`live`**, or **`paused`** ( **`ended`** rejected) so rostered clients can attach to the hub before **`Start`**; **`part.advance`** and trainee **`live_status`** writes still require **`live`** per dispatch rules.
+- **Privacy fan-out:** **`session.part_changed`** and **`session.status_changed`** go to **all** connections in the room; **`participant.live_status`** deltas go **only** to **`role=instructor`**; trainees get **`live_status.ack`** for self. After **`part.advance`**, the server resets every seat’s **`live_status`** to **`busy`** in the DB and emits one **`participant.live_status`** frame per rostered **`user_id`** to instructors so the roster UI matches DB without a refresh. **`part_generation`** increments on **`part.advance`**, synced on connections before **`session.part_changed`** fan-out; stale sockets get **`part_generation_stale`**. Pause blocks trainee **`live_status`** and instructor **`part.advance`** WS paths while session REST (roster PATCH, audits) stays as coded.
 - **Single-process room (MVP):** One shared **`/ws`** room per session with **broadcast-time filtering** (not separate trainee vs instructor websocket URLs). **Redis / multi-worker** coordination is deferred.
+- **Dashboard workshop list (user-scoped push):** **`POST …/workshop/sessions/user-workshop-feed/ws-ticket`** plus **`/user-workshop-feed/ws`** use the same **`ticket,<jwt>`** subprotocol pattern as the session room. **[`UserWorkshopFeedHub`](backend/app/services/user_workshop_feed.py)** fans out **`workshop_sessions_list_changed`** to affected roster **`user_id`s** and active **`SessionInstructor`** rows after roster membership HTTP writes, so **[`DashboardWorkshopSessions.tsx`](frontend/src/components/dashboard/DashboardWorkshopSessions.tsx)** can **`invalidateQueries(['workshopSessionsForUser'])`** for users who never opened that session’s room WebSocket. Same **single-process** limitation as **`WorkshopRealtimeHub`**.
 
 ## Persistence rules (**`WorkshopParticipant`** writers)
 
@@ -636,7 +638,7 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 ### Empty, error, and permission states
 
 - **403** roster not invited: friendly “Ask your instructor to add you.”
-- **Enter** rejected (scheduled): “Session not started yet.”
+- **Enter** allowed while **scheduled** (lobby) when the session is in handshake-eligible states, so rostered trainees can obtain a WebSocket ticket and receive **go-live** without refreshing.
 - **Repo sync failed**: instructor sees error on repo row + retry **Sync**.
 - Loading skeletons on session open while fetching session + WS ticket.
 
