@@ -290,7 +290,7 @@ test("instructor sync card shows installation settings link and repo parts previ
   await context.close()
 })
 
-test("instructor sync card can create a session from lesson preview", async ({
+test("instructor sync card can create a session from use lesson action", async ({
   browser,
 }) => {
   const email = randomEmail()
@@ -412,12 +412,11 @@ test("instructor sync card can create a session from lesson preview", async ({
   await page.goto("/workshops")
   await page.waitForURL("/workshops")
   await page.waitForLoadState("networkidle")
-  await page.getByTestId("workshop-repo-preview-toggle").click()
+  await page.getByTestId("workshop-repo-use-lesson").click()
   const previewPanel = page.getByTestId("workshop-repo-preview-panel")
   await expect(previewPanel).toContainText(
     "Create a scheduled workshop session",
   )
-  await previewPanel.getByTestId("workshop-create-session").click()
   await expect(previewPanel).toContainText("Session created.")
   await expect(
     previewPanel.getByRole("link", { name: "Open" }),
