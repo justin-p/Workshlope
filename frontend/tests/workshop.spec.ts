@@ -7,11 +7,11 @@ const apiBase = process.env.VITE_API_URL ?? "http://localhost:8000"
 async function createParticipantUserForWorkshop() {
   const email = randomEmail()
   const password = "changethis123"
-  await createUser({
+  const created = await createUser({
     email,
     password,
   })
-  return { email, password }
+  return { email, password, userId: created.id }
 }
 
 test.describe("Workshop live session", () => {
@@ -205,6 +205,7 @@ test.describe("Workshop live session", () => {
     page,
     request,
   }) => {
+    const participant = await createParticipantUserForWorkshop()
     const br = await request.post(
       `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
     )
@@ -220,6 +221,14 @@ test.describe("Workshop live session", () => {
       page.getByTestId("workshop-prework-header-count"),
     ).toContainText("Roster trainees blocked by required pre-work: 0")
     await expect(page.getByRole("button", { name: "Mark done" })).toHaveCount(0)
+    await expect(page.getByTestId("workshop-roster-empty")).toBeVisible()
+    await page
+      .getByTestId("workshop-add-trainee-user-id")
+      .fill(participant.userId)
+    await page.getByTestId("workshop-add-trainee-submit").click()
+    await expect(page.getByTestId("workshop-roster-list")).toContainText(
+      participant.email,
+    )
 
     await expect(page.getByTestId("workshop-timer-start")).toContainText(
       "Start part countdown",

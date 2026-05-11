@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **`main`:** [#48](https://github.com/justin-p/testing/pull/48) landed; **[#49](https://github.com/justin-p/testing/pull/49)** (timer stop on `part.advance`) remains open/green. **In flight:** hub UX slice restores **Use lesson** action to create session directly from synced repo row + routing coverage update (`dashboard-routing.spec.ts`). |
-| **Branch** | **`feat/workshop/hub-use-lesson-flow`** |
-| **PR** | [#50](https://github.com/justin-p/testing/pull/50) — hub "Use lesson" flow (stacked on #49) |
+| **Last synced** | **2026-05-11** — **`main`:** [#49](https://github.com/justin-p/testing/pull/49) and [#51](https://github.com/justin-p/testing/pull/51) landed (timer stops on `part.advance`; hub `Use lesson` action creates session from synced repo row + routing coverage). **In flight:** roster/add-trainee instructor UX + workshop E2E on `workshop.$sessionId.tsx`. |
+| **Branch** | **`feat/workshop/roster-add-trainee`** |
+| **PR** | _TBD — open after push for roster/add-trainee slice._ |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -30,8 +30,8 @@
     - The "advance part" button does not work
     - ✅ Timers should use the manifest
     - ✅ Start "5m countdown" should be replaced with a "extend with X" where X can be set by the instructor.
-    - ✅ **Timer resets on WS part advance** — **[#49](https://github.com/justin-p/testing/pull/49)** (pending merge onto `main`).
-    - ⚠️ The flow to create a session on the "Workshops hub" is confoluted with buttons behind multiple actions. Make this a lot more user friendly and polished. (**Hub slice in progress on `feat/workshop/hub-use-lesson-flow`**)
+    - ✅ **Timer resets on WS part advance** — **[#49](https://github.com/justin-p/testing/pull/49)**
+    - ⚠️ The flow to create a session on the "Workshops hub" is confoluted with buttons behind multiple actions. Make this a lot more user friendly and polished. (**Partially addressed by [#51](https://github.com/justin-p/testing/pull/51); remaining menu/start-depth polish still open.**)
       - e.q.
         - There are 2 repo menus. 1 with a drop down and 1 with a cstom overwrite. This should be the same form, allow seclecitng from a list, but allow users to type and thus overwrite in the same form.
         - 'Synced lesson repositories" has a "use" button, which has no real use, as it will just fill in the forms that allow you to setup a new sycn. This never happens, als that thing is already synced. A more logical thing would be that "use" is a "use lesson" button. This logic is currently behinf "preview + create session"
