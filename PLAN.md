@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **`feat/workshop/roster-remove-and-table-fix`:** roster panel **remove trainee** (confirm dialog + `DELETE …/participants/{user_id}`); user-picker table uses **`TableHeader` + `TableHead`** so columns align; manual-add row uses **`Label` + `Input`** and spacing; Playwright covers remove + column headers in [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts). |
-| **Branch** | **`feat/workshop/roster-remove-and-table-fix`** |
-| **PR** | **[#56](https://github.com/justin-p/testing/pull/56)** — roster remove trainee, picker table alignment, polish + Playwright. |
+| **Last synced** | **2026-05-11** — **`feat/dashboard/multi-lesson-repo-session`:** instructor sync card treats **multi-lesson** repos with row **Choose lesson** (expands preview only) vs **Use lesson** for single-lesson fast path; preview shows **Start workshop** per lesson plus scoped `workshop-use-lesson-session-feedback-{lessonId}`; row label uses `lesson_count` when preview is empty or not yet loaded; Playwright in [`dashboard-routing.spec.ts`](frontend/tests/dashboard-routing.spec.ts). |
+| **Branch** | **`feat/dashboard/multi-lesson-repo-session`** |
+| **PR** | — |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -35,7 +35,7 @@
       - e.q.
         - There are 2 repo menus. 1 with a drop down and 1 with a cstom overwrite. This should be the same form, allow seclecitng from a list, but allow users to type and thus overwrite in the same form.
         - 'Synced lesson repositories" has a "use" button, which has no real use, as it will just fill in the forms that allow you to setup a new sycn. This never happens, als that thing is already synced. A more logical thing would be that "use" is a "use lesson" button. This logic is currently behinf "preview + create session" (**Addressed:** row action is now **Use lesson** — [#51](https://github.com/justin-p/testing/pull/51).)
-        - After clicking "preview + create session", only then a button apears to start a session, this is not user friendly and hidden to deep in menus. (**Addressed:** preview toggle is **Preview parts** only; session start for single-lesson repos is **Use lesson** with inline feedback — not buried in the preview panel.)
+        - After clicking "preview + create session", only then a button apears to start a session, this is not user friendly and hidden to deep in menus. (**Addressed:** preview toggle is **Preview parts** only; session start for single-lesson repos is **Use lesson** with inline feedback — not buried in the preview panel. **Multi-lesson repos:** **Choose lesson** opens preview; each lesson has **Start workshop** + inline feedback — **`feat/dashboard/multi-lesson-repo-session`**.)
     - ✅ **Instructors can add trainees to a live session** — session roster panel + user-id add flow — **[#52](https://github.com/justin-p/testing/pull/52)**; **remove trainee** + roster picker table alignment — **`feat/workshop/roster-remove-and-table-fix`** (same release slice as roster search / batch add when merged).
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
