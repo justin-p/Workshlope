@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-11** — **`feat/dashboard/multi-lesson-repo-session`:** instructor sync card treats **multi-lesson** repos with row **Choose lesson** (expands preview only) vs **Use lesson** for single-lesson fast path; preview shows **Start workshop** per lesson plus scoped `workshop-use-lesson-session-feedback-{lessonId}`; row label uses `lesson_count` when preview is empty or not yet loaded; Playwright in [`dashboard-routing.spec.ts`](frontend/tests/dashboard-routing.spec.ts). |
 | **Branch** | **`feat/dashboard/multi-lesson-repo-session`** |
-| **PR** | — |
+| **PR** | **[#58](https://github.com/justin-p/testing/pull/58)** — multi-lesson **Choose lesson** + per-lesson **Start workshop** + Playwright. |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
