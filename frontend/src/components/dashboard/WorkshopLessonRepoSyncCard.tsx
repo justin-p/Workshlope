@@ -71,7 +71,6 @@ function pickInstallationIdFromRows(rows: InstallationRowLite[]): number {
 }
 const OWNER_REPO_RE = /^[^/\s]+\/[^/\s]+$/
 const COPY_ID_FEEDBACK_MS = 1500
-const AUTOFILL_FEEDBACK_MS = 2000
 const FRESH_AGE_MS = 60_000
 const AGING_AGE_MS = 5 * 60_000
 type RepoHealthFilter = "all" | "healthy" | "unhealthy"
@@ -120,7 +119,6 @@ export function WorkshopLessonRepoSyncCard() {
     number | null
   >(null)
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null)
-  const [autofillHint, setAutofillHint] = useState<string | null>(null)
   const [previewByRepoId, setPreviewByRepoId] = useState<
     Record<string, LessonRepoPreview | undefined>
   >({})
@@ -478,19 +476,6 @@ export function WorkshopLessonRepoSyncCard() {
     })
   }
 
-  const applyInstallationAndRepo = (
-    installationIdValue: number,
-    repoName: string,
-  ) => {
-    setInstallationId(String(installationIdValue))
-    setFullName(repoName)
-    setErrorDetail(null)
-    setAutofillHint(
-      `Autofilled ${repoName} with installation #${installationIdValue}.`,
-    )
-    setTimeout(() => setAutofillHint(null), AUTOFILL_FEEDBACK_MS)
-  }
-
   const copyInstallationId = async (value: number) => {
     try {
       await navigator.clipboard.writeText(String(value))
@@ -575,11 +560,12 @@ export function WorkshopLessonRepoSyncCard() {
     setInstallationId("")
     setErrorDetail(null)
     setRefreshError(null)
-    setAutofillHint(null)
     setAdvancedManualOpen(false)
   }
 
-  const loadRepoPreview = async (repoId: string) => {
+  const loadRepoPreview = async (
+    repoId: string,
+  ): Promise<LessonRepoPreview | undefined> => {
     const apiBase = (import.meta.env.VITE_API_URL as string | undefined)?.trim()
     const baseUrl =
       apiBase && apiBase.length > 0 ? apiBase : window.location.origin
@@ -603,18 +589,21 @@ export function WorkshopLessonRepoSyncCard() {
             ? (body.detail ?? "Could not load preview")
             : "Could not load preview"
         setPreviewErrorByRepoId((prev) => ({ ...prev, [repoId]: detail }))
-        return
+        return undefined
       }
+      const preview = body as LessonRepoPreview
       setPreviewByRepoId((prev) => ({
         ...prev,
-        [repoId]: body as LessonRepoPreview,
+        [repoId]: preview,
       }))
       setExpandedPreviewRepoIds((prev) => ({ ...prev, [repoId]: true }))
+      return preview
     } catch {
       setPreviewErrorByRepoId((prev) => ({
         ...prev,
         [repoId]: "Could not load preview",
       }))
+      return undefined
     } finally {
       setPreviewLoadingRepoId((current) =>
         current === repoId ? null : current,
@@ -632,6 +621,17 @@ export function WorkshopLessonRepoSyncCard() {
       return
     }
     await loadRepoPreview(repoId)
+  }
+
+  const handleUseLessonFromRepo = async (repoId: string) => {
+    const cached = previewByRepoId[repoId]
+    const preview = cached ?? (await loadRepoPreview(repoId))
+    if (!preview) return
+    if (preview.lessons.length === 1) {
+      createSessionMutation.mutate(preview.lessons[0].lesson_id)
+      return
+    }
+    setExpandedPreviewRepoIds((prev) => ({ ...prev, [repoId]: true }))
   }
 
   return (
@@ -1189,14 +1189,6 @@ export function WorkshopLessonRepoSyncCard() {
             {refreshError}
           </p>
         ) : null}
-        {autofillHint ? (
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="workshop-sync-autofill-hint"
-          >
-            {autofillHint}
-          </p>
-        ) : null}
         <div className="space-y-1 pt-2">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium">Synced lesson repositories</p>
@@ -1257,37 +1249,6 @@ export function WorkshopLessonRepoSyncCard() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {/*
-                      Keep "Use" aligned with current filter context to avoid
-                      accidental cross-installation prefills.
-                    */}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() =>
-                        applyInstallationAndRepo(
-                          repo.github_installation_id ?? installationIdInt,
-                          repo.full_name,
-                        )
-                      }
-                      disabled={
-                        !repo.github_installation_id ||
-                        (selectedInstallation !== null &&
-                          repo.github_installation_id !==
-                            selectedInstallation.installation_id)
-                      }
-                      title={
-                        selectedInstallation !== null &&
-                        repo.github_installation_id !==
-                          selectedInstallation.installation_id
-                          ? "Repo belongs to a different installation"
-                          : undefined
-                      }
-                    >
-                      Use
-                    </Button>
                     <span
                       className={
                         repo.health === "healthy"
@@ -1297,6 +1258,21 @@ export function WorkshopLessonRepoSyncCard() {
                     >
                       {repo.health}
                     </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      data-testid="workshop-repo-use-lesson"
+                      onClick={() =>
+                        void handleUseLessonFromRepo(repo.lesson_repo_id)
+                      }
+                      disabled={previewLoadingRepoId === repo.lesson_repo_id}
+                    >
+                      {previewLoadingRepoId === repo.lesson_repo_id
+                        ? "Loading..."
+                        : "Use lesson"}
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"
