@@ -247,10 +247,6 @@ test.describe("Workshop live session", () => {
     await expect(page.getByTestId("workshop-timer-status")).toContainText(
       "running",
     )
-    await page.getByTestId("workshop-timer-stop").click()
-    await expect(page.getByTestId("workshop-timer-status")).toContainText(
-      "inactive",
-    )
 
     await page.getByTestId("workshop-instructor-pause").click()
     await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
@@ -265,6 +261,17 @@ test.describe("Workshop live session", () => {
     await page.getByTestId("workshop-instructor-advance").click()
     await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
       "part.advance.ack",
+    )
+    await expect(page.getByTestId("workshop-timer-status")).toContainText(
+      "inactive",
+    )
+    await page.getByTestId("workshop-timer-start").click()
+    await expect(page.getByTestId("workshop-timer-status")).toContainText(
+      "running",
+    )
+    await page.getByTestId("workshop-timer-stop").click()
+    await expect(page.getByTestId("workshop-timer-status")).toContainText(
+      "inactive",
     )
 
     await page.getByTestId("workshop-instructor-end").click()
