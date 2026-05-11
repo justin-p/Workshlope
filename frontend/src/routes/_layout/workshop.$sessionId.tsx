@@ -304,6 +304,30 @@ function WorkshopSessionPage() {
       }
     },
   })
+  const addTraineeMutation = useMutation({
+    mutationFn: (userId: string) =>
+      WorkshopSessionsService.upsertWorkshopSessionMember({
+        sessionId,
+        requestBody: { user_id: userId, role: "participant" },
+      }),
+    onSuccess: async () => {
+      setErrorDetail(null)
+      setNewTraineeUserId("")
+      await Promise.all([
+        detailQuery.refetch(),
+        gapsQuery.refetch(),
+        aggregatesQuery.refetch(),
+      ])
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
 
   const [phase, setPhase] = useState<
     "idle" | "entering" | "ws_connecting" | "ready" | "error"
@@ -315,6 +339,7 @@ function WorkshopSessionPage() {
     null,
   )
   const [timerExtendMinutes, setTimerExtendMinutes] = useState<number>(5)
+  const [newTraineeUserId, setNewTraineeUserId] = useState<string>("")
   const [connectedRole, setConnectedRole] = useState<
     "participant" | "instructor" | null
   >(null)
@@ -541,6 +566,8 @@ function WorkshopSessionPage() {
   const lessonContentIssue =
     detailQuery.data?.lesson.lesson_content_issue ?? null
   const canRunLiveDelivery = lessonContentAvailable
+  const rosterParticipants =
+    detailQuery.data?.view === "instructor" ? detailQuery.data.participants : []
   const lessonContentIssueHint =
     lessonContentIssue === "lesson_missing"
       ? "This session is linked to a lesson record that no longer exists."
@@ -751,6 +778,62 @@ function WorkshopSessionPage() {
                 </ul>
               )}
             </>
+          )}
+        </div>
+      ) : null}
+      {detailView === "instructor" ? (
+        <div
+          className="rounded-lg border px-4 py-3 text-sm space-y-2 bg-card"
+          data-testid="workshop-roster-panel"
+        >
+          <div className="font-medium">
+            Trainee roster ({rosterParticipants.length})
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="text-xs text-muted-foreground">
+              User ID
+              <input
+                type="text"
+                value={newTraineeUserId}
+                data-testid="workshop-add-trainee-user-id"
+                className="ml-2 h-8 w-[340px] rounded border bg-background px-2 text-foreground"
+                placeholder="UUID (user_id)"
+                onChange={(event) => setNewTraineeUserId(event.target.value)}
+              />
+            </label>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              data-testid="workshop-add-trainee-submit"
+              disabled={
+                !newTraineeUserId.trim() ||
+                addTraineeMutation.isPending ||
+                !canRunLiveDelivery
+              }
+              onClick={() => addTraineeMutation.mutate(newTraineeUserId.trim())}
+            >
+              {addTraineeMutation.isPending ? "Adding..." : "Add trainee"}
+            </Button>
+          </div>
+          {rosterParticipants.length === 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="workshop-roster-empty"
+            >
+              No trainees on roster yet.
+            </p>
+          ) : (
+            <ul
+              className="space-y-1 text-xs"
+              data-testid="workshop-roster-list"
+            >
+              {rosterParticipants.map((participant) => (
+                <li key={participant.user_id} className="text-muted-foreground">
+                  {participant.email} · {participant.live_status}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       ) : null}
