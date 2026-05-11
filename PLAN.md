@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-11** — **GitHub OAuth display name:** Auth.js **bridge JWT** now includes **`name`**; FastAPI **pending approve (link existing)** and **linked bridge** set **`User.full_name`** from GitHub when the user has no display name (existing non-empty name is left unchanged). **`create_bridge_token`** accepts **`name`** / **`full_name`** for tests. |
 | **Branch** | **`feat/oauth/github-full-name-on-approval`** |
-| **PR** | *(open after push — replace when `gh pr create` returns URL)* |
+| **PR** | **[#64](https://github.com/justin-p/testing/pull/64)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
