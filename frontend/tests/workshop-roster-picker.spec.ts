@@ -43,6 +43,49 @@ test.describe("Workshop roster user picker", () => {
     await expect(rosterList).toContainText(email25)
   })
 
+  test("picker table exposes column headers and remove clears roster", async ({
+    page,
+    request,
+  }) => {
+    const prefix = `rm_${Math.random().toString(36).slice(2, 8)}`
+    const traineeEmail = `${prefix}@example.com`
+    const sessionRes = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
+    )
+    expect(sessionRes.ok()).toBeTruthy()
+    const { session_id } = await sessionRes.json()
+    await createUser({ email: traineeEmail, password: "changethis123" })
+    await page.goto(`/workshop/${session_id}`)
+    await page.waitForLoadState("networkidle")
+
+    const panel = page.getByTestId("workshop-roster-panel")
+    await expect(
+      panel.getByRole("columnheader", { name: "Type" }),
+    ).toBeVisible()
+    await expect(
+      panel.getByRole("columnheader", { name: "Email" }),
+    ).toBeVisible()
+    await expect(
+      panel.getByRole("columnheader", { name: "Full name" }),
+    ).toBeVisible()
+
+    await page.getByTestId("workshop-roster-user-picker-search").fill(prefix)
+    const table = page.getByTestId("workshop-roster-user-picker-table")
+    await expect(table).toContainText(traineeEmail)
+    await page.getByRole("checkbox", { name: `Select ${traineeEmail}` }).click()
+    await page.getByTestId("workshop-roster-add-selected").click()
+
+    const rosterList = page.getByTestId("workshop-roster-list")
+    await expect(rosterList).toContainText(traineeEmail)
+
+    await page
+      .getByRole("button", { name: `Remove ${traineeEmail} from roster` })
+      .click()
+    await expect(page.getByRole("dialog")).toBeVisible()
+    await page.getByTestId("workshop-roster-remove-confirm").click()
+    await expect(page.getByTestId("workshop-roster-empty")).toBeVisible()
+  })
+
   test("search results show Instructor badge", async ({ page, request }) => {
     const prefix = `badge_${Math.random().toString(36).slice(2, 8)}`
     const instructorEmail = `${prefix}_i@example.com`

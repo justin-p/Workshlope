@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
+import { Trash2 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-
 import {
   ApiError,
   WorkshopLessonsService,
@@ -11,12 +11,22 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
+  TableHeader,
   TableRow,
 } from "@/components/ui/table"
 import useAuth from "@/hooks/useAuth"
@@ -339,6 +349,31 @@ function WorkshopSessionPage() {
     },
   })
 
+  const removeTraineeMutation = useMutation({
+    mutationFn: (userId: string) =>
+      WorkshopSessionsService.removeWorkshopSessionParticipant({
+        sessionId,
+        userId,
+      }),
+    onSuccess: async () => {
+      setErrorDetail(null)
+      setRemoveParticipantUserId(null)
+      await Promise.all([
+        detailQuery.refetch(),
+        gapsQuery.refetch(),
+        aggregatesQuery.refetch(),
+      ])
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
   const [phase, setPhase] = useState<
     "idle" | "entering" | "ws_connecting" | "ready" | "error"
   >("idle")
@@ -359,6 +394,9 @@ function WorkshopSessionPage() {
     () => new Set(),
   )
   const [pickerNotice, setPickerNotice] = useState<string | null>(null)
+  const [removeParticipantUserId, setRemoveParticipantUserId] = useState<
+    string | null
+  >(null)
   const [isAddingSelected, setIsAddingSelected] = useState(false)
   const [_pickerAddError, setPickerAddError] = useState<string | null>(null)
   const [connectedRole, setConnectedRole] = useState<
@@ -636,6 +674,10 @@ function WorkshopSessionPage() {
   const canRunLiveDelivery = lessonContentAvailable
   const rosterParticipants =
     detailQuery.data?.view === "instructor" ? detailQuery.data.participants : []
+  const removeDialogParticipant =
+    removeParticipantUserId === null
+      ? undefined
+      : rosterParticipants.find((p) => p.user_id === removeParticipantUserId)
   const lessonContentIssueHint =
     lessonContentIssue === "lesson_missing"
       ? "This session is linked to a lesson record that no longer exists."
@@ -999,14 +1041,18 @@ function WorkshopSessionPage() {
               <p className="text-xs text-muted-foreground">Loading users…</p>
             ) : (
               <Table>
-                <TableHead>
+                <TableHeader>
                   <TableRow>
-                    <TableCell className="w-[44px]"> </TableCell>
-                    <TableCell className="w-[120px]">Type</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Full name</TableCell>
+                    <TableHead className="w-[44px]" scope="col">
+                      <span className="sr-only">Select</span>
+                    </TableHead>
+                    <TableHead className="w-[120px]" scope="col">
+                      Type
+                    </TableHead>
+                    <TableHead scope="col">Email</TableHead>
+                    <TableHead scope="col">Full name</TableHead>
                   </TableRow>
-                </TableHead>
+                </TableHeader>
                 <TableBody data-testid="workshop-roster-user-picker-table">
                   {(rosterUserPickerQuery.data?.data ?? []).length ? (
                     (rosterUserPickerQuery.data?.data ?? []).map((row) => {
@@ -1105,9 +1151,10 @@ function WorkshopSessionPage() {
               </Table>
             )}
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button
                 type="button"
+                variant={selectedUserIds.size === 0 ? "outline" : "default"}
                 data-testid="workshop-roster-add-selected"
                 disabled={
                   selectedUserIds.size === 0 ||
@@ -1133,18 +1180,24 @@ function WorkshopSessionPage() {
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-end gap-2 pt-2 border-t">
-              <label className="text-xs text-muted-foreground">
-                Paste user ID
-                <input
+            <div className="mt-4 flex flex-wrap items-end gap-2 border-t pt-4">
+              <div className="flex min-w-0 flex-col gap-1">
+                <Label
+                  htmlFor="workshop-add-trainee-user-id"
+                  className="text-xs font-normal text-muted-foreground"
+                >
+                  Paste user ID
+                </Label>
+                <Input
+                  id="workshop-add-trainee-user-id"
                   type="text"
                   value={newTraineeUserId}
                   data-testid="workshop-add-trainee-user-id"
-                  className="ml-2 h-8 w-[340px] rounded border bg-background px-2 text-foreground"
+                  className="h-8 w-[min(100%,340px)] sm:w-[340px]"
                   placeholder="UUID (user_id)"
                   onChange={(event) => setNewTraineeUserId(event.target.value)}
                 />
-              </label>
+              </div>
               <Button
                 type="button"
                 variant="secondary"
@@ -1180,12 +1233,12 @@ function WorkshopSessionPage() {
                     key={participant.user_id}
                     className="text-muted-foreground flex flex-wrap items-center justify-between gap-2"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
                       {participant.avatar_url ? (
                         <img
                           src={participant.avatar_url}
                           alt=""
-                          className="size-5 rounded-full"
+                          className="size-5 shrink-0 rounded-full"
                         />
                       ) : null}
                       <span className="min-w-0 truncate">
@@ -1196,20 +1249,80 @@ function WorkshopSessionPage() {
                         · {participant.live_status}
                       </span>
                     </div>
-                    <Badge
-                      variant={
-                        participant.live_status === "done"
-                          ? "default"
-                          : "outline"
-                      }
-                      className="shrink-0"
-                    >
-                      {participant.live_status}
-                    </Badge>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge
+                        variant={
+                          participant.live_status === "done"
+                            ? "default"
+                            : "outline"
+                        }
+                      >
+                        {participant.live_status}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        aria-label={`Remove ${participant.email} from roster`}
+                        data-testid={`workshop-roster-remove-trainee-${participant.user_id}`}
+                        disabled={
+                          removeTraineeMutation.isPending || !canRunLiveDelivery
+                        }
+                        onClick={() =>
+                          setRemoveParticipantUserId(participant.user_id)
+                        }
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
+
+            <Dialog
+              open={removeParticipantUserId !== null}
+              onOpenChange={(open) => {
+                if (!open) setRemoveParticipantUserId(null)
+              }}
+            >
+              <DialogContent showCloseButton>
+                <DialogHeader>
+                  <DialogTitle>Remove from roster?</DialogTitle>
+                  <DialogDescription>
+                    {removeDialogParticipant
+                      ? `Remove ${removeDialogParticipant.full_name ?? removeDialogParticipant.email} (${removeDialogParticipant.email}) from this session roster. They can be added again later.`
+                      : "Remove this trainee from the session roster."}
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setRemoveParticipantUserId(null)}
+                    disabled={removeTraineeMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    data-testid="workshop-roster-remove-confirm"
+                    disabled={
+                      removeParticipantUserId === null ||
+                      removeTraineeMutation.isPending
+                    }
+                    onClick={() => {
+                      if (removeParticipantUserId === null) return
+                      removeTraineeMutation.mutate(removeParticipantUserId)
+                    }}
+                  >
+                    {removeTraineeMutation.isPending ? "Removing…" : "Remove"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       ) : null}
