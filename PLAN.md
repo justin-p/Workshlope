@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **`main`:** [#49](https://github.com/justin-p/testing/pull/49) and [#51](https://github.com/justin-p/testing/pull/51) landed (timer stops on `part.advance`; hub `Use lesson` action creates session from synced repo row + routing coverage). **In flight:** roster/add-trainee instructor UX + workshop E2E on `workshop.$sessionId.tsx`. |
-| **Branch** | **`feat/workshop/roster-add-trainee`** |
-| **PR** | _TBD — open after push for roster/add-trainee slice._ |
+| **Last synced** | **2026-05-11** — **`main`:** [#49](https://github.com/justin-p/testing/pull/49), [#51](https://github.com/justin-p/testing/pull/51), and [#52](https://github.com/justin-p/testing/pull/52) landed — timer stop on `part.advance`; hub **Use lesson** + routing test; instructor **add trainee** (user ID) on session view + workshop E2E. **Next:** hub polish (unified repo field, shallower start-session UX) per remaining bullets. |
+| **Branch** | **`main`** |
+| **PR** | _None open for this tracker row — next slice from [Remaining work](#remaining-work-authoritative)._ |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -34,9 +34,9 @@
     - ⚠️ The flow to create a session on the "Workshops hub" is confoluted with buttons behind multiple actions. Make this a lot more user friendly and polished. (**Partially addressed by [#51](https://github.com/justin-p/testing/pull/51); remaining menu/start-depth polish still open.**)
       - e.q.
         - There are 2 repo menus. 1 with a drop down and 1 with a cstom overwrite. This should be the same form, allow seclecitng from a list, but allow users to type and thus overwrite in the same form.
-        - 'Synced lesson repositories" has a "use" button, which has no real use, as it will just fill in the forms that allow you to setup a new sycn. This never happens, als that thing is already synced. A more logical thing would be that "use" is a "use lesson" button. This logic is currently behinf "preview + create session"
+        - 'Synced lesson repositories" has a "use" button, which has no real use, as it will just fill in the forms that allow you to setup a new sycn. This never happens, als that thing is already synced. A more logical thing would be that "use" is a "use lesson" button. This logic is currently behinf "preview + create session" (**Addressed:** row action is now **Use lesson** — [#51](https://github.com/justin-p/testing/pull/51).)
         - After clicking "preview + create session", only then a button apears to start a session, this is not user friendly and hidden to deep in menus.
-    - There is no way to add trainees to a session.
+    - ✅ **Instructors can add trainees to a live session** — session roster panel + user-id add flow — **[#52](https://github.com/justin-p/testing/pull/52)**.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
 
