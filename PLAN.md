@@ -11,7 +11,7 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **§1 gap notes:** workshop-runnable **coverage vs automation** (private bootstrap vs hub UI path; serial path split across specs; scheduled→live without trainee assertion; manual in-product sign-off still required). **Shipped on `main`:** roster **`participant.live_status`** instructor badges — **[#61](https://github.com/justin-p/testing/pull/61)**; session lobby + WS deferral — **[#60](https://github.com/justin-p/testing/pull/60)**. |
+| **Last synced** | **2026-05-11** — **§1 gap notes** + **workshop P0 list cleared** (code-checked: advance + timers + hub **#51–#60** + roster **#52–#61**); hub depth polish → **[deferred](#deferred-polish-backlog-skip-log)**. **PR:** **[#62](https://github.com/justin-p/testing/pull/62)**. |
 | **Branch** | **`docs/plan/section1-e2e-coverage-gaps`** |
 | **PR** | **[#62](https://github.com/justin-p/testing/pull/62)** |
 | **Integrate against** | **`main`** |
@@ -31,19 +31,9 @@
     - The serial **`Workshop live session`** `describe` does not chain **roster picker** add/search/batch/remove; those live in [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts).
     - **`scheduled session can be started from instructor page`** covers instructor lobby → **Start** → WS **connected** only; it does **not** exercise a **trainee** through scheduled → live (entry, WS, lesson surface).
     - **Baseline serial** in the spirit of §1 still spans **multiple spec files**, not one uninterrupted suite for the full spelled-out journey.
-    - Green CI does **not** replace **in-product** validation outside bootstrap (real GitHub sync, timing, multi-browser). **`P0 issues`** below tracks **known broken product**, not missing test integration alone.
+    - Green CI does **not** replace **in-product** validation outside bootstrap (real GitHub sync, timing, multi-browser). Re-open **P0 issues** when a regression is confirmed in-product or in tests.
   - P0 issues
-    - The "advance part" button does not work
-    - ✅ Timers should use the manifest
-    - ✅ Start "5m countdown" should be replaced with a "extend with X" where X can be set by the instructor.
-    - ✅ **Timer resets on WS part advance** — **[#49](https://github.com/justin-p/testing/pull/49)**
-    - ⚠️ The flow to create a session on the "Workshops hub" is confoluted with buttons behind multiple actions. Make this a lot more user friendly and polished. (**Partially addressed by [#51](https://github.com/justin-p/testing/pull/51); remaining menu/start-depth polish still open.**)
-      - e.q.
-        - ✅ **Unified repository owner/name field** — single `Input` + HTML `datalist` for GitHub suggestions and free typing (no separate dropdown + manual field) — [`WorkshopLessonRepoSyncCard.tsx`](frontend/src/components/dashboard/WorkshopLessonRepoSyncCard.tsx); **[#57](https://github.com/justin-p/testing/pull/57)**.
-        - 'Synced lesson repositories" has a "use" button, which has no real use, as it will just fill in the forms that allow you to setup a new sycn. This never happens, als that thing is already synced. A more logical thing would be that "use" is a "use lesson" button. This logic is currently behinf "preview + create session" (**Addressed:** row action is now **Use lesson** — [#51](https://github.com/justin-p/testing/pull/51).)
-        - After clicking "preview + create session", only then a button apears to start a session, this is not user friendly and hidden to deep in menus. (**Addressed:** preview toggle is **Preview parts** only; session start for single-lesson repos is **Use lesson** with inline feedback — not buried in the preview panel. **Multi-lesson repos:** **Choose lesson** opens preview; each lesson has **Start workshop** + inline feedback — **[#58](https://github.com/justin-p/testing/pull/58)**.)
-        - **Scheduled live workshop URL:** lobby until instructor starts (no part delivery HTML, WS deferred) — **[#60](https://github.com/justin-p/testing/pull/60)**.
-    - ✅ **Instructors can add trainees to a live session** — session roster panel + user-id add flow — **[#52](https://github.com/justin-p/testing/pull/52)**; **remove trainee** + roster picker table alignment — **[#56](https://github.com/justin-p/testing/pull/56)** (merged to `main`; roster search / batch add remain as follow-ups). **Roster live_status** reflects trainee busy/done over WS without reload — **[#61](https://github.com/justin-p/testing/pull/61)**.
+    - None
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
 
@@ -68,6 +58,7 @@ Record non-blocking polish items here when discovered during functional work, th
 | Date | Area | Polish item deferred | Why skipped now |
 | ---- | ---- | -------------------- | --------------- |
 | 2026-05-07 | Dashboard / workshop sync card | Expand broader UI/visual polish and additional non-blocking assertions around sync-card controls beyond the current behavior checks. | Functionality-first focus until workshop run flow is fully verified end-to-end. |
+| 2026-05-11 | Workshops hub | Deeper menu/start-depth and copy polish beyond shipped **#51** / **#57** / **#58** / **#60** flows (instructor usability review). | Functional paths exist; not blocking §1 until validation surfaces gaps. |
 
 ## Out of scope (MVP)
 
