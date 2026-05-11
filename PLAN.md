@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-11** — **`feat/workshop/roster-remove-and-table-fix`:** roster panel **remove trainee** (confirm dialog + `DELETE …/participants/{user_id}`); user-picker table uses **`TableHeader` + `TableHead`** so columns align; manual-add row uses **`Label` + `Input`** and spacing; Playwright covers remove + column headers in [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts). |
 | **Branch** | **`feat/workshop/roster-remove-and-table-fix`** |
-| **PR** | *Open after push* |
+| **PR** | **[#56](https://github.com/justin-p/testing/pull/56)** — roster remove trainee, picker table alignment, polish + Playwright. |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
