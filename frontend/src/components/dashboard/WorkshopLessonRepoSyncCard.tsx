@@ -1264,7 +1264,17 @@ export function WorkshopLessonRepoSyncCard() {
                       >
                         {previewLoadingRepoId === repo.lesson_repo_id
                           ? "Loading..."
-                          : "Use lesson"}
+                          : (() => {
+                              const pv = previewByRepoId[repo.lesson_repo_id]
+                              const previewLen = pv?.lessons.length ?? 0
+                              const effectiveCount =
+                                pv !== undefined && previewLen > 0
+                                  ? previewLen
+                                  : repo.lesson_count
+                              return effectiveCount > 1
+                                ? "Choose lesson"
+                                : "Use lesson"
+                            })()}
                       </Button>
                       <Button
                         type="button"
@@ -1344,9 +1354,12 @@ export function WorkshopLessonRepoSyncCard() {
                   <p className="text-destructive">{previewError}</p>
                 ) : preview ? (
                   preview.lessons.length > 0 ? (
-                    <ul className="mt-1 space-y-1">
+                    <ul className="mt-1 space-y-2">
                       {preview.lessons.map((lesson) => (
-                        <li key={lesson.lesson_id}>
+                        <li
+                          key={lesson.lesson_id}
+                          className="rounded border border-border/60 bg-background/50 p-2"
+                        >
                           <p className="font-medium">
                             {lesson.lesson_title} ({lesson.lesson_slug})
                           </p>
@@ -1364,6 +1377,57 @@ export function WorkshopLessonRepoSyncCard() {
                               No parts in lesson.
                             </p>
                           )}
+                          {preview.lessons.length > 1 ? (
+                            <div className="mt-2 flex flex-col items-start gap-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                data-testid={`workshop-repo-start-session-${lesson.lesson_id}`}
+                                disabled={createSessionMutation.isPending}
+                                onClick={() =>
+                                  createSessionMutation.mutate(lesson.lesson_id)
+                                }
+                              >
+                                Start workshop
+                              </Button>
+                              {(() => {
+                                const lid = lesson.lesson_id
+                                const creating = creatingLessonId === lid
+                                const createdId = createdSessionByLessonId[lid]
+                                const err = createSessionErrorByLessonId[lid]
+                                if (!creating && !createdId && !err) return null
+                                return (
+                                  <div
+                                    className="max-w-[20rem] text-xs"
+                                    data-testid={`workshop-use-lesson-session-feedback-${lid}`}
+                                  >
+                                    {creating ? (
+                                      <p className="text-muted-foreground">
+                                        Creating session…
+                                      </p>
+                                    ) : null}
+                                    {createdId ? (
+                                      <p className="text-emerald-700 dark:text-emerald-400">
+                                        Session created.{" "}
+                                        <Link
+                                          to="/workshop/$sessionId"
+                                          params={{ sessionId: createdId }}
+                                          className="underline underline-offset-4"
+                                        >
+                                          Open
+                                        </Link>
+                                      </p>
+                                    ) : null}
+                                    {err ? (
+                                      <p className="text-destructive">{err}</p>
+                                    ) : null}
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
