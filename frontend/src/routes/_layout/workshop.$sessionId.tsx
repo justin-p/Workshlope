@@ -8,7 +8,17 @@ import {
   WorkshopSessionsService,
 } from "@/client"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+} from "@/components/ui/table"
 import useAuth from "@/hooks/useAuth"
 
 /** Matches UUID v4 from `uuid.uuid4()` used for workshop sessions. */
@@ -340,6 +350,17 @@ function WorkshopSessionPage() {
   )
   const [timerExtendMinutes, setTimerExtendMinutes] = useState<number>(5)
   const [newTraineeUserId, setNewTraineeUserId] = useState<string>("")
+  const ROSTER_PICKER_LIMIT = 25
+  const ROSTER_PICKER_DEBOUNCE_MS = 350
+  const [rosterPickerSearch, setRosterPickerSearch] = useState("")
+  const [rosterPickerQuery, setRosterPickerQuery] = useState("")
+  const [rosterPickerSkip, setRosterPickerSkip] = useState(0)
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const [pickerNotice, setPickerNotice] = useState<string | null>(null)
+  const [isAddingSelected, setIsAddingSelected] = useState(false)
+  const [_pickerAddError, setPickerAddError] = useState<string | null>(null)
   const [connectedRole, setConnectedRole] = useState<
     "participant" | "instructor" | null
   >(null)
@@ -350,6 +371,53 @@ function WorkshopSessionPage() {
   const wsSessionReadyRef = useRef(false)
   const wsStaleReconnectAttemptsRef = useRef(0)
   const [_wsReconnectNonce, setWsReconnectNonce] = useState(0)
+
+  useEffect(() => {
+    const t = window.setTimeout(
+      () => setRosterPickerQuery(rosterPickerSearch.trim()),
+      ROSTER_PICKER_DEBOUNCE_MS,
+    )
+    return () => window.clearTimeout(t)
+  }, [rosterPickerSearch])
+
+  useEffect(() => {
+    setRosterPickerSkip(0)
+    setSelectedUserIds(new Set())
+    if (rosterPickerQuery.trim().length > 0) {
+      setPickerNotice("Selection cleared — search changed")
+    } else {
+      setPickerNotice("Selection cleared")
+    }
+    const t = window.setTimeout(() => setPickerNotice(null), 2500)
+    return () => window.clearTimeout(t)
+  }, [rosterPickerQuery])
+
+  const rosterUserPickerQuery = useQuery({
+    queryKey: [
+      "workshopRosterUserPicker",
+      sessionId,
+      rosterPickerQuery,
+      rosterPickerSkip,
+      ROSTER_PICKER_LIMIT,
+    ],
+    queryFn: () =>
+      WorkshopSessionsService.readWorkshopSessionRosterUserPicker({
+        sessionId,
+        q: rosterPickerQuery.trim().length > 0 ? rosterPickerQuery : undefined,
+        skip: rosterPickerSkip,
+        limit: ROSTER_PICKER_LIMIT,
+      }),
+    enabled: uuidOk && detailView === "instructor",
+    retry: false,
+  })
+
+  const addSelectedChunkMutation = useMutation({
+    mutationFn: (uids: string[]) =>
+      WorkshopSessionsService.batchUpsertWorkshopSessionParticipants({
+        sessionId,
+        requestBody: { user_ids: uids },
+      }),
+  })
 
   useEffect(() => {
     if (!UUID_V4_RE.test(sessionId)) {
@@ -577,6 +645,58 @@ function WorkshopSessionPage() {
           ? "No lesson parts are currently synced for this lesson."
           : null
 
+  const handleAddSelectedToRoster = async () => {
+    const ids = Array.from(selectedUserIds)
+    if (ids.length === 0) return
+
+    setPickerAddError(null)
+    setIsAddingSelected(true)
+    try {
+      const CHUNK_SIZE = 100
+      const mergedResults: Array<{
+        status: string
+      }> = []
+
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        const chunk = ids.slice(i, i + CHUNK_SIZE)
+        const res = await addSelectedChunkMutation.mutateAsync(chunk)
+        mergedResults.push(...res.results)
+      }
+
+      await Promise.all([
+        detailQuery.refetch(),
+        gapsQuery.refetch(),
+        aggregatesQuery.refetch(),
+      ])
+
+      setSelectedUserIds(new Set())
+
+      const added = mergedResults.filter((r) => r.status === "added").length
+      const already = mergedResults.filter((r) => r.status === "already").length
+      const notFound = mergedResults.filter(
+        (r) => r.status === "not_found",
+      ).length
+      const errored = mergedResults.filter((r) => r.status === "error").length
+
+      const bits = [`Added ${added} trainee${added === 1 ? "" : "s"}`]
+      if (already > 0) bits.push(`Already on roster: ${already}`)
+      if (notFound > 0) bits.push(`Not found: ${notFound}`)
+      if (errored > 0) bits.push(`Errors: ${errored}`)
+
+      setPickerNotice(bits.join(" · "))
+      window.setTimeout(() => setPickerNotice(null), 4000)
+    } catch (e: unknown) {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setPickerAddError(body?.detail ?? e.message)
+      } else {
+        setPickerAddError(e instanceof Error ? e.message : "Request failed")
+      }
+    } finally {
+      setIsAddingSelected(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">
@@ -789,52 +909,308 @@ function WorkshopSessionPage() {
           <div className="font-medium">
             Trainee roster ({rosterParticipants.length})
           </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="text-xs text-muted-foreground">
-              User ID
-              <input
-                type="text"
-                value={newTraineeUserId}
-                data-testid="workshop-add-trainee-user-id"
-                className="ml-2 h-8 w-[340px] rounded border bg-background px-2 text-foreground"
-                placeholder="UUID (user_id)"
-                onChange={(event) => setNewTraineeUserId(event.target.value)}
-              />
-            </label>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              data-testid="workshop-add-trainee-submit"
-              disabled={
-                !newTraineeUserId.trim() ||
-                addTraineeMutation.isPending ||
-                !canRunLiveDelivery
-              }
-              onClick={() => addTraineeMutation.mutate(newTraineeUserId.trim())}
-            >
-              {addTraineeMutation.isPending ? "Adding..." : "Add trainee"}
-            </Button>
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-end gap-2 justify-between">
+              <label
+                htmlFor="workshop-roster-user-picker-search"
+                className="text-xs text-muted-foreground"
+              >
+                Find users
+                <div className="mt-1 flex items-center gap-2">
+                  <Input
+                    type="text"
+                    value={rosterPickerSearch}
+                    onChange={(e) => setRosterPickerSearch(e.target.value)}
+                    data-testid="workshop-roster-user-picker-search"
+                    id="workshop-roster-user-picker-search"
+                    placeholder="Search by full name or email"
+                    className="w-[360px]"
+                  />
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2"
+                      data-testid="workshop-roster-user-picker-page-prev"
+                      disabled={rosterPickerSkip <= 0}
+                      onClick={() =>
+                        setRosterPickerSkip((s) =>
+                          Math.max(0, s - ROSTER_PICKER_LIMIT),
+                        )
+                      }
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2"
+                      data-testid="workshop-roster-user-picker-page-next"
+                      disabled={
+                        (rosterUserPickerQuery.data?.count ?? 0) <=
+                        rosterPickerSkip + ROSTER_PICKER_LIMIT
+                      }
+                      onClick={() =>
+                        setRosterPickerSkip((s) => s + ROSTER_PICKER_LIMIT)
+                      }
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {pickerNotice ? (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="workshop-roster-picker-notice"
+              >
+                {pickerNotice}
+              </p>
+            ) : null}
+
+            {rosterUserPickerQuery.isError ? (
+              <Alert
+                variant="destructive"
+                data-testid="workshop-roster-user-picker-error"
+              >
+                <AlertTitle>Could not load users</AlertTitle>
+                <AlertDescription>
+                  {rosterUserPickerQuery.error instanceof ApiError
+                    ? ((
+                        rosterUserPickerQuery.error.body as
+                          | {
+                              detail?: string
+                            }
+                          | undefined
+                      )?.detail ?? rosterUserPickerQuery.error.message)
+                    : rosterUserPickerQuery.error instanceof Error
+                      ? rosterUserPickerQuery.error.message
+                      : "Request failed"}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            {rosterUserPickerQuery.isLoading ? (
+              <p className="text-xs text-muted-foreground">Loading users…</p>
+            ) : (
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell className="w-[44px]"> </TableCell>
+                    <TableCell className="w-[120px]">Type</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Full name</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody data-testid="workshop-roster-user-picker-table">
+                  {(rosterUserPickerQuery.data?.data ?? []).length ? (
+                    (rosterUserPickerQuery.data?.data ?? []).map((row) => {
+                      const onRoster = rosterParticipants.some(
+                        (p) => p.user_id === row.user_id,
+                      )
+                      const disabled = onRoster || !row.is_active
+                      const selected = selectedUserIds.has(row.user_id)
+                      const typeBadges: React.ReactNode[] = []
+                      if (row.is_superuser) {
+                        typeBadges.push(
+                          <Badge key="superuser" variant="secondary">
+                            Superuser
+                          </Badge>,
+                        )
+                      }
+                      if (row.is_instructor) {
+                        typeBadges.push(
+                          <Badge key="instructor" variant="outline">
+                            Instructor
+                          </Badge>,
+                        )
+                      }
+                      if (typeBadges.length === 0) {
+                        typeBadges.push(
+                          <Badge key="trainee" variant="outline">
+                            Trainee
+                          </Badge>,
+                        )
+                      }
+
+                      return (
+                        <TableRow key={row.user_id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selected}
+                              disabled={disabled}
+                              aria-label={`Select ${row.email}`}
+                              onCheckedChange={(checked) => {
+                                if (typeof checked !== "boolean") return
+                                setSelectedUserIds((prev) => {
+                                  const next = new Set(prev)
+                                  if (checked) next.add(row.user_id)
+                                  else next.delete(row.user_id)
+                                  return next
+                                })
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {typeBadges}
+                              {!row.is_active ? (
+                                <Badge
+                                  variant="destructive"
+                                  className="opacity-80"
+                                  title="Account inactive"
+                                >
+                                  Inactive
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell
+                            className={
+                              !row.is_active
+                                ? "text-muted-foreground"
+                                : undefined
+                            }
+                          >
+                            {row.email}
+                          </TableCell>
+                          <TableCell
+                            className={
+                              !row.is_active
+                                ? "text-muted-foreground"
+                                : undefined
+                            }
+                          >
+                            {row.full_name ?? "—"}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="h-24 text-center text-muted-foreground"
+                      >
+                        No users found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                data-testid="workshop-roster-add-selected"
+                disabled={
+                  selectedUserIds.size === 0 ||
+                  isAddingSelected ||
+                  !canRunLiveDelivery
+                }
+                onClick={() => void handleAddSelectedToRoster()}
+              >
+                {isAddingSelected
+                  ? "Adding..."
+                  : `Add ${selectedUserIds.size} selected`}
+              </Button>
+              {selectedUserIds.size > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="workshop-roster-clear-selection"
+                  onClick={() => setSelectedUserIds(new Set())}
+                >
+                  Clear selection
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap items-end gap-2 pt-2 border-t">
+              <label className="text-xs text-muted-foreground">
+                Paste user ID
+                <input
+                  type="text"
+                  value={newTraineeUserId}
+                  data-testid="workshop-add-trainee-user-id"
+                  className="ml-2 h-8 w-[340px] rounded border bg-background px-2 text-foreground"
+                  placeholder="UUID (user_id)"
+                  onChange={(event) => setNewTraineeUserId(event.target.value)}
+                />
+              </label>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                data-testid="workshop-add-trainee-submit"
+                disabled={
+                  !newTraineeUserId.trim() ||
+                  addTraineeMutation.isPending ||
+                  !canRunLiveDelivery
+                }
+                onClick={() =>
+                  addTraineeMutation.mutate(newTraineeUserId.trim())
+                }
+              >
+                {addTraineeMutation.isPending ? "Adding..." : "Add trainee"}
+              </Button>
+            </div>
+
+            {rosterParticipants.length === 0 ? (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="workshop-roster-empty"
+              >
+                No trainees on roster yet.
+              </p>
+            ) : (
+              <ul
+                className="space-y-1 text-xs"
+                data-testid="workshop-roster-list"
+              >
+                {rosterParticipants.map((participant) => (
+                  <li
+                    key={participant.user_id}
+                    className="text-muted-foreground flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {participant.avatar_url ? (
+                        <img
+                          src={participant.avatar_url}
+                          alt=""
+                          className="size-5 rounded-full"
+                        />
+                      ) : null}
+                      <span className="min-w-0 truncate">
+                        {participant.full_name ?? participant.email}{" "}
+                        <span className="text-xs text-muted-foreground">
+                          ({participant.email})
+                        </span>{" "}
+                        · {participant.live_status}
+                      </span>
+                    </div>
+                    <Badge
+                      variant={
+                        participant.live_status === "done"
+                          ? "default"
+                          : "outline"
+                      }
+                      className="shrink-0"
+                    >
+                      {participant.live_status}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          {rosterParticipants.length === 0 ? (
-            <p
-              className="text-xs text-muted-foreground"
-              data-testid="workshop-roster-empty"
-            >
-              No trainees on roster yet.
-            </p>
-          ) : (
-            <ul
-              className="space-y-1 text-xs"
-              data-testid="workshop-roster-list"
-            >
-              {rosterParticipants.map((participant) => (
-                <li key={participant.user_id} className="text-muted-foreground">
-                  {participant.email} · {participant.live_status}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       ) : null}
 

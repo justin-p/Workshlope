@@ -2172,6 +2172,78 @@ export const WorkshopRosterParticipantRowPublicSchema = {
     title: 'WorkshopRosterParticipantRowPublic'
 } as const;
 
+export const WorkshopRosterUserPickerPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopRosterUserPickerRowPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopRosterUserPickerPublic'
+} as const;
+
+export const WorkshopRosterUserPickerRowPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        is_superuser: {
+            type: 'boolean',
+            title: 'Is Superuser'
+        },
+        is_instructor: {
+            type: 'boolean',
+            title: 'Is Instructor'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active'
+        },
+        match_score: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Match Score',
+            description: 'Best trigram similarity when search q is set; omitted in browse mode.'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'email', 'is_superuser', 'is_instructor', 'is_active'],
+    title: 'WorkshopRosterUserPickerRowPublic',
+    description: 'One row for instructor roster user picker (browse + fuzzy search).'
+} as const;
+
 export const WorkshopSessionCorePublicSchema = {
     properties: {
         id: {
@@ -2375,6 +2447,69 @@ export const WorkshopSessionListItemSchema = {
     required: ['id', 'status', 'part_generation', 'lesson_id', 'lesson_title', 'lesson_slug'],
     title: 'WorkshopSessionListItem',
     description: 'Minimal session row for dashboard lists — no roster, no peer data.'
+} as const;
+
+export const WorkshopSessionMemberBatchResultItemSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        status: {
+            type: 'string',
+            enum: ['added', 'already', 'not_found', 'error'],
+            title: 'Status'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'status'],
+    title: 'WorkshopSessionMemberBatchResultItem'
+} as const;
+
+export const WorkshopSessionMembersBatchBodySchema = {
+    properties: {
+        user_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            maxItems: 100,
+            title: 'User Ids',
+            description: 'At most 100 user IDs per request; client may chunk larger selections.'
+        }
+    },
+    type: 'object',
+    required: ['user_ids'],
+    title: 'WorkshopSessionMembersBatchBody',
+    description: 'Add multiple participants in one request (instructor-only).'
+} as const;
+
+export const WorkshopSessionMembersBatchResponseSchema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopSessionMemberBatchResultItem'
+            },
+            type: 'array',
+            title: 'Results'
+        }
+    },
+    type: 'object',
+    required: ['results'],
+    title: 'WorkshopSessionMembersBatchResponse'
 } as const;
 
 export const WorkshopSessionPatchSchema = {

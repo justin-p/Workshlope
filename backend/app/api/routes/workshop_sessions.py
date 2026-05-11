@@ -18,7 +18,8 @@ from fastapi import (
 )
 from jwt.exceptions import PyJWTError
 from pydantic import BaseModel
-from sqlalchemy import or_
+from sqlalchemy import String, cast, literal, or_
+from sqlalchemy.sql import func as sa_func
 from sqlmodel import Session, col, func, select
 
 from app.api.deps import CurrentUser, SessionDep
@@ -43,11 +44,16 @@ from app.models import (
     WorkshopParticipantSelfPublic,
     WorkshopRosterInstructorRowPublic,
     WorkshopRosterParticipantRowPublic,
+    WorkshopRosterUserPickerPublic,
+    WorkshopRosterUserPickerRowPublic,
     WorkshopSession,
     WorkshopSessionCorePublic,
     WorkshopSessionCreate,
     WorkshopSessionCreatedPublic,
     WorkshopSessionListItem,
+    WorkshopSessionMemberBatchResultItem,
+    WorkshopSessionMembersBatchBody,
+    WorkshopSessionMembersBatchResponse,
     WorkshopSessionPatch,
     WorkshopSessionPublicInstructor,
     WorkshopSessionPublicParticipant,
@@ -326,6 +332,56 @@ def _require_workshop_instructor(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="User is not an instructor for this session",
     )
+
+
+ROSTER_PICKER_MIN_Q_LEN = 2
+ROSTER_PICKER_DEFAULT_LIMIT = 25
+ROSTER_PICKER_MAX_LIMIT = 100
+ROSTER_BATCH_MAX_IDS = 100
+
+
+def _upsert_workshop_session_participant_seat(
+    session_db: Session,
+    *,
+    session_id: uuid.UUID,
+    target_user: User,
+) -> Literal["added", "already"]:
+    """Ensure ``target_user`` has an active participant seat; mirrors single-member POST."""
+    now = datetime.now(timezone.utc)
+    instructor = session_db.exec(
+        select(SessionInstructor).where(
+            SessionInstructor.session_id == session_id,
+            SessionInstructor.user_id == target_user.id,
+            col(SessionInstructor.removed_at).is_(None),
+        )
+    ).first()
+    if instructor is not None:
+        instructor.removed_at = now
+        session_db.add(instructor)
+
+    participant = session_db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == session_id,
+            WorkshopParticipant.user_id == target_user.id,
+        )
+    ).first()
+    if participant is None:
+        session_db.add(
+            WorkshopParticipant(
+                session_id=session_id,
+                user_id=target_user.id,
+                invited_at=now,
+            )
+        )
+        return "added"
+    if participant.removed_at is None:
+        return "already"
+    participant.removed_at = None
+    participant.user_id = target_user.id
+    if participant.invited_at is None:
+        participant.invited_at = now
+    session_db.add(participant)
+    return "added"
 
 
 def _required_prerequisites_complete_for_user(
@@ -1359,6 +1415,163 @@ async def patch_workshop_session(
     return Message(message="Session updated")
 
 
+@router.get(
+    "/{session_id}/roster-user-picker",
+    response_model=WorkshopRosterUserPickerPublic,
+)
+def read_workshop_session_roster_user_picker(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    session_id: uuid.UUID,
+    q: str | None = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(
+        ROSTER_PICKER_DEFAULT_LIMIT,
+        ge=1,
+        le=ROSTER_PICKER_MAX_LIMIT,
+    ),
+) -> WorkshopRosterUserPickerPublic:
+    """Instructor-only paginated user list for roster; optional pg_trgm-ranked search."""
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+
+    q_stripped = (q or "").strip()
+    if q_stripped:
+        if len(q_stripped) < ROSTER_PICKER_MIN_Q_LEN:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Search query must be at least 2 characters",
+            )
+        email_c = cast(User.email, String)
+        name_c = func.coalesce(cast(User.full_name, String), "")
+        q_lit = literal(q_stripped)
+        sim_e = sa_func.similarity(email_c, q_lit)
+        sim_n = sa_func.similarity(name_c, q_lit)
+        match_expr = sa_func.greatest(sim_e, sim_n)
+        cond = or_(email_c.op("%")(q_lit), name_c.op("%")(q_lit))
+        count_val = session.exec(
+            select(func.count()).select_from(User).where(cond)
+        ).one()
+        stmt = (
+            select(User, match_expr.label("match_score"))
+            .where(cond)
+            .order_by(match_expr.desc(), User.email)
+            .offset(skip)
+            .limit(limit)
+        )
+        rows = session.exec(stmt).all()
+        data = [
+            WorkshopRosterUserPickerRowPublic(
+                user_id=user.id,
+                email=str(user.email),
+                full_name=user.full_name,
+                is_superuser=user.is_superuser,
+                is_instructor=user.is_instructor,
+                is_active=user.is_active,
+                match_score=float(score) if score is not None else None,
+            )
+            for user, score in rows
+        ]
+        return WorkshopRosterUserPickerPublic(data=data, count=int(count_val))
+
+    count_val = session.exec(select(func.count()).select_from(User)).one()
+    browse_stmt = select(User).order_by(User.email).offset(skip).limit(limit)
+    users = session.exec(browse_stmt).all()
+    data = [
+        WorkshopRosterUserPickerRowPublic(
+            user_id=user.id,
+            email=str(user.email),
+            full_name=user.full_name,
+            is_superuser=user.is_superuser,
+            is_instructor=user.is_instructor,
+            is_active=user.is_active,
+            match_score=None,
+        )
+        for user in users
+    ]
+    return WorkshopRosterUserPickerPublic(data=data, count=int(count_val))
+
+
+@router.post(
+    "/{session_id}/members/batch",
+    response_model=WorkshopSessionMembersBatchResponse,
+)
+def batch_upsert_workshop_session_participants(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    session_id: uuid.UUID,
+    body: WorkshopSessionMembersBatchBody,
+) -> WorkshopSessionMembersBatchResponse:
+    """Add many participants at once (deduped, stable order)."""
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+    _require_workshop_instructor(
+        session_db=session, session_id=session_id, current_user=current_user
+    )
+
+    if len(body.user_ids) > ROSTER_BATCH_MAX_IDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"At most {ROSTER_BATCH_MAX_IDS} user_ids per request",
+        )
+
+    seen: set[uuid.UUID] = set()
+    ordered_unique: list[uuid.UUID] = []
+    for uid in body.user_ids:
+        if uid not in seen:
+            seen.add(uid)
+            ordered_unique.append(uid)
+
+    results: list[WorkshopSessionMemberBatchResultItem] = []
+    for uid in ordered_unique:
+        target_user = session.get(User, uid)
+        if target_user is None:
+            results.append(
+                WorkshopSessionMemberBatchResultItem(
+                    user_id=uid,
+                    status="not_found",
+                    detail="Target user not found",
+                )
+            )
+            continue
+        try:
+            st = _upsert_workshop_session_participant_seat(
+                session,
+                session_id=session_id,
+                target_user=target_user,
+            )
+            results.append(
+                WorkshopSessionMemberBatchResultItem(
+                    user_id=uid,
+                    status=st,
+                    detail=None,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            results.append(
+                WorkshopSessionMemberBatchResultItem(
+                    user_id=uid,
+                    status="error",
+                    detail=str(exc),
+                )
+            )
+    session.commit()
+    return WorkshopSessionMembersBatchResponse(results=results)
+
+
 @router.post("/{session_id}/members", response_model=Message)
 def upsert_workshop_session_member(
     *,
@@ -1386,35 +1599,11 @@ def upsert_workshop_session_member(
 
     now = datetime.now(timezone.utc)
     if body.role == "participant":
-        instructor = session.exec(
-            select(SessionInstructor).where(
-                SessionInstructor.session_id == session_id,
-                SessionInstructor.user_id == target_user.id,
-                col(SessionInstructor.removed_at).is_(None),
-            )
-        ).first()
-        if instructor is not None:
-            instructor.removed_at = now
-            session.add(instructor)
-
-        participant = session.exec(
-            select(WorkshopParticipant).where(
-                WorkshopParticipant.session_id == session_id,
-                WorkshopParticipant.user_id == target_user.id,
-            )
-        ).first()
-        if participant is None:
-            participant = WorkshopParticipant(
-                session_id=session_id,
-                user_id=target_user.id,
-                invited_at=now,
-            )
-        else:
-            participant.user_id = target_user.id
-            participant.removed_at = None
-            if participant.invited_at is None:
-                participant.invited_at = now
-        session.add(participant)
+        _upsert_workshop_session_participant_seat(
+            session,
+            session_id=session_id,
+            target_user=target_user,
+        )
         session.commit()
         return Message(message="Member upserted as participant")
 

@@ -2479,6 +2479,202 @@ def test_upsert_member_requires_instructor_role(
     assert response.json()["detail"] == "User is not an instructor for this session"
 
 
+def test_roster_user_picker_requires_instructor_role(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    actor_email = f"picker-actor-{uuid.uuid4()}@example.com"
+    actor_headers = authentication_token_from_email(
+        client=client, email=actor_email, db=db
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/roster-user-picker",
+        headers=actor_headers,
+    )
+    assert response.status_code == 403
+
+
+def test_roster_user_picker_browse_paginates(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"picker-lead-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email, password="pw123456", is_instructor=True
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/roster-user-picker",
+        headers=headers,
+        params={"skip": 0, "limit": 5},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["data"]) <= 5
+    assert body["count"] >= len(body["data"])
+    for row in body["data"]:
+        assert row["match_score"] is None
+
+
+def test_roster_user_picker_search_rejects_short_query(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"picker-lead2-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email, password="pw123456", is_instructor=True
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/roster-user-picker",
+        headers=headers,
+        params={"q": "a"},
+    )
+    assert response.status_code == 422
+
+
+def test_roster_user_picker_search_returns_dual_flags_and_score(
+    client: TestClient, db: Session
+) -> None:
+    marker = f"trgmpick{uuid.uuid4().hex[:10]}"
+    email = f"{marker}@example.com"
+    session_row = _create_live_session(db)
+    lead_email = f"picker-lead3-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email, password="pw123456", is_instructor=True
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    picked = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password="pw123456",
+            full_name=f"Person {marker}",
+        ),
+    )
+    dual = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"dual-{marker}@example.com",
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    dual.is_superuser = True
+    db.add(dual)
+    db.commit()
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/roster-user-picker",
+        headers=headers,
+        params={"q": marker, "limit": 50},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    by_id = {row["user_id"]: row for row in body["data"]}
+    assert str(picked.id) in by_id
+    assert by_id[str(picked.id)]["match_score"] is not None
+    dual_row = by_id[str(dual.id)]
+    assert dual_row["is_superuser"] is True
+    assert dual_row["is_instructor"] is True
+
+
+def test_members_batch_adds_and_dedupes(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"batch-lead-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email, password="pw123456", is_instructor=True
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    t1 = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"b1-{uuid.uuid4()}@example.com", password="pw123456"
+        ),
+    )
+    t2 = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=f"b2-{uuid.uuid4()}@example.com", password="pw123456"
+        ),
+    )
+    db.commit()
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members/batch",
+        headers=headers,
+        json={"user_ids": [str(t1.id), str(t2.id), str(t1.id)]},
+    )
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert len(results) == 2
+    by_uid = {item["user_id"]: item["status"] for item in results}
+    assert by_uid[str(t1.id)] == "added"
+    assert by_uid[str(t2.id)] == "added"
+
+    again = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members/batch",
+        headers=headers,
+        json={"user_ids": [str(t1.id)]},
+    )
+    assert again.status_code == 200
+    assert again.json()["results"][0]["status"] == "already"
+
+
+def test_members_batch_not_found_and_oversize(client: TestClient, db: Session) -> None:
+    session_row = _create_live_session(db)
+    lead_email = f"batch-lead2-{uuid.uuid4()}@example.com"
+    lead = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=lead_email, password="pw123456", is_instructor=True
+        ),
+    )
+    db.add(SessionInstructor(session_id=session_row.id, user_id=lead.id, role="lead"))
+    db.commit()
+    headers = user_authentication_headers(
+        client=client, email=lead_email, password="pw123456"
+    )
+    missing = uuid.uuid4()
+    r1 = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members/batch",
+        headers=headers,
+        json={"user_ids": [str(missing)]},
+    )
+    assert r1.status_code == 200
+    assert r1.json()["results"][0]["status"] == "not_found"
+
+    too_many = [str(uuid.uuid4()) for _ in range(101)]
+    r2 = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/members/batch",
+        headers=headers,
+        json={"user_ids": too_many},
+    )
+    assert r2.status_code == 422
+
+
 def test_upsert_member_adds_participant_and_replaces_instructor_role(
     client: TestClient, db: Session
 ) -> None:
