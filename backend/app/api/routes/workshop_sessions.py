@@ -677,9 +677,12 @@ async def _dispatch_workshop_ws_text(
                     col(WorkshopParticipant.removed_at).is_(None),
                 )
             ).all()
+            live_status_reset_user_ids: list[uuid.UUID] = []
             for participant in participants:
                 participant.live_status = "busy"
                 db.add(participant)
+                if participant.user_id is not None:
+                    live_status_reset_user_ids.append(participant.user_id)
             db.commit()
             next_generation = int(workshop_session.part_generation)
 
@@ -699,6 +702,12 @@ async def _dispatch_workshop_ws_text(
             part_slug=target_part_slug,
             part_generation=next_generation,
         )
+        for uid in live_status_reset_user_ids:
+            await workshop_hub.publish_participant_live_status(
+                session_id=session_id,
+                user_id=uid,
+                live_status="busy",
+            )
         return True
 
     if msg_type == "session.pause":

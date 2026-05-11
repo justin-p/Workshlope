@@ -884,10 +884,17 @@ def test_ws_instructor_can_advance_part_and_broadcast_to_participants(
             assert instructor_ws.receive_json()["type"] == "session.connected"
             instructor_ws.send_json({"type": "part.advance", "part_index": 1})
             ack = instructor_ws.receive_json()
+            inst_part_changed = instructor_ws.receive_json()
+            inst_live = instructor_ws.receive_json()
             broadcast = participant_ws.receive_json()
 
     assert ack["type"] == "part.advance.ack"
     assert ack["part_index"] == 1
+    assert inst_part_changed["type"] == "session.part_changed"
+    assert inst_part_changed["part_index"] == 1
+    assert inst_live["type"] == "participant.live_status"
+    assert inst_live["live_status"] == "busy"
+    assert inst_live["user_id"] == str(participant_user.id)
     assert broadcast["type"] == "session.part_changed"
     assert broadcast["part_index"] == 1
     db.refresh(timer_row)
