@@ -11,8 +11,8 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **§1** coverage notes flattened + **P0** cleared (code-checked); **#62** merged: gap bullets + deferred hub/roster polish. Restored **§2 / §3** remaining-work sections in doc pass. |
-| **Branch** | **`main`** |
+| **Last synced** | **2026-05-11** — **`feat/workshop/e2e-scheduled-trainee-after-start`:** Playwright **scheduled → live** path for rostered **trainee** (lobby → instructor **Start** → trainee `reload` → `workshop-current-part` + WS **connected**); §1 bullet updated in [`PLAN.md`](PLAN.md). |
+| **Branch** | **`feat/workshop/e2e-scheduled-trainee-after-start`** |
 | **PR** | — |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
@@ -28,7 +28,7 @@
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
   - Most [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) flows seed via **`POST /api/v1/private/workshop/e2e-live-session/`** (local-only bootstrap), not one continuous **UI-only** create/prepare → live path from the workshops hub; hub UI session creation is covered separately in [`dashboard-routing.spec.ts`](frontend/tests/dashboard-routing.spec.ts).
   - The serial **`Workshop live session`** `describe` does not chain **roster picker** add/search/batch/remove; those live in [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts).
-  - **`scheduled session can be started from instructor page`** covers instructor lobby → **Start** → WS **connected** only; it does **not** exercise a **trainee** through scheduled → live (entry, WS, lesson surface).
+  - **`scheduled session can be started from instructor page`** covers instructor lobby → **Start** → WS **connected** only; **`trainee sees lobby while scheduled then live after instructor starts`** adds rostered trainee lobby → reload after **Start** → part surface + WS **connected** ([`workshop.spec.ts`](frontend/tests/workshop.spec.ts)).
   - **Baseline serial** in the spirit of §1 still spans **multiple spec files**, not one uninterrupted suite for the full spelled-out journey.
   - Green CI does **not** replace **in-product** validation outside bootstrap (real GitHub sync, timing, multi-browser). Re-open **P0 issues** when a regression is confirmed in-product or in tests.
   - P0 issues
