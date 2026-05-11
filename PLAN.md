@@ -33,7 +33,7 @@
   - **Baseline serial** in the spirit of §1 still spans **multiple spec files**, not one uninterrupted suite for the full spelled-out journey.
   - Green CI does **not** replace **in-product** validation outside bootstrap (real GitHub sync, timing, multi-browser). Re-open **P0 issues** when a regression is confirmed in-product or in tests.
   - P0 issues
-    - None
+    - Nwhen setting up a new session from a lesson, the instructor should be prompted to invite trainees and set pre work and any other things that are needed for the session.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
 
