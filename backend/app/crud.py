@@ -127,12 +127,34 @@ def create_oauth_account(
     return db_obj
 
 
+def apply_github_display_name_if_blank(
+    *, session: Session, user: User, display_name: str | None
+) -> bool:
+    """Set ``user.full_name`` from GitHub when the profile has no display name.
+
+    Returns ``True`` when ``user`` was modified (caller should ``commit`` if
+    needed). Does not commit itself.
+    """
+    if display_name is None:
+        return False
+    stripped = str(display_name).strip()[:255]
+    if not stripped:
+        return False
+    current = (user.full_name or "").strip()
+    if current:
+        return False
+    user.full_name = stripped
+    session.add(user)
+    return True
+
+
 def sync_linked_github_oauth_from_bridge_claims(
     *,
     session: Session,
     account: OAuthAccount,
     provider_login: object | None,
     avatar_url: object | None,
+    display_name: object | None = None,
 ) -> OAuthAccount:
     """Update stored GitHub profile fields from a verified bridge token (linked user)."""
     if account.provider != "github":
@@ -147,6 +169,12 @@ def sync_linked_github_oauth_from_bridge_claims(
         avatar = avatar_url.strip()[:512]
         if avatar and account.avatar_url != avatar:
             account.avatar_url = avatar
+            changed = True
+    user = session.get(User, account.user_id)
+    if user is not None and isinstance(display_name, str):
+        if apply_github_display_name_if_blank(
+            session=session, user=user, display_name=display_name
+        ):
             changed = True
     if changed:
         session.add(account)

@@ -97,6 +97,7 @@ def bridge_login(*, session: SessionDep, body: GitHubBridgeRequest) -> Any:
             account=account,
             provider_login=provider_login,
             avatar_url=avatar_url,
+            display_name=full_name,
         )
         return BridgeResponse(
             status="signed_in",
@@ -209,6 +210,10 @@ def approve_pending_login(
             email=pending.email,
             full_name=pending.full_name,
         )
+
+    crud.apply_github_display_name_if_blank(
+        session=session, user=user, display_name=pending.full_name
+    )
 
     account = crud.create_oauth_account(
         session=session,

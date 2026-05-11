@@ -155,6 +155,28 @@ class TestBridgeLinkedFlow:
         assert account.avatar_url == "https://new.example/new.png"
         assert account.provider_login == "carol-next"
 
+    def test_linked_bridge_sets_user_full_name_when_blank(
+        self, client: TestClient, db: Session
+    ) -> None:
+        user = _create_active_user(db)
+        assert user.full_name is None
+        crud.create_oauth_account(
+            session=db,
+            user_id=user.id,
+            provider="github",
+            provider_account_id="850",
+            provider_login="pat",
+        )
+        token = _bridge_token(
+            provider_account_id="850",
+            provider_login="pat",
+            name="Pat From GitHub",
+        )
+        r = client.post(f"{API}/oauth/github/bridge", json={"bridge_token": token})
+        assert r.status_code == 200
+        db.refresh(user)
+        assert user.full_name == "Pat From GitHub"
+
     def test_linked_inactive_user_denied(self, client: TestClient, db: Session) -> None:
         user = _create_active_user(db, is_active=False)
         crud.create_oauth_account(
@@ -312,6 +334,62 @@ class TestAdminApproveLinkExisting:
             crud.get_pending_github_login_by_id(session=db, pending_id=pending_id)
             is None
         )
+
+    def test_approve_link_sets_full_name_from_pending_when_user_blank(
+        self,
+        client: TestClient,
+        db: Session,
+        superuser_token_headers: dict[str, str],
+    ) -> None:
+        user = _create_active_user(db)
+        assert user.full_name is None
+        pending = crud.upsert_pending_github_login(
+            session=db,
+            provider="github",
+            provider_account_id="305",
+            provider_login="pat",
+            email=user.email,
+            full_name="Pat From GitHub",
+        )
+        r = client.post(
+            f"{API}/oauth/github/pending/{pending.id}/approve",
+            json={"user_id": str(user.id)},
+            headers=superuser_token_headers,
+        )
+        assert r.status_code == 200
+        db.refresh(user)
+        assert user.full_name == "Pat From GitHub"
+
+    def test_approve_link_preserves_existing_full_name_when_pending_has_name(
+        self,
+        client: TestClient,
+        db: Session,
+        superuser_token_headers: dict[str, str],
+    ) -> None:
+        user = crud.create_user(
+            session=db,
+            user_create=UserCreate(
+                email=random_email(),
+                password=random_lower_string(),
+                full_name="Existing Name",
+            ),
+        )
+        pending = crud.upsert_pending_github_login(
+            session=db,
+            provider="github",
+            provider_account_id="306",
+            provider_login="ghuser",
+            email=user.email,
+            full_name="GitHub Would Overwrite",
+        )
+        r = client.post(
+            f"{API}/oauth/github/pending/{pending.id}/approve",
+            json={"user_id": str(user.id)},
+            headers=superuser_token_headers,
+        )
+        assert r.status_code == 200
+        db.refresh(user)
+        assert user.full_name == "Existing Name"
 
     def test_approve_link_existing_unknown_user_404(
         self,
