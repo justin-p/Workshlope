@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **`main`:** [#49](https://github.com/justin-p/testing/pull/49), [#51](https://github.com/justin-p/testing/pull/51), and [#52](https://github.com/justin-p/testing/pull/52) landed — timer stop on `part.advance`; hub **Use lesson** + routing test; instructor **add trainee** (user ID) on session view + workshop E2E. **Next:** hub polish (unified repo field, shallower start-session UX) per remaining bullets. |
-| **Branch** | **`feat/workshop/sync-card-preview-only`** |
-| **PR** | **[#54](https://github.com/justin-p/testing/pull/54)** — preview-only parts toggle; **Use lesson** inline session feedback. |
+| **Last synced** | **2026-05-11** — **`feat/workshop/roster-remove-and-table-fix`:** roster panel **remove trainee** (confirm dialog + `DELETE …/participants/{user_id}`); user-picker table uses **`TableHeader` + `TableHead`** so columns align; manual-add row uses **`Label` + `Input`** and spacing; Playwright covers remove + column headers in [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts). |
+| **Branch** | **`feat/workshop/roster-remove-and-table-fix`** |
+| **PR** | *Open after push* |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -36,7 +36,7 @@
         - There are 2 repo menus. 1 with a drop down and 1 with a cstom overwrite. This should be the same form, allow seclecitng from a list, but allow users to type and thus overwrite in the same form.
         - 'Synced lesson repositories" has a "use" button, which has no real use, as it will just fill in the forms that allow you to setup a new sycn. This never happens, als that thing is already synced. A more logical thing would be that "use" is a "use lesson" button. This logic is currently behinf "preview + create session" (**Addressed:** row action is now **Use lesson** — [#51](https://github.com/justin-p/testing/pull/51).)
         - After clicking "preview + create session", only then a button apears to start a session, this is not user friendly and hidden to deep in menus. (**Addressed:** preview toggle is **Preview parts** only; session start for single-lesson repos is **Use lesson** with inline feedback — not buried in the preview panel.)
-    - ✅ **Instructors can add trainees to a live session** — session roster panel + user-id add flow — **[#52](https://github.com/justin-p/testing/pull/52)**.
+    - ✅ **Instructors can add trainees to a live session** — session roster panel + user-id add flow — **[#52](https://github.com/justin-p/testing/pull/52)**; **remove trainee** + roster picker table alignment — **`feat/workshop/roster-remove-and-table-fix`** (same release slice as roster search / batch add when merged).
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
 
@@ -169,7 +169,7 @@ Keep PRs merge-ready via **`AGENTS.md`** loops—especially **`gh pr checks --wa
 | Hub unit tests | [`backend/tests/services/test_workshop_realtime.py`](backend/tests/services/test_workshop_realtime.py) |
 | Local E2E session bootstrap (`ENVIRONMENT=local` only) | [`backend/app/api/routes/private.py`](backend/app/api/routes/private.py) — `bootstrap_e2e_workshop_live_session` (+ `with_incomplete_required_prerequisite`, distinct-trainee vs `FIRST_SUPERUSER` instructor split); tests in [`backend/tests/api/routes/test_private.py`](backend/tests/api/routes/test_private.py) |
 | Trainee workshop UI (enter + ws-ticket + WebSocket) | [`frontend/src/routes/_layout/workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) |
-| Workshop Playwright | [`frontend/tests/workshop.spec.ts`](frontend/tests/workshop.spec.ts) |
+| Workshop Playwright | [`frontend/tests/workshop.spec.ts`](frontend/tests/workshop.spec.ts), [`frontend/tests/workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts) |
 | Dashboard landing + routing | [`frontend/src/lib/dashboardLanding.ts`](frontend/src/lib/dashboardLanding.ts), stub rails [`frontend/src/components/dashboard/DashboardStubRails.tsx`](frontend/src/components/dashboard/DashboardStubRails.tsx), routes under [`frontend/src/routes/_layout/dashboard/`](frontend/src/routes/_layout/dashboard/), [`frontend/src/routes/_layout/workshops.tsx`](frontend/src/routes/_layout/workshops.tsx), sidebar [`frontend/src/components/Sidebar/AppSidebar.tsx`](frontend/src/components/Sidebar/AppSidebar.tsx), OAuth landing [`frontend/src/routes/auth.callback.tsx`](frontend/src/routes/auth.callback.tsx) |
 | Admin users (`is_instructor`) | [`frontend/src/components/Admin/AddUser.tsx`](frontend/src/components/Admin/AddUser.tsx), [`frontend/src/components/Admin/EditUser.tsx`](frontend/src/components/Admin/EditUser.tsx), [`frontend/src/components/Admin/columns.tsx`](frontend/src/components/Admin/columns.tsx); E2E [`frontend/tests/admin.spec.ts`](frontend/tests/admin.spec.ts) |
 | Playwright harness (backend reset / env) | [`scripts/e2e-backend-reset.sh`](scripts/e2e-backend-reset.sh), [`frontend/playwright.global-setup.ts`](frontend/playwright.global-setup.ts), [`frontend/playwright.config.ts`](frontend/playwright.config.ts) |
