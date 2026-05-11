@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import {
   ApiError,
@@ -110,6 +110,7 @@ function buildRecentRepos(nextRepo: string, recentRepos: string[]): string[] {
 
 export function WorkshopLessonRepoSyncCard() {
   const queryClient = useQueryClient()
+  const repoOwnerNameDatalistId = useId()
   const lastAutofillFingerprintForEmpty = useRef<string | null>(null)
   const [fullName, setFullName] = useState("")
   const [installationId, setInstallationId] = useState("")
@@ -384,16 +385,21 @@ export function WorkshopLessonRepoSyncCard() {
     selectedInstallation?.entitled_repositories,
   ])
 
+  const dedupedRepoNameSuggestions = useMemo(() => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const name of repoNameSuggestions) {
+      if (seen.has(name)) continue
+      seen.add(name)
+      out.push(name)
+    }
+    return out
+  }, [repoNameSuggestions])
+
   const installationSelectValue =
     primaryPickerMode &&
     sortedInstallRows.some((row) => row.installation_id === installationIdInt)
       ? String(installationIdInt)
-      : undefined
-
-  const repoSuggestSelectValue =
-    repoNameSuggestions.length > 0 &&
-    repoNameSuggestions.includes(normalizedRepo)
-      ? normalizedRepo
       : undefined
 
   const selectedInstallLiveListsNoRepos =
@@ -822,55 +828,34 @@ export function WorkshopLessonRepoSyncCard() {
             <div className="space-y-1.5">
               <label
                 className="text-xs text-muted-foreground"
-                htmlFor={
-                  repoNameSuggestions.length > 0
-                    ? "workshop-repo-suggest-trigger"
-                    : "repo-full-name-primary"
-                }
+                htmlFor="repo-full-name-primary"
               >
                 Repository (owner/name)
               </label>
-              {repoNameSuggestions.length > 0 ? (
-                <Select
-                  key={installationIdInt}
-                  value={repoSuggestSelectValue}
-                  onValueChange={(value) => {
-                    setFullName(value)
-                    setErrorDetail(null)
-                  }}
-                >
-                  <SelectTrigger
-                    id="workshop-repo-suggest-trigger"
-                    className="w-full"
-                    data-testid="workshop-sync-repo-suggest"
-                  >
-                    <SelectValue placeholder="Select repository…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {repoNameSuggestions.map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
               {accessibleReposQuery.isFetching &&
               !accessibleReposQuery.isSuccess ? (
                 <p className="text-xs text-muted-foreground">
                   Loading repositories GitHub grants this installation…
                 </p>
               ) : null}
-              {repoNameSuggestions.length > 0 ? (
+              {dedupedRepoNameSuggestions.length > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Or enter owner/repo below if the repo is missing from the
-                  list.
+                  Pick a suggestion or type any owner/repo (including repos not
+                  in the list).
                 </p>
               ) : null}
               <Input
                 id="repo-full-name-primary"
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                list={
+                  dedupedRepoNameSuggestions.length > 0
+                    ? repoOwnerNameDatalistId
+                    : undefined
+                }
+                onChange={(e) => {
+                  setFullName(e.target.value)
+                  setErrorDetail(null)
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && canSubmit) {
                     event.preventDefault()
@@ -880,6 +865,13 @@ export function WorkshopLessonRepoSyncCard() {
                 placeholder="owner/repo (e.g. acme/workshop-lessons)"
                 data-testid="workshop-sync-full-name"
               />
+              {dedupedRepoNameSuggestions.length > 0 ? (
+                <datalist id={repoOwnerNameDatalistId}>
+                  {dedupedRepoNameSuggestions.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+              ) : null}
               {accessibleReposQuery.isSuccess &&
               repoNameSuggestions.length === 0 &&
               !blockingSetupHint ? (
