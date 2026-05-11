@@ -359,9 +359,13 @@ test.describe("Workshop live session", () => {
     const { session_id } = await br.json()
 
     await page.goto(`/workshop/${session_id}`)
-    await expect(page.getByTestId("workshop-error")).toContainText(
-      "Session not started yet",
+    await expect(page.getByTestId("workshop-session-lobby")).toBeVisible()
+    await expect(page.getByTestId("workshop-current-part")).toHaveCount(0)
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /waiting for start/i,
     )
+    await expect(page.getByTestId("workshop-error")).toHaveCount(0)
+
     await page.getByTestId("workshop-instructor-start").click()
     await expect(page.getByTestId("workshop-ws-status")).toHaveText(
       /connected/i,

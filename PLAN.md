@@ -11,7 +11,7 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **`feat/workshop/roster-live-status-realtime`:** instructor workshop roster **busy/done** badges update from WebSocket **`participant.live_status`** via React Query cache patch ([`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx)); `workshop-roster-live-status-{user_id}` test id; Playwright in [`workshop.spec.ts`](frontend/tests/workshop.spec.ts). |
+| **Last synced** | **2026-05-11** — **`feat/workshop/roster-live-status-realtime`:** instructor roster **busy/done** from WS **`participant.live_status`** + React Query cache patch ([`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx)); `workshop-roster-live-status-{user_id}`; Playwright in [`workshop.spec.ts`](frontend/tests/workshop.spec.ts). `main` already includes **#60** session lobby + WS deferral until live/paused. |
 | **Branch** | **`feat/workshop/roster-live-status-realtime`** |
 | **PR** | **[#61](https://github.com/justin-p/testing/pull/61)** |
 | **Integrate against** | **`main`** |
@@ -36,6 +36,7 @@
         - ✅ **Unified repository owner/name field** — single `Input` + HTML `datalist` for GitHub suggestions and free typing (no separate dropdown + manual field) — [`WorkshopLessonRepoSyncCard.tsx`](frontend/src/components/dashboard/WorkshopLessonRepoSyncCard.tsx); **[#57](https://github.com/justin-p/testing/pull/57)**.
         - 'Synced lesson repositories" has a "use" button, which has no real use, as it will just fill in the forms that allow you to setup a new sycn. This never happens, als that thing is already synced. A more logical thing would be that "use" is a "use lesson" button. This logic is currently behinf "preview + create session" (**Addressed:** row action is now **Use lesson** — [#51](https://github.com/justin-p/testing/pull/51).)
         - After clicking "preview + create session", only then a button apears to start a session, this is not user friendly and hidden to deep in menus. (**Addressed:** preview toggle is **Preview parts** only; session start for single-lesson repos is **Use lesson** with inline feedback — not buried in the preview panel. **Multi-lesson repos:** **Choose lesson** opens preview; each lesson has **Start workshop** + inline feedback — **[#58](https://github.com/justin-p/testing/pull/58)**.)
+        - **Scheduled live workshop URL:** lobby until instructor starts (no part delivery HTML, WS deferred) — **[#60](https://github.com/justin-p/testing/pull/60)**.
     - ✅ **Instructors can add trainees to a live session** — session roster panel + user-id add flow — **[#52](https://github.com/justin-p/testing/pull/52)**; **remove trainee** + roster picker table alignment — **[#56](https://github.com/justin-p/testing/pull/56)** (merged to `main`; roster search / batch add remain as follow-ups). **Roster live_status** reflects trainee busy/done over WS without reload — **[#61](https://github.com/justin-p/testing/pull/61)**.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
