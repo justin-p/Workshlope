@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-11** — **`feat/workshop/session-lobby-before-live`:** scheduled `/workshop/$sessionId` shows **lobby** (`workshop-session-lobby`), hides part HTML, opens WebSocket only when session is **live** or **paused**; [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) + [`workshop.spec.ts`](frontend/tests/workshop.spec.ts). |
 | **Branch** | **`feat/workshop/session-lobby-before-live`** |
-| **PR** | — |
+| **PR** | **[#60](https://github.com/justin-p/testing/pull/60)** — scheduled session lobby + WS deferral + Playwright. |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
