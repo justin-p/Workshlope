@@ -199,7 +199,8 @@ function WorkshopSessionPage() {
     queryKey: ["workshopSessionTimer", sessionId],
     queryFn: () =>
       WorkshopSessionsService.readWorkshopSessionTimer({ sessionId }),
-    enabled: uuidOk && detailView === "instructor",
+    enabled:
+      uuidOk && (detailView === "instructor" || detailView === "participant"),
     retry: false,
     refetchInterval: (query) =>
       query.state.data?.status === "running" ? 1_000 : false,
@@ -886,6 +887,20 @@ function WorkshopSessionPage() {
           data-testid="workshop-prework-header-count"
         >
           Required pre-work remaining: {participantRemainingRequiredCount}
+        </p>
+      ) : null}
+      {detailView === "participant" && timerStatus !== "inactive" ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="workshop-trainee-timer-status"
+        >
+          Timer: {timerStatus}
+          {timerMode ? ` (${timerMode})` : ""}
+          {typeof timerRemainingSeconds === "number"
+            ? ` (${formatTimerRemainingSeconds(timerRemainingSeconds)} left)`
+            : typeof timerElapsedSeconds === "number"
+              ? ` (${formatTimerRemainingSeconds(timerElapsedSeconds)} elapsed)`
+              : ""}
         </p>
       ) : null}
       {detailView === "instructor" ? (

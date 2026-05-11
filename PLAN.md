@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-11** — **GitHub OAuth display name:** Auth.js **bridge JWT** now includes **`name`**; FastAPI **pending approve (link existing)** and **linked bridge** set **`User.full_name`** from GitHub when the user has no display name (existing non-empty name is left unchanged). **`create_bridge_token`** accepts **`name`** / **`full_name`** for tests. |
-| **Branch** | **`feat/oauth/github-full-name-on-approval`** |
-| **PR** | **[#64](https://github.com/justin-p/testing/pull/64)** |
+| **Last synced** | **2026-05-11** — Rostered trainees may **GET** the session **timer snapshot** (`status`, `remaining_seconds` / `elapsed_seconds`, mode) for pacing; **timer mutations** and **`GET …/timer/events`** (audit with **actor**) remain **instructor-only**. |
+| **Branch** | **`feat/workshop/trainee-timer-read`** |
+| **PR** | **[#65](https://github.com/justin-p/testing/pull/65)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -108,7 +108,7 @@ Rough themes to revisit **only after** **[Remaining work](#remaining-work-author
 - **Pause**: No participant busy/done writes; **no part navigation** (no **part_generation** bump) until **resume** or **end**.
 - **Awards**: Badge grants are issued **only after instructor verification** of completion (not immediately on trainee self-finish), and surfaced across profile, session views, instructor views, and a global leaderboard. Revocation requires auditable reasons and updates active counts/leaderboard views.
 - **Prework/prerequisites**: Lessons can define prerequisite tasks; trainee completion is tracked and surfaced before session start.
-- **Pacing tools**: Session timer controls (per-part countdown/elapsed and overrun flags) are instructor-facing.
+- **Pacing tools**: Session timer **writes** and instructor cockpit controls (per-part countdown/elapsed and overrun flags) are instructor-only; rostered trainees may **read** the server timer snapshot over HTTP for pacing. **Timer audit events** (actor-bearing list) stay instructor-only.
 - **Backend delivery method**: Use `/python-tdd-with-uv` workflow across the entire backend implementation (test-first, vertical slices, `uv run pytest` loop).
 
 ## Locked decisions
@@ -420,6 +420,7 @@ Implementation lives in **[`backend/app/services/workshop_realtime.py`](backend/
 - **Privacy fan-out:** **`session.part_changed`** and **`session.status_changed`** go to **all** connections in the room; **`participant.live_status`** deltas go **only** to **`role=instructor`**; trainees get **`live_status.ack`** for self. After **`part.advance`**, the server resets every seat’s **`live_status`** to **`busy`** in the DB and emits one **`participant.live_status`** frame per rostered **`user_id`** to instructors so the roster UI matches DB without a refresh. **`part_generation`** increments on **`part.advance`**, synced on connections before **`session.part_changed`** fan-out; stale sockets get **`part_generation_stale`**. Pause blocks trainee **`live_status`** and instructor **`part.advance`** WS paths while session REST (roster PATCH, audits) stays as coded.
 - **Single-process room (MVP):** One shared **`/ws`** room per session with **broadcast-time filtering** (not separate trainee vs instructor websocket URLs). **Redis / multi-worker** coordination is deferred.
 - **Dashboard workshop list (user-scoped push):** **`POST …/workshop/sessions/user-workshop-feed/ws-ticket`** plus **`/user-workshop-feed/ws`** use the same **`ticket,<jwt>`** subprotocol pattern as the session room. **[`UserWorkshopFeedHub`](backend/app/services/user_workshop_feed.py)** fans out **`workshop_sessions_list_changed`** to affected roster **`user_id`s** and active **`SessionInstructor`** rows after roster membership HTTP writes, so **[`DashboardWorkshopSessions.tsx`](frontend/src/components/dashboard/DashboardWorkshopSessions.tsx)** can **`invalidateQueries(['workshopSessionsForUser'])`** for users who never opened that session’s room WebSocket. Same **single-process** limitation as **`WorkshopRealtimeHub`**.
+- **Timer snapshot (HTTP):** **`GET …/sessions/{id}/timer`** uses the same session membership gate as **`GET …/sessions/{id}`** detail (rostered participant or instructor); **timer POSTs** and **`GET …/timer/events`** remain instructor-only.
 
 ## Persistence rules (**`WorkshopParticipant`** writers)
 
@@ -464,7 +465,7 @@ Authoritative handlers: **`enter_workshop_session`**, **`patch_workshop_session_
 - **Field-level RBAC:** enforce instructor/superuser-only access for timer/pacing controls, prerequisite definition mutations, badge grant/revoke actions, and any instructor-only roster/completion surfaces.
 - **Scoped data exposure:** trainees can read only their own prerequisite completions; never return peer identity or roster fields in trainee DTOs.
 - **Timer integrity:** timer state is server-authoritative; reject client-supplied backdated timestamps and enforce legal state transitions.
-- **Timer auditing:** immutable audit trail for timer start/pause/resume/stop with actor and timestamp.
+- **Timer auditing:** immutable audit trail for timer start/pause/resume/stop with actor and timestamp; **HTTP list of events** is instructor-only (trainees use the timer snapshot endpoint only).
 - **Badge actions:** grant only after instructor verification; revoke requires persisted reason + actor/timestamp; leaderboard/profile DTOs exclude revoked grants from active counts per product rules.
 
 ## Privacy (user delete)
