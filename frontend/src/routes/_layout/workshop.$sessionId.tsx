@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import {
   ApiError,
   WorkshopLessonsService,
+  type WorkshopSessionsReadWorkshopSessionDetailResponse,
   WorkshopSessionsService,
 } from "@/client"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -535,6 +536,8 @@ function WorkshopSessionPage() {
               status?: string
               detail?: string
               part_index?: number
+              user_id?: string
+              live_status?: string
             }
             if (
               msg.type === "error" &&
@@ -579,6 +582,30 @@ function WorkshopSessionPage() {
             ) {
               setRoomStatus(msg.status)
             }
+            if (msg.type === "participant.live_status") {
+              const userId = msg.user_id
+              const nextLiveStatus = msg.live_status
+              if (
+                typeof userId === "string" &&
+                userId.length > 0 &&
+                typeof nextLiveStatus === "string" &&
+                nextLiveStatus.length > 0
+              ) {
+                queryClient.setQueryData<
+                  WorkshopSessionsReadWorkshopSessionDetailResponse | undefined
+                >(["workshopSessionDetail", sessionId], (cached) => {
+                  if (!cached || cached.view !== "instructor") return cached
+                  return {
+                    ...cached,
+                    participants: cached.participants.map((p) =>
+                      p.user_id === userId
+                        ? { ...p, live_status: nextLiveStatus }
+                        : p,
+                    ),
+                  }
+                })
+              }
+            }
           } catch {
             /* non-JSON frame */
           }
@@ -622,6 +649,7 @@ function WorkshopSessionPage() {
     }
   }, [
     sessionId,
+    queryClient,
     detailQuery.isSuccess,
     detailQuery.data?.session.status,
     detailQuery.data,
@@ -1311,6 +1339,7 @@ function WorkshopSessionPage() {
                             ? "default"
                             : "outline"
                         }
+                        data-testid={`workshop-roster-live-status-${participant.user_id}`}
                       >
                         {participant.live_status}
                       </Badge>

@@ -341,6 +341,10 @@ test.describe("Workshop live session", () => {
       "participant.live_status",
     )
 
+    await expect(
+      page.getByTestId(`workshop-roster-live-status-${participant.userId}`),
+    ).toHaveText("done", { timeout: 10_000 })
+
     await participantContext.close()
   })
 
