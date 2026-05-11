@@ -12,8 +12,8 @@
 | ------ | ------ |
 
 | **Last synced** | **2026-05-11** — **`main`:** [#49](https://github.com/justin-p/testing/pull/49), [#51](https://github.com/justin-p/testing/pull/51), and [#52](https://github.com/justin-p/testing/pull/52) landed — timer stop on `part.advance`; hub **Use lesson** + routing test; instructor **add trainee** (user ID) on session view + workshop E2E. **Next:** hub polish (unified repo field, shallower start-session UX) per remaining bullets. |
-| **Branch** | **`main`** |
-| **PR** | _None open for this tracker row — next slice from [Remaining work](#remaining-work-authoritative)._ |
+| **Branch** | **`feat/workshop/sync-card-preview-only`** |
+| **PR** | **[#54](https://github.com/justin-p/testing/pull/54)** — preview-only parts toggle; **Use lesson** inline session feedback. |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -35,7 +35,7 @@
       - e.q.
         - There are 2 repo menus. 1 with a drop down and 1 with a cstom overwrite. This should be the same form, allow seclecitng from a list, but allow users to type and thus overwrite in the same form.
         - 'Synced lesson repositories" has a "use" button, which has no real use, as it will just fill in the forms that allow you to setup a new sycn. This never happens, als that thing is already synced. A more logical thing would be that "use" is a "use lesson" button. This logic is currently behinf "preview + create session" (**Addressed:** row action is now **Use lesson** — [#51](https://github.com/justin-p/testing/pull/51).)
-        - After clicking "preview + create session", only then a button apears to start a session, this is not user friendly and hidden to deep in menus.
+        - After clicking "preview + create session", only then a button apears to start a session, this is not user friendly and hidden to deep in menus. (**Addressed:** preview toggle is **Preview parts** only; session start for single-lesson repos is **Use lesson** with inline feedback — not buried in the preview panel.)
     - ✅ **Instructors can add trainees to a live session** — session roster panel + user-id add flow — **[#52](https://github.com/justin-p/testing/pull/52)**.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.

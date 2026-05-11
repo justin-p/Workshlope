@@ -413,14 +413,13 @@ test("instructor sync card can create a session from use lesson action", async (
   await page.waitForURL("/workshops")
   await page.waitForLoadState("networkidle")
   await page.getByTestId("workshop-repo-use-lesson").click()
-  const previewPanel = page.getByTestId("workshop-repo-preview-panel")
-  await expect(previewPanel).toContainText(
-    "Create a scheduled workshop session",
+  const syncCard = page.getByTestId("workshop-lesson-repo-sync-card")
+  const feedback = syncCard.getByTestId("workshop-use-lesson-session-feedback")
+  await expect(feedback).toContainText("Session created.")
+  await expect(feedback.getByRole("link", { name: "Open" })).toHaveAttribute(
+    "href",
+    "/workshop/33333333-3333-4333-8333-333333333333",
   )
-  await expect(previewPanel).toContainText("Session created.")
-  await expect(
-    previewPanel.getByRole("link", { name: "Open" }),
-  ).toHaveAttribute("href", "/workshop/33333333-3333-4333-8333-333333333333")
 
   await context.close()
 })
