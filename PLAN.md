@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-11** — **§1 gap notes:** workshop-runnable **coverage vs automation** (private bootstrap vs hub UI path; serial path split across specs; scheduled→live without trainee assertion; manual in-product sign-off still required). **Shipped on `main`:** roster **`participant.live_status`** instructor badges — **[#61](https://github.com/justin-p/testing/pull/61)**; session lobby + WS deferral — **[#60](https://github.com/justin-p/testing/pull/60)**. |
 | **Branch** | **`docs/plan/section1-e2e-coverage-gaps`** |
-| **PR** | — |
+| **PR** | **[#62](https://github.com/justin-p/testing/pull/62)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
