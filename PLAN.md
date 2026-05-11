@@ -59,6 +59,7 @@ Record non-blocking polish items here when discovered during functional work, th
 | ---- | ---- | -------------------- | --------------- |
 | 2026-05-07 | Dashboard / workshop sync card | Expand broader UI/visual polish and additional non-blocking assertions around sync-card controls beyond the current behavior checks. | Functionality-first focus until workshop run flow is fully verified end-to-end. |
 | 2026-05-11 | Workshops hub | Deeper menu/start-depth and copy polish beyond shipped **#51** / **#57** / **#58** / **#60** flows (instructor usability review). | Functional paths exist; not blocking §1 until validation surfaces gaps. |
+| 2026-05-11 | Workshop roster | Search / batch-add UX polish beyond current [`workshop-roster-picker.spec.ts`](frontend/tests/workshop-roster-picker.spec.ts) coverage. | Core add/remove/picker shipped (**#52**, **#56**); expand when product prioritizes. |
 
 ## Out of scope (MVP)
 
