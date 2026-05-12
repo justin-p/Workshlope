@@ -496,6 +496,10 @@ export type WorkshopSessionCorePublic = {
 
 export type WorkshopSessionCreate = {
     lesson_id: string;
+    /**
+     * Optional trainees to roster immediately after session creation (same transaction as create).
+     */
+    participant_user_ids?: (Array<(string)> | null);
 };
 
 export type WorkshopSessionCreatedPublic = {
@@ -935,6 +939,15 @@ export type WorkshopLessonsDeleteLessonPrerequisiteData = {
 };
 
 export type WorkshopLessonsDeleteLessonPrerequisiteResponse = (Message);
+
+export type WorkshopLessonsReadLessonRosterUserPickerData = {
+    lessonId: string;
+    limit?: number;
+    q?: (string | null);
+    skip?: number;
+};
+
+export type WorkshopLessonsReadLessonRosterUserPickerResponse = (WorkshopRosterUserPickerPublic);
 
 export type WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterData = {
     lessonId: string;

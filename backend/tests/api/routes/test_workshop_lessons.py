@@ -1362,3 +1362,60 @@ def test_prerequisite_gaps_skip_roster_ids_with_no_user_row(
     )
     assert r.status_code == 200
     assert r.json()["count"] == 0
+
+
+def test_read_lesson_roster_user_picker_requires_instructor(
+    client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
+) -> None:
+    lesson = _create_lesson(db)
+    r = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/roster-user-picker",
+        headers=normal_user_token_headers,
+    )
+    assert r.status_code == 403
+
+
+def test_read_lesson_roster_user_picker_returns_users_for_instructor(
+    client: TestClient, db: Session
+) -> None:
+    lesson = _create_lesson(db)
+    email = f"ws-picker-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(client=client, email=email, db=db)
+    r = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{lesson.id}/roster-user-picker",
+        headers=headers,
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert "data" in body
+    assert "count" in body
+    assert body["count"] >= 1
+
+
+def test_read_lesson_roster_user_picker_404_for_missing_lesson(
+    client: TestClient, db: Session
+) -> None:
+    email = f"ws-picker-404-{uuid.uuid4()}@example.com"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=email,
+            password="pw123456",
+            is_instructor=True,
+        ),
+    )
+    headers = authentication_token_from_email(client=client, email=email, db=db)
+    missing = uuid.uuid4()
+    r = client.get(
+        f"{settings.API_V1_STR}/workshop/lessons/{missing}/roster-user-picker",
+        headers=headers,
+    )
+    assert r.status_code == 404

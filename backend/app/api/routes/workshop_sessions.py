@@ -20,11 +20,15 @@ from fastapi import (
 )
 from jwt.exceptions import PyJWTError
 from pydantic import BaseModel
-from sqlalchemy import String, cast, literal, or_
-from sqlalchemy.sql import func as sa_func
+from sqlalchemy import or_
 from sqlmodel import Session, col, func, select
 
 from app.api.deps import CurrentUser, SessionDep
+from app.api.roster_user_picker_query import (
+    ROSTER_PICKER_DEFAULT_LIMIT,
+    ROSTER_PICKER_MAX_LIMIT,
+    workshop_roster_user_picker_public,
+)
 from app.core.config import settings
 from app.core.db import engine
 from app.core.security import ALGORITHM
@@ -47,7 +51,6 @@ from app.models import (
     WorkshopRosterInstructorRowPublic,
     WorkshopRosterParticipantRowPublic,
     WorkshopRosterUserPickerPublic,
-    WorkshopRosterUserPickerRowPublic,
     WorkshopSession,
     WorkshopSessionCorePublic,
     WorkshopSessionCreate,
@@ -393,9 +396,6 @@ def _require_workshop_instructor(
     )
 
 
-ROSTER_PICKER_MIN_Q_LEN = 2
-ROSTER_PICKER_DEFAULT_LIMIT = 25
-ROSTER_PICKER_MAX_LIMIT = 100
 ROSTER_BATCH_MAX_IDS = 100
 
 
@@ -923,6 +923,7 @@ def create_workshop_session(
     *,
     session: SessionDep,
     current_user: CurrentUser,
+    background_tasks: BackgroundTasks,
     body: WorkshopSessionCreate,
 ) -> WorkshopSessionCreatedPublic:
     if not (current_user.is_superuser or current_user.is_instructor):
@@ -935,6 +936,28 @@ def create_workshop_session(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lesson not found",
+        )
+
+    raw_ids = list(body.participant_user_ids or [])
+    if len(raw_ids) > ROSTER_BATCH_MAX_IDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"At most {ROSTER_BATCH_MAX_IDS} participant_user_ids per request",
+        )
+
+    seen: set[uuid.UUID] = set()
+    ordered_unique: list[uuid.UUID] = []
+    for uid in raw_ids:
+        if uid == current_user.id:
+            continue
+        if uid not in seen:
+            seen.add(uid)
+            ordered_unique.append(uid)
+
+    if len(ordered_unique) > ROSTER_BATCH_MAX_IDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"At most {ROSTER_BATCH_MAX_IDS} participant_user_ids per request",
         )
 
     first_part = session.exec(
@@ -951,8 +974,7 @@ def create_workshop_session(
         part_generation=1,
     )
     session.add(created)
-    session.commit()
-    session.refresh(created)
+    session.flush()
 
     seat = SessionInstructor(
         session_id=created.id,
@@ -960,7 +982,37 @@ def create_workshop_session(
         role="lead",
     )
     session.add(seat)
+
+    roster_results: list[tuple[uuid.UUID, Literal["added", "already"]]] = []
+    for uid in ordered_unique:
+        target_user = session.get(User, uid)
+        if target_user is None:
+            session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"participant user not found: {uid}",
+            )
+        st = _upsert_workshop_session_participant_seat(
+            session,
+            session_id=created.id,
+            target_user=target_user,
+        )
+        roster_results.append((uid, st))
+
     session.commit()
+    session.refresh(created)
+
+    affected_participants = [
+        uid for uid, st in roster_results if st in ("added", "already")
+    ]
+    if affected_participants:
+        instructors = _active_instructor_user_ids_for_session(
+            session, session_id=created.id
+        )
+        recipients = _dedupe_user_ids(affected_participants, instructors)
+        background_tasks.add_task(
+            _notify_workshop_sessions_list_changed, recipients, created.id
+        )
 
     return WorkshopSessionCreatedPublic(
         session_id=created.id,
@@ -1511,61 +1563,13 @@ def read_workshop_session_roster_user_picker(
         session_db=session, session_id=session_id, current_user=current_user
     )
 
-    q_stripped = (q or "").strip()
-    if q_stripped:
-        if len(q_stripped) < ROSTER_PICKER_MIN_Q_LEN:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Search query must be at least 2 characters",
-            )
-        email_c = cast(User.email, String)
-        name_c = func.coalesce(cast(User.full_name, String), "")
-        q_lit = literal(q_stripped)
-        sim_e = sa_func.similarity(email_c, q_lit)
-        sim_n = sa_func.similarity(name_c, q_lit)
-        match_expr = sa_func.greatest(sim_e, sim_n)
-        cond = or_(email_c.op("%")(q_lit), name_c.op("%")(q_lit))
-        count_val = session.exec(
-            select(func.count()).select_from(User).where(cond)
-        ).one()
-        stmt = (
-            select(User, match_expr.label("match_score"))
-            .where(cond)
-            .order_by(match_expr.desc(), User.email)
-            .offset(skip)
-            .limit(limit)
-        )
-        rows = session.exec(stmt).all()
-        data = [
-            WorkshopRosterUserPickerRowPublic(
-                user_id=user.id,
-                email=str(user.email),
-                full_name=user.full_name,
-                is_superuser=user.is_superuser,
-                is_instructor=user.is_instructor,
-                is_active=user.is_active,
-                match_score=float(score) if score is not None else None,
-            )
-            for user, score in rows
-        ]
-        return WorkshopRosterUserPickerPublic(data=data, count=int(count_val))
-
-    count_val = session.exec(select(func.count()).select_from(User)).one()
-    browse_stmt = select(User).order_by(User.email).offset(skip).limit(limit)
-    users = session.exec(browse_stmt).all()
-    data = [
-        WorkshopRosterUserPickerRowPublic(
-            user_id=user.id,
-            email=str(user.email),
-            full_name=user.full_name,
-            is_superuser=user.is_superuser,
-            is_instructor=user.is_instructor,
-            is_active=user.is_active,
-            match_score=None,
-        )
-        for user in users
-    ]
-    return WorkshopRosterUserPickerPublic(data=data, count=int(count_val))
+    try:
+        return workshop_roster_user_picker_public(session, q=q, skip=skip, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post(

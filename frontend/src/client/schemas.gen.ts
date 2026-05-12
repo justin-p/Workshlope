@@ -2298,6 +2298,22 @@ export const WorkshopSessionCreateSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Lesson Id'
+        },
+        participant_user_ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Participant User Ids',
+            description: 'Optional trainees to roster immediately after session creation (same transaction as create).'
         }
     },
     type: 'object',
