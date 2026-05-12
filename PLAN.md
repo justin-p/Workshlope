@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **Instructor verify + badge grant** landed on **`main`** via **[#76](https://github.com/justin-p/testing/pull/76)** (merged): [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) roster **Mark verified complete** + **Grant badge**; trainee **Badges earned in this session** from `self.session_badges` ([`read_workshop_session_detail`](backend/app/api/routes/workshop_sessions.py)); E2E [`with_e2e_badge`](backend/app/api/routes/private.py) + [`workshop-instructor-verify-badge.spec.ts`](frontend/tests/workshop-instructor-verify-badge.spec.ts). Prior: pause part-nav (**#75**); code highlight (**#74**). |
-| **Branch** | **`main`** |
-| **PR** | *(merged [#76](https://github.com/justin-p/testing/pull/76))* |
+| **Last synced** | **2026-05-12** — **Instructor badge revoke + lesson sync drift** on branch **`feat/workshop/revoke-badge-lesson-sync-drift`**: `WorkshopSession.lesson_sync_ack_generation` (migration + backfill), session detail exposes `lesson_sync_generation` / ack + **`active_badge_grants`** for revoke targeting; **`PATCH …/workshop/sessions/{id}`** accepts `lesson_sync_ack_generation` (must match current lesson generation) with part index clamp; instructor **`workshop.$sessionId.tsx`** revoke dialog (required reason + test IDs), drift **Alert** + **Dialog** (“Review later” dismisses; “Switch to latest” PATCHes ack); local-only **`POST …/private/workshop/e2e-bump-lesson-sync/{session_id}/`** for Playwright; OpenAPI + `frontend/src/client` regenerated. Prior merged on **`main`**: verify + grant (**#76**), pause part-nav (**#75**), code highlight (**#74**). |
+| **Branch** | **`feat/workshop/revoke-badge-lesson-sync-drift`** |
+| **PR** | *(open after push — `gh pr create`)* |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -28,6 +28,11 @@
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
+- Lesson sync **drift** after repo changes: instructor **acknowledge** via PATCH (generation match + part clamp); immutable “keep old Markdown” snapshot remains **out of scope** while `LessonPart` rows are shared (see PR description).
+
+**2. Badge end-to-end (blocking)**
+
+- Instructor **revoke** with required reason + roster **active grant** visibility for targeting (shipped on drift slice branch); trainee sees removal after refresh.
 
 ## Deferred polish backlog (skip log)
 
