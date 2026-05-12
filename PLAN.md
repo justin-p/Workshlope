@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **`feat/workshop/badges-unified-model`** / **[#80](https://github.com/justin-p/testing/pull/80)**: same slice as prior row, plus **GET/PATCH `/workshop/badges/{id}`** for hub edit page + OpenAPI client; hub recipients dialog duplicate-query cleanup; post-end roster CTA opens existing **badge end summary** dialog (`setBadgeEndSummaryOpen`); `models.py` duplicate DTO removal after main merge. Prior merged: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. |
-| **Branch** | **`feat/workshop/badges-unified-model`** |
-| **PR** | **[#80](https://github.com/justin-p/testing/pull/80)** |
+| **Last synced** | **2026-05-12** — **`feat/workshop/badge-hub-lesson-config`** / **[#81](https://github.com/justin-p/testing/pull/81)**: badge hub lesson manifest **auto-import** copy (link to **Workshops**), optional nudge when lesson-linked rows use default artwork, **Artwork** per-row upload; **`GET /workshop/badges`** includes **`lesson_repo_id`**. Rebases on **[#80](https://github.com/justin-p/testing/pull/80)** (merged to **main**: unified hub, GET/PATCH single badge, session-end auto-award, post-end summary CTA, client regen). Prior: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. |
+| **Branch** | **`feat/workshop/badge-hub-lesson-config`** |
+| **PR** | **[#81](https://github.com/justin-p/testing/pull/81)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 

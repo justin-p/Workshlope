@@ -780,6 +780,10 @@ class WorkshopBadgeDefinitionPublic(SQLModel):
     lesson_id: uuid.UUID | None = None
     lesson_slug: str | None = None
     lesson_title: str | None = None
+    lesson_repo_id: uuid.UUID | None = Field(
+        default=None,
+        description="Owning lesson repository when this badge is tied to a lesson.",
+    )
     image_url: str | None = Field(
         default=None,
         description="Relative API path to uploaded image, or null to use UI default artwork.",

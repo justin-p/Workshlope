@@ -306,6 +306,10 @@ export type WorkshopBadgeDefinitionPublic = {
     lesson_slug?: (string | null);
     lesson_title?: (string | null);
     /**
+     * Owning lesson repository when this badge is tied to a lesson.
+     */
+    lesson_repo_id?: (string | null);
+    /**
      * Relative API path to uploaded image, or null to use UI default artwork.
      */
     image_url?: (string | null);

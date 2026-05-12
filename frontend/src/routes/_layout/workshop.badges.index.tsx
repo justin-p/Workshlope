@@ -1,4 +1,4 @@
-// Badge hub: catalog (optional archived), grant via org user search, recipients + revoke, leaderboard link.
+// Badge hub: lesson manifest import hints, per-badge artwork upload, catalog, grant, recipients, leaderboard.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   createFileRoute,
@@ -7,7 +7,7 @@ import {
   redirect,
 } from "@tanstack/react-router"
 import { Loader2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import {
   ApiError,
@@ -15,6 +15,7 @@ import {
   UsersService,
   WorkshopBadgesService,
 } from "@/client"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -66,6 +67,13 @@ function badgeImageSrc(imageUrl: string | null | undefined): string {
   return `${base}${imageUrl}`
 }
 
+type ArtworkBadge = {
+  id: string
+  slug: string
+  title: string
+  lessonTitle: string | null | undefined
+}
+
 function WorkshopBadgesHub() {
   const queryClient = useQueryClient()
   const [includeArchived, setIncludeArchived] = useState(false)
@@ -89,6 +97,10 @@ function WorkshopBadgesHub() {
   const [revokeReason, setRevokeReason] = useState("")
   const [recipientsError, setRecipientsError] = useState<string | null>(null)
 
+  const [artworkBadge, setArtworkBadge] = useState<ArtworkBadge | null>(null)
+  const [artworkFile, setArtworkFile] = useState<File | null>(null)
+  const [artworkError, setArtworkError] = useState<string | null>(null)
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["workshop-badges", includeArchived],
     queryFn: () =>
@@ -96,6 +108,12 @@ function WorkshopBadgesHub() {
         includeArchived,
       }),
   })
+
+  const lessonBadgesMissingImageCount = useMemo(() => {
+    return (data?.data ?? []).filter(
+      (b) => Boolean(b.lesson_id) && !b.image_url,
+    ).length
+  }, [data?.data])
 
   useEffect(() => {
     const t = window.setTimeout(
@@ -121,6 +139,13 @@ function WorkshopBadgesHub() {
       setRecipientsError(null)
     }
   }, [recipientsBadgeId])
+
+  useEffect(() => {
+    if (artworkBadge === null) {
+      setArtworkFile(null)
+      setArtworkError(null)
+    }
+  }, [artworkBadge])
 
   const grantPickerQuery = useQuery({
     queryKey: [
@@ -210,6 +235,28 @@ function WorkshopBadgesHub() {
     },
   })
 
+  const uploadArtworkMutation = useMutation({
+    mutationFn: async ({ badgeId, file }: { badgeId: string; file: File }) =>
+      WorkshopBadgesService.uploadWorkshopBadgeImage({
+        badgeId,
+        formData: { file },
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["workshop-badges"] })
+      setArtworkBadge(null)
+      setArtworkFile(null)
+      setArtworkError(null)
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setArtworkError(body?.detail ?? e.message)
+      } else {
+        setArtworkError(e instanceof Error ? e.message : "Upload failed")
+      }
+    },
+  })
+
   return (
     <div className="space-y-6" data-testid="workshop-badges-hub">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -257,6 +304,42 @@ function WorkshopBadgesHub() {
           Show archived badges
         </Label>
       </div>
+
+      <Alert data-testid="workshop-badges-hub-lesson-import-hint">
+        <AlertTitle>Lesson badges</AlertTitle>
+        <AlertDescription className="space-y-2">
+          <p>
+            When you import or sync a lesson repository under{" "}
+            <Link
+              to="/workshops"
+              className="font-medium text-foreground underline underline-offset-2"
+            >
+              Workshops
+            </Link>
+            , version&nbsp;2 manifests can list a{" "}
+            <code className="rounded bg-muted px-1 text-xs">badges</code>{" "}
+            section. Each entry is created or updated here automatically—no need
+            to type manifest slugs by hand.
+          </p>
+          <p className="text-muted-foreground text-sm">
+            Sync again after editing the YAML. Use <strong>Artwork</strong> on a
+            row to upload PNG, JPEG, or WebP so the badge shows your branding in
+            sessions and leaderboards.
+          </p>
+        </AlertDescription>
+      </Alert>
+
+      {lessonBadgesMissingImageCount > 0 ? (
+        <Alert data-testid="workshop-badges-hub-default-artwork-nudge">
+          <AlertTitle>Default artwork</AlertTitle>
+          <AlertDescription>
+            <strong>{lessonBadgesMissingImageCount}</strong> lesson-linked badge
+            {lessonBadgesMissingImageCount === 1 ? " " : "s "}
+            still use the default icon. Open <strong>Artwork</strong> on each
+            row to replace it.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {error ? (
         <p className="text-destructive text-sm" role="alert">
@@ -325,37 +408,63 @@ function WorkshopBadgesHub() {
                         "—"
                       )}
                     </TableCell>
-                    <TableCell className="text-right space-x-2 whitespace-nowrap">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-testid={`workshop-badge-hub-grant-open-${b.slug}`}
-                        disabled={archived}
-                        title={
-                          archived
-                            ? "Archived badges cannot receive new grants"
-                            : undefined
-                        }
-                        onClick={() => {
-                          setGrantBadgeId(b.id)
-                          setGrantBadgeSlug(b.slug)
-                        }}
-                      >
-                        Grant
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-testid={`workshop-badge-hub-recipients-open-${b.slug}`}
-                        onClick={() => {
-                          setRecipientsBadgeId(b.id)
-                          setRecipientsBadgeSlug(b.slug)
-                        }}
-                      >
-                        Recipients
-                      </Button>
+                    <TableCell className="text-right">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          data-testid={`workshop-badge-hub-artwork-open-${b.slug}`}
+                          disabled={archived}
+                          title={
+                            archived
+                              ? "Archived badges cannot be updated this way"
+                              : undefined
+                          }
+                          onClick={() => {
+                            setArtworkBadge({
+                              id: b.id,
+                              slug: b.slug,
+                              title: b.title,
+                              lessonTitle: b.lesson_title,
+                            })
+                            setArtworkFile(null)
+                            setArtworkError(null)
+                          }}
+                        >
+                          Artwork
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          data-testid={`workshop-badge-hub-grant-open-${b.slug}`}
+                          disabled={archived}
+                          title={
+                            archived
+                              ? "Archived badges cannot receive new grants"
+                              : undefined
+                          }
+                          onClick={() => {
+                            setGrantBadgeId(b.id)
+                            setGrantBadgeSlug(b.slug)
+                          }}
+                        >
+                          Grant
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          data-testid={`workshop-badge-hub-recipients-open-${b.slug}`}
+                          onClick={() => {
+                            setRecipientsBadgeId(b.id)
+                            setRecipientsBadgeSlug(b.slug)
+                          }}
+                        >
+                          Recipients
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
@@ -668,6 +777,98 @@ function WorkshopBadgesHub() {
               }}
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={artworkBadge !== null}
+        onOpenChange={(open) => {
+          if (!open) setArtworkBadge(null)
+        }}
+      >
+        <DialogContent
+          className="max-w-lg"
+          data-testid="workshop-badge-hub-artwork-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle>Badge artwork</DialogTitle>
+            <DialogDescription>
+              {artworkBadge?.lessonTitle
+                ? "This badge is linked to a lesson from your synced repository. Replace the image any time."
+                : "Upload a square image for this badge."}
+            </DialogDescription>
+          </DialogHeader>
+          {artworkBadge ? (
+            <>
+              <p className="font-medium text-foreground">
+                {artworkBadge.title}
+              </p>
+              <p className="text-muted-foreground font-mono text-xs">
+                {artworkBadge.slug}
+              </p>
+              {artworkBadge.lessonTitle ? (
+                <p className="text-muted-foreground text-sm">
+                  Lesson: {artworkBadge.lessonTitle}
+                </p>
+              ) : null}
+            </>
+          ) : null}
+          <div className="space-y-2">
+            <Label htmlFor="workshop-badge-hub-artwork-file">
+              Image file (PNG, JPEG, or WebP, max 512&nbsp;KB)
+            </Label>
+            <Input
+              id="workshop-badge-hub-artwork-file"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              data-testid="workshop-badge-hub-artwork-file"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                setArtworkFile(f ?? null)
+                setArtworkError(null)
+              }}
+            />
+          </div>
+          {artworkError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {artworkError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setArtworkBadge(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              data-testid="workshop-badge-hub-artwork-upload"
+              disabled={
+                artworkBadge === null ||
+                artworkFile === null ||
+                uploadArtworkMutation.isPending
+              }
+              onClick={() => {
+                if (artworkBadge === null || artworkFile === null) return
+                setArtworkError(null)
+                uploadArtworkMutation.mutate({
+                  badgeId: artworkBadge.id,
+                  file: artworkFile,
+                })
+              }}
+            >
+              {uploadArtworkMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  Uploading…
+                </>
+              ) : (
+                "Upload"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
