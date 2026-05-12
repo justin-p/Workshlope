@@ -69,7 +69,7 @@ test.describe("Workshop instructor verify and badge grant", () => {
     const badgesRes = await fetch(`${apiBase}/api/v1/workshop/badges`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (!badgesRes.ok()) {
+    if (!badgesRes.ok) {
       throw new Error(
         `list badges failed: ${badgesRes.status} ${await badgesRes.text()}`,
       )
