@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **Post-session trainee lesson read:** ended sessions show read-only mode on [`workshop.$sessionId`](frontend/src/routes/_layout/workshop.$sessionId.tsx) (full part navigation, softened pre-work, `ended` patched into session detail on WS close); E2E bootstrap `initial_status=ended`; Playwright [`workshop-post-session-read.spec.ts`](frontend/tests/workshop-post-session-read.spec.ts) + API tests. Prior: pre-create wizard PR **#72** / [#68](https://github.com/justin-p/testing/pull/68)-[#70](https://github.com/justin-p/testing/pull/70). |
-| **Branch** | **`feat/workshop/post-session-lesson-read`** |
-| **PR** | [#73](https://github.com/justin-p/testing/pull/73) |
+| **Last synced** | **2026-05-12** — **Workshop lesson code blocks:** fenced Markdown in session lesson bodies keeps `language-*` classes through nh3; [`WorkshopMarkdownHtml`](frontend/src/components/WorkshopMarkdownHtml.tsx) applies highlight.js (curated grammars) plus per-block copy on [`workshop.$sessionId`](frontend/src/routes/_layout/workshop.$sessionId.tsx); GitHub / GitHub Dark hljs themes for light vs `.dark`; Playwright asserts copy control on post-session read. Prior: post-session trainee lesson read (**#73**); pre-create wizard **#72** / [#68](https://github.com/justin-p/testing/pull/68)-[#70](https://github.com/justin-p/testing/pull/70). |
+| **Branch** | **`feat/workshop/markdown-code-highlight-copy`** |
+| **PR** | [#74](https://github.com/justin-p/testing/pull/74) |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -45,7 +45,6 @@ Record non-blocking polish items here when discovered during functional work, th
 | 2026-05-12 | Countdown Timer UX | Redesign countdown timer for improved look and clarity for both instructors and trainees; make it more user-friendly and visually appealing. | Current timer is functional for pacing; polish deferred until core flows locked. |
 | 2026-05-12 | Workshop Page – WebSocket Stats | Hide full WebSocket stats from users at the bottom of the page, or place them behind a debug toggle for instructor troubleshooting only. | Debug output not required for core session operation; move behind toggle post-MVP. |
 | 2026-05-12 | Workshop Pages Text Sizing | Increase font size on workshop pages for readability; current baseline is too small, especially for instructors. | Cosmetic; defer until functional gaps completely closed. |
-| 2026-05-12 | Markdown Rendering | Upgrade Markdown codeblock rendering for colored syntax highlighting and improved appearance. | Not blocking lesson/session delivery; defer syntax highlight polish. |
 | 2026-05-12 | Workshop Page Debug Info | Move miscellaneous debug session/workshop information behind an explicit "show debug info" toggle or section to avoid leaking internals to normal users. | Debug visibility is non-critical; defer behind toggle once MVP path stable. |
 | 2026-05-12 | Workshop session (a11y) | **`aria-live`** (or equivalent) announcements when the instructor advances parts so trainees hear "Moved to Part N" style updates without peer names, matching [UI / UX specification](#ui--ux-specification) accessibility notes. | Core part sync works over HTTP/WS first; screen-reader polish deferred. |
 | 2026-05-12 | Workshop session (loading) | Deliberate **loading skeletons** (and coherent disabled-control shells) while session detail and realtime path resolve, per empty/error states in [UI / UX specification](#ui--ux-specification). | Today the page falls back to generic title/empty part until data arrives; defer structured shells until blocking flow is green. |

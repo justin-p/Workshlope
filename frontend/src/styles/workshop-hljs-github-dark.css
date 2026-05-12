@@ -1,0 +1,86 @@
+/* Scoped GitHub Dark hljs theme for `.dark .workshop-markdown` only (see index.css). */
+.dark .workshop-markdown code.hljs {
+  padding: 3px 5px;
+}
+.dark .workshop-markdown pre code.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+}
+.dark .workshop-markdown .hljs {
+  color: #c9d1d9;
+  background: #0d1117;
+}
+.dark .workshop-markdown .hljs-doctag,
+.dark .workshop-markdown .hljs-keyword,
+.dark .workshop-markdown .hljs-meta .hljs-keyword,
+.dark .workshop-markdown .hljs-template-tag,
+.dark .workshop-markdown .hljs-template-variable,
+.dark .workshop-markdown .hljs-type,
+.dark .workshop-markdown .hljs-variable.language_ {
+  color: #ff7b72;
+}
+.dark .workshop-markdown .hljs-title,
+.dark .workshop-markdown .hljs-title.class_,
+.dark .workshop-markdown .hljs-title.class_.inherited__,
+.dark .workshop-markdown .hljs-title.function_ {
+  color: #d2a8ff;
+}
+.dark .workshop-markdown .hljs-attr,
+.dark .workshop-markdown .hljs-attribute,
+.dark .workshop-markdown .hljs-literal,
+.dark .workshop-markdown .hljs-meta,
+.dark .workshop-markdown .hljs-number,
+.dark .workshop-markdown .hljs-operator,
+.dark .workshop-markdown .hljs-variable,
+.dark .workshop-markdown .hljs-selector-attr,
+.dark .workshop-markdown .hljs-selector-class,
+.dark .workshop-markdown .hljs-selector-id {
+  color: #79c0ff;
+}
+.dark .workshop-markdown .hljs-regexp,
+.dark .workshop-markdown .hljs-string,
+.dark .workshop-markdown .hljs-meta .hljs-string {
+  color: #a5d6ff;
+}
+.dark .workshop-markdown .hljs-built_in,
+.dark .workshop-markdown .hljs-symbol {
+  color: #ffa657;
+}
+.dark .workshop-markdown .hljs-comment,
+.dark .workshop-markdown .hljs-code,
+.dark .workshop-markdown .hljs-formula {
+  color: #8b949e;
+}
+.dark .workshop-markdown .hljs-name,
+.dark .workshop-markdown .hljs-quote,
+.dark .workshop-markdown .hljs-selector-tag,
+.dark .workshop-markdown .hljs-selector-pseudo {
+  color: #7ee787;
+}
+.dark .workshop-markdown .hljs-subst {
+  color: #c9d1d9;
+}
+.dark .workshop-markdown .hljs-section {
+  color: #1f6feb;
+  font-weight: bold;
+}
+.dark .workshop-markdown .hljs-bullet {
+  color: #f2cc60;
+}
+.dark .workshop-markdown .hljs-emphasis {
+  color: #c9d1d9;
+  font-style: italic;
+}
+.dark .workshop-markdown .hljs-strong {
+  color: #c9d1d9;
+  font-weight: bold;
+}
+.dark .workshop-markdown .hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+.dark .workshop-markdown .hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
+}

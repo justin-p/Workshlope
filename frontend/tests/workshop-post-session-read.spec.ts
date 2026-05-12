@@ -42,6 +42,11 @@ test.describe("Workshop post-session read-only", () => {
 
     const partBody = page.getByTestId("workshop-current-part-body")
     await expect(partBody).toContainText("Part 0", { timeout: 15_000 })
+    await expect(partBody).toContainText("echo hi")
+
+    await expect(
+      page.getByRole("button", { name: /copy code/i }).first(),
+    ).toBeVisible()
 
     const preworkBanner = page.getByTestId(
       "workshop-prework-participant-banner",

@@ -102,3 +102,10 @@ def test_lesson_markdown_to_safe_html_escapes_raw_tags() -> None:
 def test_lesson_markdown_to_safe_html_allows_https_links() -> None:
     html = lesson_markdown_to_safe_html("[x](https://example.org/y)")
     assert 'href="https://example.org/y"' in html
+
+
+def test_lesson_markdown_to_safe_html_preserves_fence_code_language_class() -> None:
+    """nh3 must keep language-* on <code> so the SPA can run a highlighter."""
+    html = lesson_markdown_to_safe_html("```python\nx = 1\n```")
+    assert 'class="language-python"' in html
+    assert "<pre>" in html and "<code" in html
