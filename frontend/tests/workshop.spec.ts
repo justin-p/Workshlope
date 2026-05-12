@@ -372,6 +372,15 @@ test.describe("Workshop live session", () => {
     const { session_id } = await br.json()
 
     await page.goto(`/workshop/${session_id}`)
+    await expect(
+      page.getByTestId("workshop-instructor-setup-prompt"),
+    ).toBeVisible()
+    await expect(
+      page.getByTestId("workshop-instructor-setup-prompt"),
+    ).toContainText("Invite trainees")
+    await expect(
+      page.getByTestId("workshop-instructor-setup-prompt"),
+    ).toContainText("Review prerequisite gates")
     await expect(page.getByTestId("workshop-session-lobby")).toBeVisible()
     await expect(page.getByTestId("workshop-current-part")).toHaveCount(0)
     // Scheduled lobby may already show realtime as connected (WS handshake before start).
@@ -381,6 +390,9 @@ test.describe("Workshop live session", () => {
     await expect(page.getByTestId("workshop-error")).toHaveCount(0)
 
     await page.getByTestId("workshop-instructor-start").click()
+    await expect(
+      page.getByTestId("workshop-instructor-setup-prompt"),
+    ).toHaveCount(0)
     await expect(page.getByTestId("workshop-session-lobby")).toHaveCount(0, {
       timeout: 15_000,
     })
