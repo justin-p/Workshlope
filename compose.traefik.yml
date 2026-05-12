@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:3.6
+    image: traefik:v3.7
     ports:
       # Bind only to localhost for HTTP and HTTPS
       - 127.0.0.1:80:80
