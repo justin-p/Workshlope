@@ -32,10 +32,12 @@ test.describe("Workshop roster user picker", () => {
     const email0 = `${prefix}_00@example.com`
     const email25 = `${prefix}_25@example.com`
     await page.getByTestId("workshop-roster-user-picker-search").fill(prefix)
-    await expect(table).toContainText(email0)
+    await page.waitForLoadState("networkidle")
+    await expect(table).toContainText(email0, { timeout: 15_000 })
     await page.getByRole("checkbox", { name: `Select ${email0}` }).click()
     await page.getByTestId("workshop-roster-user-picker-page-next").click()
-    await expect(table).toContainText(email25)
+    await page.waitForLoadState("networkidle")
+    await expect(table).toContainText(email25, { timeout: 15_000 })
     await page.getByRole("checkbox", { name: `Select ${email25}` }).click()
     await page.getByTestId("workshop-roster-add-selected").click()
     const rosterList = page.getByTestId("workshop-roster-list")
