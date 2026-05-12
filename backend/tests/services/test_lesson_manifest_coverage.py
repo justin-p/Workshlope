@@ -56,8 +56,23 @@ parts:
         parse_lesson_manifest(raw)
 
 
-def test_version_must_be_one() -> None:
+def test_version_two_without_badges_parses_like_v1_shape() -> None:
     raw = """version: 2
+lesson:
+  slug: ok-lesson
+  title: T
+parts:
+  - slug: one
+    title: P
+    path: x.md
+"""
+    parsed = parse_lesson_manifest(raw)
+    assert parsed.version == 2
+    assert parsed.badges is None
+
+
+def test_version_must_be_one_or_two() -> None:
+    raw = """version: 3
 lesson:
   slug: ok-lesson
   title: T

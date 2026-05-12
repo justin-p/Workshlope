@@ -49,7 +49,11 @@ test.describe("Badge hub, org grant, global leaderboard", () => {
         json: { user_id: String(trainee.id), badge_id: String(badge!.id) },
       },
     )
-    expect(grant.ok()).toBeTruthy()
+    if (!grant.ok()) {
+      throw new Error(
+        `org grant failed: ${grant.status()} ${await grant.text()}`,
+      )
+    }
 
     await page.goto("/workshop/badges/leaderboard")
     await page.waitForLoadState("networkidle")

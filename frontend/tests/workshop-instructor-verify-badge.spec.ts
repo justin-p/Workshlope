@@ -64,9 +64,21 @@ test.describe("Workshop instructor verify and badge grant", () => {
       page.getByTestId(`workshop-roster-verified-label-${participant.userId}`),
     ).toBeVisible({ timeout: 10_000 })
 
+    const grantResponsePromise = page.waitForResponse(
+      (resp) =>
+        resp.request().method() === "POST" &&
+        resp.url().includes("/workshop/badges/sessions/") &&
+        resp.url().endsWith("/grant"),
+    )
     await page
       .getByTestId(`workshop-roster-grant-badge-${participant.userId}`)
       .click()
+    const grantResp = await grantResponsePromise
+    if (!grantResp.ok()) {
+      throw new Error(
+        `session badge grant failed: ${grantResp.status()} ${await grantResp.text()}`,
+      )
+    }
 
     await participantPage.reload()
     await participantPage.waitForLoadState("networkidle")
