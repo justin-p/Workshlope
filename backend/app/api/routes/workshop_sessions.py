@@ -20,7 +20,7 @@ from fastapi import (
 )
 from jwt.exceptions import PyJWTError
 from pydantic import BaseModel
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlmodel import Session, col, func, select
 
 from app.api.deps import CurrentUser, SessionDep
@@ -81,6 +81,7 @@ from app.services.lesson_markdown_pipeline import (
     rewrite_relative_asset_urls,
 )
 from app.services.user_workshop_feed import user_workshop_feed_hub
+from app.services.workshop_badge_auto_award import award_lesson_badges_on_session_end
 from app.services.workshop_realtime import (
     WorkshopWsConnection,
     workshop_hub,
@@ -1365,9 +1366,16 @@ def read_workshop_session_detail(
                 col(WorkshopBadgeGrant.badge_id) == WorkshopBadgeDefinition.id,
             )
             .where(
-                WorkshopBadgeGrant.session_id == session_id,
-                WorkshopBadgeGrant.user_id == current_user.id,
+                col(WorkshopBadgeGrant.user_id) == current_user.id,
                 col(WorkshopBadgeGrant.revoked_at).is_(None),
+                or_(
+                    col(WorkshopBadgeGrant.session_id) == session_id,
+                    and_(
+                        col(WorkshopBadgeGrant.session_id).is_(None),
+                        col(WorkshopBadgeDefinition.lesson_id)
+                        == workshop_row.lesson_id,
+                    ),
+                ),
             )
         ).all()
         session_badges = [
@@ -2046,6 +2054,12 @@ async def end_workshop_session(
         )
     workshop_session.status = "ended"
     session.add(workshop_session)
+    session.flush()
+    award_lesson_badges_on_session_end(
+        session,
+        workshop_session=workshop_session,
+        granted_by_user_id=current_user.id,
+    )
     session.commit()
     await workshop_hub.publish_session_status_changed(
         session_id=session_id,

@@ -1413,6 +1413,18 @@ export const WorkshopBadgeDefinitionPublicSchema = {
             ],
             title: 'Image Url',
             description: 'Relative API path to uploaded image, or null to use UI default artwork.'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
         }
     },
     type: 'object',
@@ -1439,6 +1451,65 @@ export const WorkshopBadgeDefinitionsPublicSchema = {
     title: 'WorkshopBadgeDefinitionsPublic'
 } as const;
 
+export const WorkshopBadgeGrantRecipientPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        granted_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Granted At'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'email'],
+    title: 'WorkshopBadgeGrantRecipientPublic'
+} as const;
+
+export const WorkshopBadgeGrantRecipientsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopBadgeGrantRecipientPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopBadgeGrantRecipientsPublic'
+} as const;
+
 export const WorkshopBadgeGrantRequestSchema = {
     properties: {
         user_id: {
@@ -1455,6 +1526,37 @@ export const WorkshopBadgeGrantRequestSchema = {
     type: 'object',
     required: ['user_id', 'badge_id'],
     title: 'WorkshopBadgeGrantRequest'
+} as const;
+
+export const WorkshopBadgeGrantRevokeForBadgeRequestSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        reason: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'reason'],
+    title: 'WorkshopBadgeGrantRevokeForBadgeRequest'
+} as const;
+
+export const WorkshopBadgeHubGrantRequestSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        }
+    },
+    type: 'object',
+    required: ['user_id'],
+    title: 'WorkshopBadgeHubGrantRequest'
 } as const;
 
 export const WorkshopBadgeRevokeRequestSchema = {

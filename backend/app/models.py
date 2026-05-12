@@ -463,6 +463,11 @@ class WorkshopBadgeDefinition(SQLModel, table=True):
         ondelete="SET NULL",
     )
     image_filename: str | None = Field(default=None, max_length=255)
+    archived_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+        description="Set when manifest no longer lists this badge; grants remain read-only.",
+    )
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
@@ -766,6 +771,7 @@ class WorkshopBadgeDefinitionPublic(SQLModel):
         default=None,
         description="Relative API path to uploaded image, or null to use UI default artwork.",
     )
+    archived_at: datetime | None = None
 
 
 class WorkshopBadgeDefinitionsPublic(SQLModel):
@@ -782,6 +788,27 @@ class WorkshopBadgeRevokeRequest(SQLModel):
     user_id: uuid.UUID
     badge_id: uuid.UUID
     reason: str | None = Field(default=None, max_length=255)
+
+
+class WorkshopBadgeHubGrantRequest(SQLModel):
+    user_id: uuid.UUID
+
+
+class WorkshopBadgeGrantRevokeForBadgeRequest(SQLModel):
+    user_id: uuid.UUID
+    reason: str = Field(max_length=255)
+
+
+class WorkshopBadgeGrantRecipientPublic(SQLModel):
+    user_id: uuid.UUID
+    email: str
+    full_name: str | None = None
+    granted_at: datetime | None = None
+
+
+class WorkshopBadgeGrantRecipientsPublic(SQLModel):
+    data: list[WorkshopBadgeGrantRecipientPublic]
+    count: int
 
 
 class WorkshopSessionLeaderboardRowPublic(SQLModel):

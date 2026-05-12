@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, OauthBridgeLoginData, OauthBridgeLoginResponse, OauthListPendingLoginsData, OauthListPendingLoginsResponse, OauthApprovePendingLoginData, OauthApprovePendingLoginResponse, OauthDenyPendingLoginData, OauthDenyPendingLoginResponse, OauthGetLinkStatusData, OauthGetLinkStatusResponse, OauthAdminUnlinkGithubData, OauthAdminUnlinkGithubResponse, PrivateCreateUserData, PrivateCreateUserResponse, PrivateBootstrapE2eWorkshopLiveSessionData, PrivateBootstrapE2eWorkshopLiveSessionResponse, PrivateE2eBumpWorkshopLessonSyncGenerationData, PrivateE2eBumpWorkshopLessonSyncGenerationResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WorkshopBadgesReadWorkshopBadgesResponse, WorkshopBadgesCreateWorkshopBadgeData, WorkshopBadgesCreateWorkshopBadgeResponse, WorkshopBadgesReadWorkshopGlobalBadgeLeaderboardResponse, WorkshopBadgesGrantWorkshopBadgeData, WorkshopBadgesGrantWorkshopBadgeResponse, WorkshopBadgesRevokeWorkshopBadgeData, WorkshopBadgesRevokeWorkshopBadgeResponse, WorkshopBadgesGrantWorkshopBadgeOrgData, WorkshopBadgesGrantWorkshopBadgeOrgResponse, WorkshopBadgesRevokeWorkshopBadgeOrgData, WorkshopBadgesRevokeWorkshopBadgeOrgResponse, WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData, WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse, WorkshopBadgesReadWorkshopBadgeImageData, WorkshopBadgesReadWorkshopBadgeImageResponse, WorkshopBadgesUploadWorkshopBadgeImageData, WorkshopBadgesUploadWorkshopBadgeImageResponse, WorkshopLessonReposReadLessonReposData, WorkshopLessonReposReadLessonReposResponse, WorkshopLessonReposReadGithubInstallationsData, WorkshopLessonReposReadGithubInstallationsResponse, WorkshopLessonReposRefreshGithubInstallationsData, WorkshopLessonReposRefreshGithubInstallationsResponse, WorkshopLessonReposRefreshGithubInstallationRepositoriesData, WorkshopLessonReposRefreshGithubInstallationRepositoriesResponse, WorkshopLessonReposReadGithubInstallationAccessibleRepositoriesData, WorkshopLessonReposReadGithubInstallationAccessibleRepositoriesResponse, WorkshopLessonReposReadLessonRepoPreviewData, WorkshopLessonReposReadLessonRepoPreviewResponse, WorkshopLessonReposSyncLessonRepoFromGithubData, WorkshopLessonReposSyncLessonRepoFromGithubResponse, WorkshopLessonsCreateLessonPrerequisiteData, WorkshopLessonsCreateLessonPrerequisiteResponse, WorkshopLessonsReadLessonPrerequisitesData, WorkshopLessonsReadLessonPrerequisitesResponse, WorkshopLessonsPatchLessonPrerequisiteData, WorkshopLessonsPatchLessonPrerequisiteResponse, WorkshopLessonsDeleteLessonPrerequisiteData, WorkshopLessonsDeleteLessonPrerequisiteResponse, WorkshopLessonsReadLessonRosterUserPickerData, WorkshopLessonsReadLessonRosterUserPickerResponse, WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterData, WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterResponse, WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterData, WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterResponse, WorkshopLessonsReadMyLessonPrerequisitesData, WorkshopLessonsReadMyLessonPrerequisitesResponse, WorkshopLessonsCompleteLessonPrerequisiteData, WorkshopLessonsCompleteLessonPrerequisiteResponse, WorkshopSessionsReadWorkshopSessionsForUserData, WorkshopSessionsReadWorkshopSessionsForUserResponse, WorkshopSessionsCreateWorkshopSessionData, WorkshopSessionsCreateWorkshopSessionResponse, WorkshopSessionsReadWorkshopPartAssetData, WorkshopSessionsReadWorkshopPartAssetResponse, WorkshopSessionsReadWorkshopSessionDetailData, WorkshopSessionsReadWorkshopSessionDetailResponse, WorkshopSessionsPatchWorkshopSessionData, WorkshopSessionsPatchWorkshopSessionResponse, WorkshopSessionsReadWorkshopSessionRosterUserPickerData, WorkshopSessionsReadWorkshopSessionRosterUserPickerResponse, WorkshopSessionsBatchUpsertWorkshopSessionParticipantsData, WorkshopSessionsBatchUpsertWorkshopSessionParticipantsResponse, WorkshopSessionsUpsertWorkshopSessionMemberData, WorkshopSessionsUpsertWorkshopSessionMemberResponse, WorkshopSessionsRemoveWorkshopSessionParticipantData, WorkshopSessionsRemoveWorkshopSessionParticipantResponse, WorkshopSessionsPatchWorkshopSessionParticipantData, WorkshopSessionsPatchWorkshopSessionParticipantResponse, WorkshopSessionsEnterWorkshopSessionData, WorkshopSessionsEnterWorkshopSessionResponse, WorkshopSessionsStartWorkshopSessionData, WorkshopSessionsStartWorkshopSessionResponse, WorkshopSessionsEndWorkshopSessionData, WorkshopSessionsEndWorkshopSessionResponse, WorkshopSessionsReadWorkshopSessionTimerData, WorkshopSessionsReadWorkshopSessionTimerResponse, WorkshopSessionsReadWorkshopSessionTimerEventsData, WorkshopSessionsReadWorkshopSessionTimerEventsResponse, WorkshopSessionsStartWorkshopSessionTimerData, WorkshopSessionsStartWorkshopSessionTimerResponse, WorkshopSessionsExtendWorkshopSessionTimerData, WorkshopSessionsExtendWorkshopSessionTimerResponse, WorkshopSessionsPauseWorkshopSessionTimerData, WorkshopSessionsPauseWorkshopSessionTimerResponse, WorkshopSessionsResumeWorkshopSessionTimerData, WorkshopSessionsResumeWorkshopSessionTimerResponse, WorkshopSessionsStopWorkshopSessionTimerData, WorkshopSessionsStopWorkshopSessionTimerResponse, WorkshopSessionsCreateUserWorkshopFeedWsTicketResponse, WorkshopSessionsCreateWorkshopWsTicketData, WorkshopSessionsCreateWorkshopWsTicketResponse } from './types.gen';
+import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, OauthBridgeLoginData, OauthBridgeLoginResponse, OauthListPendingLoginsData, OauthListPendingLoginsResponse, OauthApprovePendingLoginData, OauthApprovePendingLoginResponse, OauthDenyPendingLoginData, OauthDenyPendingLoginResponse, OauthGetLinkStatusData, OauthGetLinkStatusResponse, OauthAdminUnlinkGithubData, OauthAdminUnlinkGithubResponse, PrivateCreateUserData, PrivateCreateUserResponse, PrivateBootstrapE2eWorkshopLiveSessionData, PrivateBootstrapE2eWorkshopLiveSessionResponse, PrivateE2eBumpWorkshopLessonSyncGenerationData, PrivateE2eBumpWorkshopLessonSyncGenerationResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, WorkshopBadgesReadWorkshopBadgesData, WorkshopBadgesReadWorkshopBadgesResponse, WorkshopBadgesCreateWorkshopBadgeData, WorkshopBadgesCreateWorkshopBadgeResponse, WorkshopBadgesReadWorkshopGlobalBadgeLeaderboardResponse, WorkshopBadgesGrantWorkshopBadgeData, WorkshopBadgesGrantWorkshopBadgeResponse, WorkshopBadgesRevokeWorkshopBadgeData, WorkshopBadgesRevokeWorkshopBadgeResponse, WorkshopBadgesGrantWorkshopBadgeOrgData, WorkshopBadgesGrantWorkshopBadgeOrgResponse, WorkshopBadgesRevokeWorkshopBadgeOrgData, WorkshopBadgesRevokeWorkshopBadgeOrgResponse, WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData, WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse, WorkshopBadgesReadWorkshopBadgeGrantUserPickerData, WorkshopBadgesReadWorkshopBadgeGrantUserPickerResponse, WorkshopBadgesReadWorkshopBadgeGrantRecipientsData, WorkshopBadgesReadWorkshopBadgeGrantRecipientsResponse, WorkshopBadgesGrantWorkshopBadgeFromHubData, WorkshopBadgesGrantWorkshopBadgeFromHubResponse, WorkshopBadgesRevokeWorkshopBadgeFromHubData, WorkshopBadgesRevokeWorkshopBadgeFromHubResponse, WorkshopBadgesReadWorkshopBadgeImageData, WorkshopBadgesReadWorkshopBadgeImageResponse, WorkshopBadgesUploadWorkshopBadgeImageData, WorkshopBadgesUploadWorkshopBadgeImageResponse, WorkshopLessonReposReadLessonReposData, WorkshopLessonReposReadLessonReposResponse, WorkshopLessonReposReadGithubInstallationsData, WorkshopLessonReposReadGithubInstallationsResponse, WorkshopLessonReposRefreshGithubInstallationsData, WorkshopLessonReposRefreshGithubInstallationsResponse, WorkshopLessonReposRefreshGithubInstallationRepositoriesData, WorkshopLessonReposRefreshGithubInstallationRepositoriesResponse, WorkshopLessonReposReadGithubInstallationAccessibleRepositoriesData, WorkshopLessonReposReadGithubInstallationAccessibleRepositoriesResponse, WorkshopLessonReposReadLessonRepoPreviewData, WorkshopLessonReposReadLessonRepoPreviewResponse, WorkshopLessonReposSyncLessonRepoFromGithubData, WorkshopLessonReposSyncLessonRepoFromGithubResponse, WorkshopLessonsCreateLessonPrerequisiteData, WorkshopLessonsCreateLessonPrerequisiteResponse, WorkshopLessonsReadLessonPrerequisitesData, WorkshopLessonsReadLessonPrerequisitesResponse, WorkshopLessonsPatchLessonPrerequisiteData, WorkshopLessonsPatchLessonPrerequisiteResponse, WorkshopLessonsDeleteLessonPrerequisiteData, WorkshopLessonsDeleteLessonPrerequisiteResponse, WorkshopLessonsReadLessonRosterUserPickerData, WorkshopLessonsReadLessonRosterUserPickerResponse, WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterData, WorkshopLessonsReadLessonPrerequisiteGapsForSessionRosterResponse, WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterData, WorkshopLessonsReadLessonPrerequisiteAggregatesForSessionRosterResponse, WorkshopLessonsReadMyLessonPrerequisitesData, WorkshopLessonsReadMyLessonPrerequisitesResponse, WorkshopLessonsCompleteLessonPrerequisiteData, WorkshopLessonsCompleteLessonPrerequisiteResponse, WorkshopSessionsReadWorkshopSessionsForUserData, WorkshopSessionsReadWorkshopSessionsForUserResponse, WorkshopSessionsCreateWorkshopSessionData, WorkshopSessionsCreateWorkshopSessionResponse, WorkshopSessionsReadWorkshopPartAssetData, WorkshopSessionsReadWorkshopPartAssetResponse, WorkshopSessionsReadWorkshopSessionDetailData, WorkshopSessionsReadWorkshopSessionDetailResponse, WorkshopSessionsPatchWorkshopSessionData, WorkshopSessionsPatchWorkshopSessionResponse, WorkshopSessionsReadWorkshopSessionRosterUserPickerData, WorkshopSessionsReadWorkshopSessionRosterUserPickerResponse, WorkshopSessionsBatchUpsertWorkshopSessionParticipantsData, WorkshopSessionsBatchUpsertWorkshopSessionParticipantsResponse, WorkshopSessionsUpsertWorkshopSessionMemberData, WorkshopSessionsUpsertWorkshopSessionMemberResponse, WorkshopSessionsRemoveWorkshopSessionParticipantData, WorkshopSessionsRemoveWorkshopSessionParticipantResponse, WorkshopSessionsPatchWorkshopSessionParticipantData, WorkshopSessionsPatchWorkshopSessionParticipantResponse, WorkshopSessionsEnterWorkshopSessionData, WorkshopSessionsEnterWorkshopSessionResponse, WorkshopSessionsStartWorkshopSessionData, WorkshopSessionsStartWorkshopSessionResponse, WorkshopSessionsEndWorkshopSessionData, WorkshopSessionsEndWorkshopSessionResponse, WorkshopSessionsReadWorkshopSessionTimerData, WorkshopSessionsReadWorkshopSessionTimerResponse, WorkshopSessionsReadWorkshopSessionTimerEventsData, WorkshopSessionsReadWorkshopSessionTimerEventsResponse, WorkshopSessionsStartWorkshopSessionTimerData, WorkshopSessionsStartWorkshopSessionTimerResponse, WorkshopSessionsExtendWorkshopSessionTimerData, WorkshopSessionsExtendWorkshopSessionTimerResponse, WorkshopSessionsPauseWorkshopSessionTimerData, WorkshopSessionsPauseWorkshopSessionTimerResponse, WorkshopSessionsResumeWorkshopSessionTimerData, WorkshopSessionsResumeWorkshopSessionTimerResponse, WorkshopSessionsStopWorkshopSessionTimerData, WorkshopSessionsStopWorkshopSessionTimerResponse, WorkshopSessionsCreateUserWorkshopFeedWsTicketResponse, WorkshopSessionsCreateWorkshopWsTicketData, WorkshopSessionsCreateWorkshopWsTicketResponse } from './types.gen';
 
 export class ItemsService {
     /**
@@ -680,13 +680,21 @@ export class UtilsService {
 export class WorkshopBadgesService {
     /**
      * Read Workshop Badges
+     * @param data The data for the request.
+     * @param data.includeArchived
      * @returns WorkshopBadgeDefinitionsPublic Successful Response
      * @throws ApiError
      */
-    public static readWorkshopBadges(): CancelablePromise<WorkshopBadgesReadWorkshopBadgesResponse> {
+    public static readWorkshopBadges(data: WorkshopBadgesReadWorkshopBadgesData = {}): CancelablePromise<WorkshopBadgesReadWorkshopBadgesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/workshop/badges'
+            url: '/api/v1/workshop/badges',
+            query: {
+                include_archived: data.includeArchived
+            },
+            errors: {
+                422: 'Validation Error'
+            }
         });
     }
     
@@ -819,6 +827,100 @@ export class WorkshopBadgesService {
             path: {
                 session_id: data.sessionId
             },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Workshop Badge Grant User Picker
+     * @param data The data for the request.
+     * @param data.badgeId
+     * @param data.q
+     * @param data.skip
+     * @param data.limit
+     * @returns WorkshopRosterUserPickerPublic Successful Response
+     * @throws ApiError
+     */
+    public static readWorkshopBadgeGrantUserPicker(data: WorkshopBadgesReadWorkshopBadgeGrantUserPickerData): CancelablePromise<WorkshopBadgesReadWorkshopBadgeGrantUserPickerResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/badges/{badge_id}/grant-user-picker',
+            path: {
+                badge_id: data.badgeId
+            },
+            query: {
+                q: data.q,
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Workshop Badge Grant Recipients
+     * @param data The data for the request.
+     * @param data.badgeId
+     * @returns WorkshopBadgeGrantRecipientsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readWorkshopBadgeGrantRecipients(data: WorkshopBadgesReadWorkshopBadgeGrantRecipientsData): CancelablePromise<WorkshopBadgesReadWorkshopBadgeGrantRecipientsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/workshop/badges/{badge_id}/grants',
+            path: {
+                badge_id: data.badgeId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Grant Workshop Badge From Hub
+     * @param data The data for the request.
+     * @param data.badgeId
+     * @param data.requestBody
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static grantWorkshopBadgeFromHub(data: WorkshopBadgesGrantWorkshopBadgeFromHubData): CancelablePromise<WorkshopBadgesGrantWorkshopBadgeFromHubResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/badges/{badge_id}/grants',
+            path: {
+                badge_id: data.badgeId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Revoke Workshop Badge From Hub
+     * @param data The data for the request.
+     * @param data.badgeId
+     * @param data.requestBody
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static revokeWorkshopBadgeFromHub(data: WorkshopBadgesRevokeWorkshopBadgeFromHubData): CancelablePromise<WorkshopBadgesRevokeWorkshopBadgeFromHubResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/workshop/badges/{badge_id}/grants/revoke',
+            path: {
+                badge_id: data.badgeId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: 'Validation Error'
             }
