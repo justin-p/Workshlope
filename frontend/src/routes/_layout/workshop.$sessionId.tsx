@@ -776,6 +776,10 @@ function WorkshopSessionPage() {
   const canRunLiveDelivery = lessonContentAvailable
   const rosterParticipants =
     detailQuery.data?.view === "instructor" ? detailQuery.data.participants : []
+  const showInstructorSetupPrompt =
+    detailView === "instructor" &&
+    sessionInLobby &&
+    (rosterParticipants.length === 0 || requiredAggregateRows.length === 0)
   const removeDialogParticipant =
     removeParticipantUserId === null
       ? undefined
@@ -930,6 +934,40 @@ function WorkshopSessionPage() {
           {instructorBlockedTraineesCount}
         </p>
       ) : null}
+      {showInstructorSetupPrompt ? (
+        <Alert
+          variant="default"
+          className="border-primary/25 bg-primary/5"
+          data-testid="workshop-instructor-setup-prompt"
+        >
+          <AlertTitle>Before you start</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>
+              Set up this session by inviting trainees and reviewing pre-work.
+            </p>
+            <div className="flex flex-wrap gap-3 text-xs">
+              {rosterParticipants.length === 0 ? (
+                <a
+                  href="#workshop-roster-panel"
+                  className="text-primary underline underline-offset-4"
+                  data-testid="workshop-instructor-setup-go-roster"
+                >
+                  Invite trainees
+                </a>
+              ) : null}
+              {requiredAggregateRows.length === 0 ? (
+                <a
+                  href="#workshop-prework-instructor-panel"
+                  className="text-primary underline underline-offset-4"
+                  data-testid="workshop-instructor-setup-go-prework"
+                >
+                  Review prerequisite gates
+                </a>
+              ) : null}
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {sessionInLobby ? (
         <Alert
           variant="default"
@@ -1037,6 +1075,7 @@ function WorkshopSessionPage() {
 
       {detailView === "instructor" ? (
         <div
+          id="workshop-prework-instructor-panel"
           className="rounded-lg border px-4 py-3 text-sm space-y-2 bg-card"
           data-testid="workshop-prework-instructor-panel"
         >
@@ -1090,6 +1129,7 @@ function WorkshopSessionPage() {
       ) : null}
       {detailView === "instructor" ? (
         <div
+          id="workshop-roster-panel"
           className="rounded-lg border px-4 py-3 text-sm space-y-2 bg-card"
           data-testid="workshop-roster-panel"
         >
