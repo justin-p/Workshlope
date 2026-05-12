@@ -70,6 +70,19 @@ test.describe("Workshop live session", () => {
       /connected/i,
       { timeout: 15_000 },
     )
+    await expect(
+      participantPage.getByTestId("workshop-trainee-timer-status"),
+    ).toHaveCount(0)
+
+    await page.getByTestId("workshop-timer-start").click()
+    await expect(page.getByTestId("workshop-timer-status")).toContainText(
+      "running",
+    )
+    await expect(
+      participantPage.getByTestId("workshop-trainee-timer-status"),
+    ).toContainText(/Timer: running(\s\((countdown|countup)\))?/i, {
+      timeout: 20_000,
+    })
 
     await page.getByTestId("workshop-instructor-pause").click()
     await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(

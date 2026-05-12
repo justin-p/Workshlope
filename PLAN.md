@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — Extended **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** with nine UX/spec-alignment rows (workshop session page + dashboards). Trainee timer read behavior remains as in **[#65](https://github.com/justin-p/testing/pull/65)** (snapshot **GET**, instructor-only mutations/events, polling + WS invalidation). |
-| **Branch** | **`docs/plan/deferred-polish-backlog`** |
-| **PR** | **[#66](https://github.com/justin-p/testing/pull/66)** |
+| **Last synced** | **2026-05-12** — Added Playwright coverage to assert a trainee sees `workshop-trainee-timer-status` after an instructor starts the timer (no manual reload), aligned with **[#65](https://github.com/justin-p/testing/pull/65)** timer-read behavior. |
+| **Branch** | **`test/workshop/trainee-timer-playwright-followup`** |
+| **PR** | _(open after push)_ |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -671,6 +671,7 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 - Security checks: safe-retry/idempotency for applicable HTTP mutations and route-throttling or abuse guards on auth bridge/login; **no** public ingest-webhook routes to protect in this MVP.
 - Unit/API: prerequisite completion semantics, timer state transitions, badge grant/revoke authorization and audit fields.
 - Playwright: trainee prework checklist flow, instructor timer controls + overrun UI.
+- Playwright: trainee timer visibility regression guard — in the dual-role workshop flow, instructor `workshop-timer-start` must surface trainee `workshop-trainee-timer-status` (running/countdown) without a page reload.
 - Playwright (in-flight local): expanded dashboard/workshops role routing and stub-rail shortcuts (`dashboard-routing.spec.ts`) plus non-instructor `/workshops` redirect and resilient blocked-count assertion (`workshop.spec.ts`); added stale-token regression coverage (`login tolerates stale access token without redirect loop`) and login guard now clears invalid local token instead of ping-ponging `/` ↔ `/login`; added instructor prerequisite-roster analytics coverage on live session view (`workshop-prework-instructor-panel` and gaps summary) and workshops-hub blocked-analytics summary (`workshop-blocked-analytics*`).
 - Backend/contracts (in-flight local): added `lesson_manifest_sync` audit table keyed by repo + manifest path with persisted `manifest_sha256` on sync (`backend/app/models.py`, `backend/app/services/lesson_repo_sync.py`, migration `f7a8b9c0d1e2`, service test coverage in `backend/tests/services/test_lesson_repo_sync.py`).
 - Backend/contract (in-flight local): `POST /api/v1/private/users/` now accepts `is_instructor` for deterministic E2E role seeding; covered by `backend/tests/api/routes/test_private.py::test_create_user_can_set_instructor_flag`.
