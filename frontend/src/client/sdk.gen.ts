@@ -390,6 +390,8 @@ export class PrivateService {
      * Pass ``with_incomplete_required_prerequisite=true`` to add one **required**
      * lesson prerequisite with **no** completion row for the rostered trainee
      * (participant flows / Playwright pre-work UI).
+     * Pass ``with_e2e_badge=true`` to create a **WorkshopBadgeDefinition** with a
+     * unique slug for grant-badge Playwright flows.
      *
      * When ``participant_email`` is set and differs from ``FIRST_SUPERUSER``, the
      * trainee is rostered **only** as a participant and **``FIRST_SUPERUSER``** is
@@ -400,6 +402,7 @@ export class PrivateService {
      * @param data.omitParticipantSeat
      * @param data.initialStatus
      * @param data.withIncompleteRequiredPrerequisite
+     * @param data.withE2eBadge
      * @returns PrivateWorkshopE2ELiveSessionResponse Successful Response
      * @throws ApiError
      */
@@ -411,7 +414,8 @@ export class PrivateService {
                 participant_email: data.participantEmail,
                 omit_participant_seat: data.omitParticipantSeat,
                 initial_status: data.initialStatus,
-                with_incomplete_required_prerequisite: data.withIncompleteRequiredPrerequisite
+                with_incomplete_required_prerequisite: data.withIncompleteRequiredPrerequisite,
+                with_e2e_badge: data.withE2eBadge
             },
             errors: {
                 422: 'Validation Error'

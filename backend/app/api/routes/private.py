@@ -17,6 +17,7 @@ from app.models import (
     SessionInstructor,
     User,
     UserPublic,
+    WorkshopBadgeDefinition,
     WorkshopParticipant,
     WorkshopSession,
 )
@@ -66,6 +67,7 @@ def bootstrap_e2e_workshop_live_session(
     omit_participant_seat: Annotated[bool, Query()] = False,
     initial_status: Annotated[Literal["live", "scheduled", "ended"], Query()] = "live",
     with_incomplete_required_prerequisite: Annotated[bool, Query()] = False,
+    with_e2e_badge: Annotated[bool, Query()] = False,
 ) -> PrivateWorkshopE2ELiveSessionResponse:
     """Create a live workshop session with lesson parts for local E2E only.
 
@@ -80,6 +82,8 @@ def bootstrap_e2e_workshop_live_session(
     Pass ``with_incomplete_required_prerequisite=true`` to add one **required**
     lesson prerequisite with **no** completion row for the rostered trainee
     (participant flows / Playwright pre-work UI).
+    Pass ``with_e2e_badge=true`` to create a **WorkshopBadgeDefinition** with a
+    unique slug for grant-badge Playwright flows.
 
     When ``participant_email`` is set and differs from ``FIRST_SUPERUSER``, the
     trainee is rostered **only** as a participant and **``FIRST_SUPERUSER``** is
@@ -154,6 +158,16 @@ def bootstrap_e2e_workshop_live_session(
                 details="Complete this item in E2E to clear the banner.",
                 ordering=0,
                 required_flag=True,
+            )
+        )
+
+    if with_e2e_badge:
+        session.add(
+            WorkshopBadgeDefinition(
+                slug=f"e2e-grant-{sid}",
+                title="E2E Grant Badge",
+                description="Created by e2e-live-session bootstrap for grant tests.",
+                points=10,
             )
         )
 

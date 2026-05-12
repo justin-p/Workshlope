@@ -43,6 +43,8 @@ from app.models import (
     SessionInstructor,
     User,
     UserPrerequisiteCompletion,
+    WorkshopBadgeDefinition,
+    WorkshopBadgeGrant,
     WorkshopLessonPartBrief,
     WorkshopLessonSummaryPublic,
     WorkshopParticipant,
@@ -62,6 +64,7 @@ from app.models import (
     WorkshopSessionPatch,
     WorkshopSessionPublicInstructor,
     WorkshopSessionPublicParticipant,
+    WorkshopSessionSelfBadgeGrantPublic,
     WorkshopSessionsPublic,
     WorkshopSessionTimer,
     WorkshopSessionTimerEvent,
@@ -1314,11 +1317,32 @@ def read_workshop_session_detail(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="participant_seat_missing",
             )
+        grant_pairs = session.exec(
+            select(WorkshopBadgeGrant, WorkshopBadgeDefinition)
+            .join(
+                WorkshopBadgeDefinition,
+                col(WorkshopBadgeGrant.badge_id) == WorkshopBadgeDefinition.id,
+            )
+            .where(
+                WorkshopBadgeGrant.session_id == session_id,
+                WorkshopBadgeGrant.user_id == current_user.id,
+                col(WorkshopBadgeGrant.revoked_at).is_(None),
+            )
+        ).all()
+        session_badges = [
+            WorkshopSessionSelfBadgeGrantPublic(
+                badge_id=defn.id,
+                title=defn.title,
+                slug=defn.slug,
+            )
+            for _grant, defn in grant_pairs
+        ]
         self_snap = WorkshopParticipantSelfPublic(
             invited_at=participant.invited_at,
             joined_at=participant.joined_at,
             finished_at=participant.finished_at,
             live_status=participant.live_status,
+            session_badges=session_badges,
         )
         return WorkshopSessionPublicParticipant(
             session=core,
