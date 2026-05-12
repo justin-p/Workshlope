@@ -66,41 +66,33 @@ test.describe("Workshop instructor verify and badge grant", () => {
     ).toBeVisible({ timeout: 10_000 })
 
     const token = await getApiTokenAsSuperuser()
-    const badgesRes = await fetch(`${apiBase}/api/v1/workshop/badges`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const auth = { Authorization: `Bearer ${token}` }
+    const badgesRes = await request.get(`${apiBase}/api/v1/workshop/badges`, {
+      headers: auth,
     })
-    if (!badgesRes.ok) {
-      throw new Error(
-        `list badges failed: ${badgesRes.status} ${await badgesRes.text()}`,
-      )
-    }
+    expect(
+      badgesRes.ok(),
+      `list badges failed: ${badgesRes.status()} ${await badgesRes.text()}`,
+    ).toBeTruthy()
     const badgesJson = (await badgesRes.json()) as {
       data: Array<{ id: string; slug: string }>
     }
     const e2eSlug = `e2e-grant-${session_id}`
     const badge = badgesJson.data.find((b) => b.slug === e2eSlug)
-    if (!badge) {
-      throw new Error(`missing bootstrap badge slug ${e2eSlug}`)
-    }
-    const grantRes = await fetch(
+    expect(badge, `missing bootstrap badge slug ${e2eSlug}`).toBeTruthy()
+
+    // Use `data` for JSON — `json` is not a valid APIRequestContext option (empty body).
+    const grantRes = await request.post(
       `${apiBase}/api/v1/workshop/badges/sessions/${session_id}/grant`,
       {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: String(participant.userId),
-          badge_id: badge.id,
-        }),
+        headers: auth,
+        data: { user_id: participant.userId, badge_id: badge!.id },
       },
     )
-    if (!grantRes.ok) {
-      throw new Error(
-        `session badge grant failed: ${grantRes.status} ${await grantRes.text()}`,
-      )
-    }
+    expect(
+      grantRes.ok(),
+      `session badge grant failed: ${grantRes.status()} ${await grantRes.text()}`,
+    ).toBeTruthy()
 
     await page.reload()
     await page.waitForLoadState("networkidle")

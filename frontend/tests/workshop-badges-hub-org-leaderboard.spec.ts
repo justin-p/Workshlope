@@ -32,8 +32,10 @@ test.describe("Badge hub, org grant, global leaderboard", () => {
       timeout: 10_000,
     })
 
+    const token = await getApiTokenAsSuperuser()
+    const auth = { Authorization: `Bearer ${token}` }
     const list = await request.get(`${apiBase}/api/v1/workshop/badges`, {
-      headers: { Authorization: `Bearer ${await getApiTokenAsSuperuser()}` },
+      headers: auth,
     })
     expect(list.ok()).toBeTruthy()
     const badges = (await list.json()) as {
@@ -42,26 +44,15 @@ test.describe("Badge hub, org grant, global leaderboard", () => {
     const badge = badges.data.find((b) => b.slug === slug)
     expect(badge).toBeTruthy()
 
-    const token = await getApiTokenAsSuperuser()
-    const grantRes = await fetch(
+    // Playwright APIRequestContext uses `data` for JSON bodies — `json` is ignored (empty body → 422).
+    const grantRes = await request.post(
       `${apiBase}/api/v1/workshop/badges/org/grant`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: String(trainee.id),
-          badge_id: String(badge!.id),
-        }),
-      },
+      { headers: auth, data: { user_id: trainee.id, badge_id: badge!.id } },
     )
-    if (!grantRes.ok) {
-      throw new Error(
-        `org grant failed: ${grantRes.status} ${await grantRes.text()}`,
-      )
-    }
+    expect(
+      grantRes.ok(),
+      `org grant failed: ${grantRes.status()} ${await grantRes.text()}`,
+    ).toBeTruthy()
 
     await page.goto("/workshop/badges/leaderboard")
     await page.waitForLoadState("networkidle")

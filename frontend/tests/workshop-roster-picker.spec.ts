@@ -28,17 +28,18 @@ test.describe("Workshop roster user picker", () => {
       }),
     )
 
-    const table = page.getByTestId("workshop-roster-user-picker-table")
     const email0 = `${prefix}_00@example.com`
     const email25 = `${prefix}_25@example.com`
     await page.getByTestId("workshop-roster-user-picker-search").fill(prefix)
     await page.waitForLoadState("networkidle")
-    await expect(table).toContainText(email0, { timeout: 15_000 })
-    await page.getByRole("checkbox", { name: `Select ${email0}` }).click()
+    const row0 = page.getByRole("checkbox", { name: `Select ${email0}` })
+    await expect(row0).toBeVisible({ timeout: 15_000 })
+    await row0.click()
     await page.getByTestId("workshop-roster-user-picker-page-next").click()
     await page.waitForLoadState("networkidle")
-    await expect(table).toContainText(email25, { timeout: 15_000 })
-    await page.getByRole("checkbox", { name: `Select ${email25}` }).click()
+    const row25 = page.getByRole("checkbox", { name: `Select ${email25}` })
+    await expect(row25).toBeVisible({ timeout: 15_000 })
+    await row25.click()
     await page.getByTestId("workshop-roster-add-selected").click()
     const rosterList = page.getByTestId("workshop-roster-list")
     await expect(rosterList).toContainText(email0)
