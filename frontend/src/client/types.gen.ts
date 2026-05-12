@@ -1043,7 +1043,7 @@ export type WorkshopBadgesReadWorkshopBadgeImageData = {
     badgeId: string;
 };
 
-export type WorkshopBadgesReadWorkshopBadgeImageResponse = (unknown);
+export type WorkshopBadgesReadWorkshopBadgeImageResponse = ((Blob | File));
 
 export type WorkshopBadgesUploadWorkshopBadgeImageData = {
     badgeId: string;

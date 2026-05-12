@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **`feat/workshop/badge-hub-lesson-config`** / **[#81](https://github.com/justin-p/testing/pull/81)**: badge hub lesson manifest **auto-import** copy (link to **Workshops**), optional nudge when lesson-linked rows use default artwork, **Artwork** per-row upload; **`GET /workshop/badges`** includes **`lesson_repo_id`**. Rebases on **[#80](https://github.com/justin-p/testing/pull/80)** (merged to **main**: unified hub, GET/PATCH single badge, session-end auto-award, post-end summary CTA, client regen). Prior: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. |
-| **Branch** | **`feat/workshop/badge-hub-lesson-config`** |
-| **PR** | **[#81](https://github.com/justin-p/testing/pull/81)** |
+| **Last synced** | **2026-05-12** — **`feat/workshop/badge-image-anonymous-get`**: OpenAPI + client for anonymous **`GET /workshop/badges/{id}/image`** (binary 200, `security: []`); removed unused `AuthenticatedBadgeImage`; hub artwork E2E (`workshop-badge-hub-artwork.spec.ts`). Prior: **[#81](https://github.com/justin-p/testing/pull/81)** (badge hub lesson config). |
+| **Branch** | **`feat/workshop/badge-image-anonymous-get`** |
+| **PR** | — (open from branch after push) |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -102,6 +102,7 @@ Rough themes to revisit **only after** **[Remaining work](#remaining-work-author
 - **Signals**: **live_status** = busy | done for the **current part**, shown **only to that user and to instructors** — **trainees must not see other trainees’ status**, roster, joined/finished timestamps, or presence (privacy + reduces comparison anxiety). Instructor cockpit remains the aggregate view.
 - **Pause**: No participant busy/done writes; **no part navigation** (no **part_generation** bump) until **resume** or **end**.
 - **Awards**: For each **lesson-linked** badge definition, the system **auto-awards** to **participant-seat** users when the instructor **ends** the session (idempotent: at most one active grant per user+badge). Instructors also **manually grant** from the **badge hub** (org-scoped user search). **Instructor verification** of trainee completion remains the gate for other completion signals; grants surface on session views, profile where applicable, and the **global leaderboard**. Revocation (hub) requires an auditable reason and updates active counts/leaderboard views.
+- **Badge artwork (HTTP)**: **`GET /api/v1/workshop/badges/{badge_id}/image`** serves **raw image bytes without authentication** (for `<img src>` on hub, session, leaderboard). All other badge routes (catalog, grants, upload, etc.) remain **Bearer-authenticated**; artwork is UUID-bound obscurity only (metadata stays protected).
 - **Prework/prerequisites**: Lessons can define prerequisite tasks; trainee completion is tracked and surfaced before session start.
 - **Pacing tools**: Session timer **writes** and instructor cockpit controls (per-part countdown/elapsed and overrun flags) are instructor-only; rostered trainees may **read** the server timer snapshot over HTTP for pacing. **Timer audit events** (actor-bearing list) stay instructor-only.
 - **Backend delivery method**: Use `/python-tdd-with-uv` workflow across the entire backend implementation (test-first, vertical slices, `uv run pytest` loop).

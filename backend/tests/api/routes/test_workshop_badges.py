@@ -786,3 +786,109 @@ def test_session_end_auto_awards_lesson_badges(client: TestClient, db: Session) 
         select(WorkshopBadgeGrant).where(WorkshopBadgeGrant.badge_id == badge.id)
     ).all()
     assert len([r for r in rows if r.revoked_at is None]) == 1
+
+
+# 1×1 PNG (valid magic bytes + structure)
+_MINIMAL_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d4948445200010000010802000000907753de"
+    "0000000c49444154789c63f8cfc000000301010018dd8db40000000049454e44ae426082"
+)
+
+
+def test_workshop_badge_catalog_requires_auth(client: TestClient) -> None:
+    r = client.get(f"{settings.API_V1_STR}/workshop/badges")
+    assert r.status_code == 401
+
+
+def test_workshop_badge_image_get_anonymous_returns_png_bytes(
+    client: TestClient, db: Session
+) -> None:
+    headers, _ = _instructor_headers(client, db)
+    create = client.post(
+        f"{settings.API_V1_STR}/workshop/badges",
+        headers=headers,
+        json={
+            "slug": f"badge-img-{uuid.uuid4()}",
+            "title": "Image test",
+            "points": 1,
+        },
+    )
+    assert create.status_code == 200
+    badge_id = create.json()["id"]
+
+    up = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/{badge_id}/image",
+        headers=headers,
+        files={"file": ("t.png", _MINIMAL_PNG, "image/png")},
+    )
+    assert up.status_code == 200, up.text
+
+    anon = client.get(f"{settings.API_V1_STR}/workshop/badges/{badge_id}/image")
+    assert anon.status_code == 200
+    assert anon.headers.get("content-type", "").startswith("image/png")
+    assert anon.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+    with_auth = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/{badge_id}/image",
+        headers=headers,
+    )
+    assert with_auth.status_code == 200
+    assert with_auth.content == anon.content
+
+
+def test_workshop_badge_image_not_found_unknown_badge(client: TestClient) -> None:
+    missing = uuid.uuid4()
+    r = client.get(f"{settings.API_V1_STR}/workshop/badges/{missing}/image")
+    assert r.status_code == 404
+
+
+def test_workshop_badge_image_not_found_when_no_upload(
+    client: TestClient, db: Session
+) -> None:
+    headers, _ = _instructor_headers(client, db)
+    create = client.post(
+        f"{settings.API_V1_STR}/workshop/badges",
+        headers=headers,
+        json={
+            "slug": f"badge-noimg-{uuid.uuid4()}",
+            "title": "No image",
+            "points": 1,
+        },
+    )
+    assert create.status_code == 200
+    badge_id = create.json()["id"]
+    r = client.get(f"{settings.API_V1_STR}/workshop/badges/{badge_id}/image")
+    assert r.status_code == 404
+
+
+def test_list_badges_includes_image_url_after_upload(
+    client: TestClient, db: Session
+) -> None:
+    headers, _ = _instructor_headers(client, db)
+    create = client.post(
+        f"{settings.API_V1_STR}/workshop/badges",
+        headers=headers,
+        json={
+            "slug": f"badge-url-{uuid.uuid4()}",
+            "title": "URL field",
+            "points": 2,
+        },
+    )
+    assert create.status_code == 200
+    badge_id = create.json()["id"]
+    assert create.json().get("image_url") is None
+
+    up = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/{badge_id}/image",
+        headers=headers,
+        files={"file": ("t.png", _MINIMAL_PNG, "image/png")},
+    )
+    assert up.status_code == 200
+
+    listed = client.get(f"{settings.API_V1_STR}/workshop/badges", headers=headers)
+    assert listed.status_code == 200
+    rows = listed.json()["data"]
+    row = next((x for x in rows if x["id"] == badge_id), None)
+    assert row is not None
+    assert row.get("image_url") is not None
+    assert f"/workshop/badges/{badge_id}/image" in row["image_url"]
