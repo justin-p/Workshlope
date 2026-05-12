@@ -10,8 +10,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "80:80"
-      - "8090:8080"
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:8090:8080"
     # Duplicate the command from compose.yml to add --api.insecure=true
     command:
       # Enable Docker in Traefik, so that it reads labels from Docker services
@@ -48,19 +48,19 @@ services:
   db:
     restart: "no"
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     env_file:
       - .env.local
 
   adminer:
     restart: "no"
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
 
   backend:
     restart: "no"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -97,8 +97,8 @@ services:
   mailcatcher:
     image: schickling/mailcatcher
     ports:
-      - "1080:1080"
-      - "1025:1025"
+      - "127.0.0.1:1080:1080"
+      - "127.0.0.1:1025:1025"
 
   authjs-service:
     restart: "no"
@@ -110,7 +110,7 @@ services:
   frontend:
     restart: "no"
     ports:
-      - "5173:80"
+      - "127.0.0.1:5173:80"
     volumes:
       # Same-origin /api/v1 → backend (Playwright chromium must not call localhost:8000).
       - ./frontend/nginx-compose-api-proxy.conf:/etc/nginx/extra-conf.d/backend-not-found.conf:ro
@@ -148,7 +148,7 @@ services:
       - ./frontend/blob-report:/app/frontend/blob-report
       - ./frontend/test-results:/app/frontend/test-results
     ports:
-      - 9323:9323
+      - 127.0.0.1:9323:9323
 
 networks:
   traefik-public:
