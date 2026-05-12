@@ -11,7 +11,7 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **`main`** includes **[#77](https://github.com/justin-p/testing/pull/77)** (drift ack, revoke, `active_badge_grants`, e2e bump). Open **[#78](https://github.com/justin-p/testing/pull/78)** on **`feat/workshop/badge-end-to-end`**: badge hub, manifest v2 `badges[]`, org grants, global leaderboard, migration **`g1h2i3j4k5l6`**. **Blocking:** **§1 Workshop** only. Prior: **[#76](https://github.com/justin-p/testing/pull/76)**. |
+| **Last synced** | **2026-05-12** — **`main`** includes **[#77](https://github.com/justin-p/testing/pull/77)** (drift ack, revoke, `active_badge_grants`, e2e bump). Open **[#78](https://github.com/justin-p/testing/pull/78)** on **`feat/workshop/badge-end-to-end`**: badge hub, manifest v2 `badges[]`, org grants, global leaderboard, migrations **`g1h2i3j4k5l6`** + merge head **`a6357a27fcd7`**. **Blocking:** **§1 Workshop** only. Prior: **[#76](https://github.com/justin-p/testing/pull/76)**. |
 | **Branch** | **`feat/workshop/badge-end-to-end`** |
 | **PR** | **[#78](https://github.com/justin-p/testing/pull/78)** |
 | **Integrate against** | **`main`** |
