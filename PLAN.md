@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-12** — **`feat/workshop/badge-hub-lesson-config`**: badge hub explains lesson manifest **auto-import** (link to **Workshops**), optional nudge when lesson-linked rows still use default artwork, **Artwork** per-row upload dialog; **`GET /workshop/badges`** includes **`lesson_repo_id`** for lesson-tied definitions. Related merged/pending: **[#80](https://github.com/justin-p/testing/pull/80)** (unified hub, session-end auto-award, archived definitions, Playwright). Prior: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. |
 | **Branch** | **`feat/workshop/badge-hub-lesson-config`** |
-| **PR** | Open after push (stack on **#80** or rebase to `main` once **#80** merges). |
+| **PR** | **[#81](https://github.com/justin-p/testing/pull/81)** (stack on **#80**); **[#80](https://github.com/justin-p/testing/pull/80)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
