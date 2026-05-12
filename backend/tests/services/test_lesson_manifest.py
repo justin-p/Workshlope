@@ -99,3 +99,44 @@ parts:
 """
     with pytest.raises(ManifestValidationError):
         parse_lesson_manifest(payload)
+
+
+def test_parse_manifest_v2_accepts_optional_badges() -> None:
+    payload = """
+version: 2
+lesson:
+  slug: lesson-v2
+  title: V2
+parts:
+  - slug: one
+    title: One
+    path: a.md
+badges:
+  - slug: finisher
+    title: Finished
+    points: 10
+    description: Completed all parts
+"""
+    m = parse_lesson_manifest(payload)
+    assert m.version == 2
+    assert m.badges is not None and len(m.badges) == 1
+    assert m.badges[0].slug == "finisher"
+    assert m.badges[0].points == 10
+
+
+def test_parse_manifest_v1_rejects_badges_key() -> None:
+    payload = """
+version: 1
+lesson:
+  slug: lesson-a
+  title: Lesson A
+parts:
+  - slug: one
+    title: Part One
+    path: 01-setup.md
+badges: []
+"""
+    with pytest.raises(
+        ManifestValidationError, match="version 1 must not declare badges"
+    ):
+        parse_lesson_manifest(payload)

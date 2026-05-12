@@ -1,4 +1,4 @@
-import { BookOpen, Home, Users } from "lucide-react"
+import { Award, BookOpen, Home, Trophy, Users } from "lucide-react"
 import type { UserPublic } from "@/client"
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
@@ -24,9 +24,15 @@ function buildNavItemsForUser(user: UserPublic): Item[] {
       title: primaryHomeSidebarLabel(user),
       path: homePath,
     },
+    {
+      icon: Trophy,
+      title: "Badge leaderboard",
+      path: "/workshop/badges/leaderboard",
+    },
   ]
   if (user.is_instructor || user.is_superuser) {
     items.push({ icon: BookOpen, title: "Workshops", path: "/workshops" })
+    items.push({ icon: Award, title: "Badges", path: "/workshop/badges" })
   }
   if (user.is_superuser) {
     items.push({ icon: Users, title: "Admin", path: "/admin" })

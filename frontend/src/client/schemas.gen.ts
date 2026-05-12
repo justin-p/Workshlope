@@ -84,6 +84,19 @@ export const Body_login_login_access_tokenSchema = {
     title: 'Body_login-login_access_token'
 } as const;
 
+export const Body_workshop_badges_upload_workshop_badge_imageSchema = {
+    properties: {
+        file: {
+            type: 'string',
+            format: 'binary',
+            title: 'File'
+        }
+    },
+    type: 'object',
+    required: ['file'],
+    title: 'Body_workshop-badges-upload_workshop_badge_image'
+} as const;
+
 export const BridgeResponseSchema = {
     properties: {
         status: {
@@ -1280,7 +1293,7 @@ export const WorkshopBadgeDefinitionCreateSchema = {
     properties: {
         slug: {
             type: 'string',
-            maxLength: 64,
+            maxLength: 128,
             title: 'Slug'
         },
         title: {
@@ -1342,6 +1355,52 @@ export const WorkshopBadgeDefinitionPublicSchema = {
         points: {
             type: 'integer',
             title: 'Points'
+        },
+        lesson_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Lesson Id'
+        },
+        lesson_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Lesson Slug'
+        },
+        lesson_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Lesson Title'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url',
+            description: 'Relative API path to uploaded image, or null to use UI default artwork.'
         }
     },
     type: 'object',
@@ -1414,6 +1473,79 @@ export const WorkshopBadgeRevokeRequestSchema = {
     type: 'object',
     required: ['user_id', 'badge_id'],
     title: 'WorkshopBadgeRevokeRequest'
+} as const;
+
+export const WorkshopGlobalLeaderboardPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopGlobalLeaderboardRowPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopGlobalLeaderboardPublic'
+} as const;
+
+export const WorkshopGlobalLeaderboardRowPublicSchema = {
+    properties: {
+        rank: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Rank'
+        },
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
+        },
+        total_points: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Total Points'
+        },
+        badge_count: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Badge Count'
+        }
+    },
+    type: 'object',
+    required: ['rank', 'user_id', 'email', 'total_points', 'badge_count'],
+    title: 'WorkshopGlobalLeaderboardRowPublic'
 } as const;
 
 export const WorkshopLessonPartBriefSchema = {

@@ -66,7 +66,7 @@ parts:
     title: P
     path: x.md
 """
-    with pytest.raises(ManifestValidationError, match="version must be 1"):
+    with pytest.raises(ManifestValidationError, match="version must be 1 or 2"):
         parse_lesson_manifest(raw)
 
 

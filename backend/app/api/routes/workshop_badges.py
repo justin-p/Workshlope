@@ -1,14 +1,22 @@
 import logging
+import mimetypes
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlmodel import Session, col, func, select
 
 from app.api.deps import CurrentUser, SessionDep
+from app.core.config import settings
 from app.models import (
+    Lesson,
     Message,
+    OAuthAccount,
     SessionInstructor,
+    User,
     WorkshopBadgeDefinition,
     WorkshopBadgeDefinitionCreate,
     WorkshopBadgeDefinitionPublic,
@@ -16,6 +24,8 @@ from app.models import (
     WorkshopBadgeGrant,
     WorkshopBadgeGrantRequest,
     WorkshopBadgeRevokeRequest,
+    WorkshopGlobalLeaderboardPublic,
+    WorkshopGlobalLeaderboardRowPublic,
     WorkshopParticipant,
     WorkshopSession,
     WorkshopSessionLeaderboardPublic,
@@ -24,6 +34,10 @@ from app.models import (
 
 router = APIRouter(prefix="/workshop/badges", tags=["workshop-badges"])
 logger = logging.getLogger(__name__)
+
+_BADGE_IMAGE_MAX_BYTES = 512 * 1024
+_ALLOWED_IMAGE_CT = frozenset({"image/png", "image/jpeg", "image/webp"})
+_CT_SUFFIX = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 
 
 def _require_superuser_or_instructor(current_user: CurrentUser) -> None:
@@ -76,23 +90,131 @@ def _require_active_session_participant(
     )
 
 
+def _badge_image_dir() -> Path:
+    return Path(settings.BADGE_IMAGE_DIR)
+
+
+def _badge_definition_public(
+    *,
+    api_prefix: str,
+    row: WorkshopBadgeDefinition,
+    lesson_slug: str | None,
+    lesson_title: str | None,
+) -> WorkshopBadgeDefinitionPublic:
+    image_url = (
+        f"{api_prefix}/workshop/badges/{row.id}/image" if row.image_filename else None
+    )
+    return WorkshopBadgeDefinitionPublic(
+        id=row.id,
+        slug=row.slug,
+        title=row.title,
+        description=row.description,
+        points=row.points,
+        lesson_id=row.lesson_id,
+        lesson_slug=lesson_slug,
+        lesson_title=lesson_title,
+        image_url=image_url,
+    )
+
+
+def _github_avatar_urls_for_users(
+    session_db: Session, *, user_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, str | None]:
+    if not user_ids:
+        return {}
+    rows = session_db.exec(
+        select(OAuthAccount.user_id, OAuthAccount.avatar_url).where(
+            OAuthAccount.provider == "github",
+            col(OAuthAccount.user_id).in_(user_ids),
+        )
+    ).all()
+    return dict(rows)
+
+
 @router.get("", response_model=WorkshopBadgeDefinitionsPublic)
 def read_workshop_badges(
-    *, session: SessionDep, current_user: CurrentUser
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
 ) -> WorkshopBadgeDefinitionsPublic:
     _require_superuser_or_instructor(current_user)
     rows = session.exec(select(WorkshopBadgeDefinition)).all()
+    lesson_ids = {r.lesson_id for r in rows if r.lesson_id is not None}
+    lessons_by_id: dict[uuid.UUID, tuple[str, str]] = {}
+    if lesson_ids:
+        for les in session.exec(
+            select(Lesson).where(col(Lesson.id).in_(lesson_ids))
+        ).all():
+            lessons_by_id[les.id] = (les.slug, les.title)
+
     data = [
-        WorkshopBadgeDefinitionPublic(
-            id=row.id,
-            slug=row.slug,
-            title=row.title,
-            description=row.description,
-            points=row.points,
+        _badge_definition_public(
+            api_prefix=settings.API_V1_STR,
+            row=row,
+            lesson_slug=lessons_by_id.get(row.lesson_id, (None, None))[0]
+            if row.lesson_id
+            else None,
+            lesson_title=lessons_by_id.get(row.lesson_id, (None, None))[1]
+            if row.lesson_id
+            else None,
         )
         for row in rows
     ]
     return WorkshopBadgeDefinitionsPublic(data=data, count=len(data))
+
+
+@router.get(
+    "/leaderboard",
+    response_model=WorkshopGlobalLeaderboardPublic,
+)
+def read_workshop_global_badge_leaderboard(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> WorkshopGlobalLeaderboardPublic:
+    _ = current_user.id
+    rows = session.exec(
+        select(
+            WorkshopBadgeGrant.user_id,
+            func.sum(WorkshopBadgeDefinition.points),
+            func.count(col(WorkshopBadgeGrant.id)),
+        )
+        .join(
+            WorkshopBadgeDefinition,
+            col(WorkshopBadgeGrant.badge_id) == col(WorkshopBadgeDefinition.id),
+        )
+        .where(col(WorkshopBadgeGrant.revoked_at).is_(None))
+        .group_by(col(WorkshopBadgeGrant.user_id))
+    ).all()
+    sorted_rows = sorted(
+        rows,
+        key=lambda r: (-int(r[1] or 0), str(r[0])),
+    )
+    user_ids = {r[0] for r in sorted_rows}
+    avatars = _github_avatar_urls_for_users(session, user_ids=user_ids)
+    users_by_id = {
+        u.id: u
+        for u in session.exec(select(User).where(col(User.id).in_(user_ids))).all()
+    }
+    data: list[WorkshopGlobalLeaderboardRowPublic] = []
+    rank = 0
+    for user_id, total_points, badge_count in sorted_rows:
+        u = users_by_id.get(user_id)
+        if u is None:
+            continue
+        rank += 1
+        data.append(
+            WorkshopGlobalLeaderboardRowPublic(
+                rank=rank,
+                user_id=user_id,
+                full_name=u.full_name,
+                email=str(u.email),
+                avatar_url=avatars.get(user_id),
+                total_points=int(total_points or 0),
+                badge_count=int(badge_count or 0),
+            )
+        )
+    return WorkshopGlobalLeaderboardPublic(data=data, count=len(data))
 
 
 @router.post("", response_model=WorkshopBadgeDefinitionPublic)
@@ -116,16 +238,16 @@ def create_workshop_badge(
         title=body.title,
         description=body.description,
         points=body.points,
+        lesson_id=None,
     )
     session.add(row)
     session.commit()
     session.refresh(row)
-    return WorkshopBadgeDefinitionPublic(
-        id=row.id,
-        slug=row.slug,
-        title=row.title,
-        description=row.description,
-        points=row.points,
+    return _badge_definition_public(
+        api_prefix=settings.API_V1_STR,
+        row=row,
+        lesson_slug=None,
+        lesson_title=None,
     )
 
 
@@ -231,7 +353,6 @@ def revoke_workshop_badge(
             status_code=status.HTTP_404_NOT_FOUND, detail="Active badge grant not found"
         )
     if grant.revoked_at is not None:
-        # Idempotent revoke for retry-safe instructor actions.
         logger.info(
             "workshop_badge_revoke_idempotent",
             extra={
@@ -251,6 +372,116 @@ def revoke_workshop_badge(
         "workshop_badge_revoked",
         extra={
             "session_id": str(session_id),
+            "target_user_id": str(body.user_id),
+            "badge_id": str(body.badge_id),
+            "actor_user_id": str(current_user.id),
+            "reason": normalized_reason,
+        },
+    )
+    return Message(message="Badge revoked")
+
+
+@router.post("/org/grant", response_model=Message)
+def grant_workshop_badge_org(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    body: WorkshopBadgeGrantRequest,
+) -> Message:
+    _require_superuser_or_instructor(current_user)
+    target = session.get(User, body.user_id)
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    badge = session.get(WorkshopBadgeDefinition, body.badge_id)
+    if badge is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Badge not found"
+        )
+    grant = session.exec(
+        select(WorkshopBadgeGrant).where(
+            col(WorkshopBadgeGrant.session_id).is_(None),
+            WorkshopBadgeGrant.user_id == body.user_id,
+            WorkshopBadgeGrant.badge_id == body.badge_id,
+        )
+    ).first()
+    if grant is not None and grant.revoked_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="badge_already_granted",
+        )
+    was_regrant = grant is not None
+    if grant is None:
+        grant = WorkshopBadgeGrant(
+            session_id=None,
+            user_id=body.user_id,
+            badge_id=body.badge_id,
+            granted_by_user_id=current_user.id,
+        )
+    else:
+        grant.granted_by_user_id = current_user.id
+        grant.granted_at = datetime.now(timezone.utc)
+        grant.revoked_at = None
+        grant.revoked_by_user_id = None
+        grant.revoked_reason = None
+    session.add(grant)
+    session.commit()
+    logger.info(
+        "workshop_badge_granted_org",
+        extra={
+            "target_user_id": str(body.user_id),
+            "badge_id": str(body.badge_id),
+            "actor_user_id": str(current_user.id),
+            "regranted": was_regrant,
+        },
+    )
+    return Message(message="Badge granted")
+
+
+@router.post("/org/revoke", response_model=Message)
+def revoke_workshop_badge_org(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    body: WorkshopBadgeRevokeRequest,
+) -> Message:
+    _require_superuser_or_instructor(current_user)
+    normalized_reason = (body.reason or "").strip()
+    if not normalized_reason:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="badge_revoke_reason_required",
+        )
+    grant = session.exec(
+        select(WorkshopBadgeGrant).where(
+            col(WorkshopBadgeGrant.session_id).is_(None),
+            WorkshopBadgeGrant.user_id == body.user_id,
+            WorkshopBadgeGrant.badge_id == body.badge_id,
+        )
+    ).first()
+    if grant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Active badge grant not found"
+        )
+    if grant.revoked_at is not None:
+        logger.info(
+            "workshop_badge_revoke_org_idempotent",
+            extra={
+                "target_user_id": str(body.user_id),
+                "badge_id": str(body.badge_id),
+                "actor_user_id": str(current_user.id),
+            },
+        )
+        return Message(message="Badge already revoked")
+    grant.revoked_at = datetime.now(timezone.utc)
+    grant.revoked_by_user_id = current_user.id
+    grant.revoked_reason = normalized_reason
+    session.add(grant)
+    session.commit()
+    logger.info(
+        "workshop_badge_revoked_org",
+        extra={
             "target_user_id": str(body.user_id),
             "badge_id": str(body.badge_id),
             "actor_user_id": str(current_user.id),
@@ -301,3 +532,75 @@ def read_workshop_session_badge_leaderboard(
         for user_id, total_points, badge_count in rows
     ]
     return WorkshopSessionLeaderboardPublic(data=data, count=len(data))
+
+
+@router.get("/{badge_id}/image")
+def read_workshop_badge_image(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    badge_id: uuid.UUID,
+) -> FileResponse:
+    _ = current_user.id
+    row = session.get(WorkshopBadgeDefinition, badge_id)
+    if row is None or not row.image_filename:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    path = _badge_image_dir() / row.image_filename
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    media_type, _ = mimetypes.guess_type(str(path))
+    return FileResponse(
+        path,
+        media_type=media_type or "application/octet-stream",
+    )
+
+
+@router.post("/{badge_id}/image", response_model=WorkshopBadgeDefinitionPublic)
+async def upload_workshop_badge_image(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    badge_id: uuid.UUID,
+    file: Annotated[UploadFile, File()],
+) -> WorkshopBadgeDefinitionPublic:
+    _require_superuser_or_instructor(current_user)
+    row = session.get(WorkshopBadgeDefinition, badge_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Badge not found"
+        )
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    if content_type not in _ALLOWED_IMAGE_CT:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="badge_image_invalid_type",
+        )
+    raw = await file.read()
+    if len(raw) > _BADGE_IMAGE_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="badge_image_too_large",
+        )
+    suffix = _CT_SUFFIX[content_type]
+    dest_dir = _badge_image_dir()
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{row.id.hex}.{suffix}"
+    dest = dest_dir / filename
+    dest.write_bytes(raw)
+    row.image_filename = filename
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    lesson_slug: str | None = None
+    lesson_title: str | None = None
+    if row.lesson_id is not None:
+        les = session.get(Lesson, row.lesson_id)
+        if les is not None:
+            lesson_slug = les.slug
+            lesson_title = les.title
+    return _badge_definition_public(
+        api_prefix=settings.API_V1_STR,
+        row=row,
+        lesson_slug=lesson_slug,
+        lesson_title=lesson_title,
+    )

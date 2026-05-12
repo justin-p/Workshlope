@@ -19,6 +19,10 @@ export type Body_login_login_access_token = {
     client_secret?: (string | null);
 };
 
+export type Body_workshop_badges_upload_workshop_badge_image = {
+    file: (Blob | File);
+};
+
 /**
  * Discriminated response from the GitHub bridge endpoint.
  *
@@ -290,6 +294,13 @@ export type WorkshopBadgeDefinitionPublic = {
     title: string;
     description?: (string | null);
     points: number;
+    lesson_id?: (string | null);
+    lesson_slug?: (string | null);
+    lesson_title?: (string | null);
+    /**
+     * Relative API path to uploaded image, or null to use UI default artwork.
+     */
+    image_url?: (string | null);
 };
 
 export type WorkshopBadgeDefinitionsPublic = {
@@ -306,6 +317,21 @@ export type WorkshopBadgeRevokeRequest = {
     user_id: string;
     badge_id: string;
     reason?: (string | null);
+};
+
+export type WorkshopGlobalLeaderboardPublic = {
+    data: Array<WorkshopGlobalLeaderboardRowPublic>;
+    count: number;
+};
+
+export type WorkshopGlobalLeaderboardRowPublic = {
+    rank: number;
+    user_id: string;
+    full_name?: (string | null);
+    email: string;
+    avatar_url?: (string | null);
+    total_points: number;
+    badge_count: number;
 };
 
 /**
@@ -859,6 +885,8 @@ export type WorkshopBadgesCreateWorkshopBadgeData = {
 
 export type WorkshopBadgesCreateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
 
+export type WorkshopBadgesReadWorkshopGlobalBadgeLeaderboardResponse = (WorkshopGlobalLeaderboardPublic);
+
 export type WorkshopBadgesGrantWorkshopBadgeData = {
     requestBody: WorkshopBadgeGrantRequest;
     sessionId: string;
@@ -873,11 +901,36 @@ export type WorkshopBadgesRevokeWorkshopBadgeData = {
 
 export type WorkshopBadgesRevokeWorkshopBadgeResponse = (Message);
 
+export type WorkshopBadgesGrantWorkshopBadgeOrgData = {
+    requestBody: WorkshopBadgeGrantRequest;
+};
+
+export type WorkshopBadgesGrantWorkshopBadgeOrgResponse = (Message);
+
+export type WorkshopBadgesRevokeWorkshopBadgeOrgData = {
+    requestBody: WorkshopBadgeRevokeRequest;
+};
+
+export type WorkshopBadgesRevokeWorkshopBadgeOrgResponse = (Message);
+
 export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData = {
     sessionId: string;
 };
 
 export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse = (WorkshopSessionLeaderboardPublic);
+
+export type WorkshopBadgesReadWorkshopBadgeImageData = {
+    badgeId: string;
+};
+
+export type WorkshopBadgesReadWorkshopBadgeImageResponse = (unknown);
+
+export type WorkshopBadgesUploadWorkshopBadgeImageData = {
+    badgeId: string;
+    formData: Body_workshop_badges_upload_workshop_badge_image;
+};
+
+export type WorkshopBadgesUploadWorkshopBadgeImageResponse = (WorkshopBadgeDefinitionPublic);
 
 export type WorkshopLessonReposReadLessonReposData = {
     health?: string;

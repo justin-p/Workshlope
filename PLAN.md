@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **Instructor verify + badge grant** landed on **`main`** via **[#76](https://github.com/justin-p/testing/pull/76)** (merged): [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) roster **Mark verified complete** + **Grant badge**; trainee **Badges earned in this session** from `self.session_badges` ([`read_workshop_session_detail`](backend/app/api/routes/workshop_sessions.py)); E2E [`with_e2e_badge`](backend/app/api/routes/private.py) + [`workshop-instructor-verify-badge.spec.ts`](frontend/tests/workshop-instructor-verify-badge.spec.ts). Prior: pause part-nav (**#75**); code highlight (**#74**). |
-| **Branch** | **`main`** |
-| **PR** | *(merged [#76](https://github.com/justin-p/testing/pull/76))* |
+| **Last synced** | **2026-05-12** — **Badge end-to-end** on **`feat/workshop/badge-end-to-end`**: manifest **`version: 2`** + optional **`badges[]`** on lesson sync; `WorkshopBadgeDefinition` **`lesson_id`**, **`image_filename`**, slug **128**; nullable **`session_id`** on grants + org **`/org/grant`** / **`/org/revoke`**; **`GET …/workshop/badges/leaderboard`** (global); badge image **GET/POST**; SPA hub ([`workshop.badges.index.tsx`](frontend/src/routes/_layout/workshop.badges.index.tsx)), wizard ([`workshop.badges.new.tsx`](frontend/src/routes/_layout/workshop.badges.new.tsx)), leaderboard ([`workshop.badges.leaderboard.tsx`](frontend/src/routes/_layout/workshop.badges.leaderboard.tsx)), [`public/badge-default.svg`](frontend/public/badge-default.svg); Alembic **`g1h2i3j4k5l6`**; OpenAPI + client regen. Prior on **`main`**: verify + grant (**[#76](https://github.com/justin-p/testing/pull/76)**); drift + revoke (**[#77](https://github.com/justin-p/testing/pull/77)**). |
+| **Branch** | **`feat/workshop/badge-end-to-end`** |
+| **PR** | *(open after push)* |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -28,6 +28,16 @@
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
+
+**2. Badge end-to-end (blocking)**
+
+- **Registry hub (instructor + superuser):** **`/workshop/badges`** — catalog with image or default, lesson link when manifest-sourced, links to wizard + global leaderboard ([`workshop.badges.index.tsx`](frontend/src/routes/_layout/workshop.badges.index.tsx)).
+- **Images:** App uploads via **`POST …/workshop/badges/{id}/image`**; **`BADGE_IMAGE_DIR`** ([`config.py`](backend/app/core/config.py)); sync does **not** overwrite existing **`image_filename`**. Default artwork: [`frontend/public/badge-default.svg`](frontend/public/badge-default.svg).
+- **Manifest v2:** Optional **`badges`** array; composed slug **`{lesson.slug}__{badge.slug}`**; parser + sync in [`lesson_manifest.py`](backend/app/services/lesson_manifest.py), [`lesson_repo_sync.py`](backend/app/services/lesson_repo_sync.py). **v1** must not declare `badges`.
+- **Wizard:** **`/workshop/badges/new`** — stand-alone badge (`lesson_id` null).
+- **Grants:** Session flow unchanged. **Org:** `session_id` **NULL**; **`POST …/org/grant`** / **`POST …/org/revoke`** (instructor/superuser → any user; revoke reason required). No completion verification for org grants.
+- **Global leaderboard:** **`GET …/workshop/badges/leaderboard`** — any authenticated user ([`workshop_badges.py`](backend/app/api/routes/workshop_badges.py)). Trainee **session** page still omits leaderboard per privacy spec.
+- **Tests:** [`test_workshop_badges.py`](backend/tests/api/routes/test_workshop_badges.py) org + global; manifest/repo sync v2; Playwright [`workshop-badges-hub-org-leaderboard.spec.ts`](frontend/tests/workshop-badges-hub-org-leaderboard.spec.ts).
 
 ## Deferred polish backlog (skip log)
 
@@ -197,7 +207,7 @@ Each lesson folder must contain `lesson.manifest.yaml`.
 
 ### Required schema
 
-- `version` (integer): manifest schema version; MVP requires `1`.
+- `version` (integer): **`1`** or **`2`** (see [Manifest version 2](#manifest-version-2-optional-badge-catalog)).
 - `lesson` (object):
   - `slug` (string, kebab-case, unique per repo)
   - `title` (string)
@@ -211,6 +221,12 @@ Each lesson folder must contain `lesson.manifest.yaml`.
 - `lesson.summary` (string)
 - `part.estimated_minutes` (integer >= 0)
 - `part.objectives` (array of strings)
+
+### Manifest version 2 (optional badge catalog)
+
+- When `version` is **`2`**, an optional top-level **`badges`** array may declare badge **metadata** for sync (no images in YAML — operators upload images in the badge hub).
+- Each `badges[*]` object: required **`slug`** (kebab-case, unique within the lesson), **`title`**, **`points`** (integer 0–1000); optional **`description`**.
+- **`version: 1` must not declare `badges`** (even as an empty array).
 
 ### Validation rules
 
@@ -242,6 +258,24 @@ parts:
     title: Build Your First Endpoint
     path: 02-first-endpoint.md
     estimated_minutes: 20
+```
+
+### Example (version 2 with badges)
+
+```yaml
+version: 2
+lesson:
+  slug: fastapi-workshop-basics
+  title: FastAPI Workshop Basics
+parts:
+  - slug: setup-and-prereqs
+    title: Setup and Prerequisites
+    path: 01-setup.md
+badges:
+  - slug: workshop-graduate
+    title: Workshop graduate
+    points: 50
+    description: Completed all parts in the live session track.
 ```
 
 ### JSON Schema (draft 2020-12)
@@ -316,6 +350,8 @@ parts:
   }
 }
 ```
+
+**Version 2:** same object shape with `"version": { "const": 2 }` and optional `"badges"` array; each badge item uses `additionalProperties: false` with required `slug`, `title`, `points` and optional `description` (same slug/title constraints as parts where applicable).
 
 Implementation note: JSON Schema cannot reliably validate symlink-escape checks; enforce symlink root containment in backend filesystem validation after schema validation.
 

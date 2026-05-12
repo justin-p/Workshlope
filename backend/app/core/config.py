@@ -1,5 +1,6 @@
 import secrets
 import warnings
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -100,6 +101,8 @@ class Settings(BaseSettings):
     GITHUB_INSTALLATION_POLL_INTERVAL_SECONDS: int = 300
     GITHUB_INSTALLATION_POLL_REFRESH_REPOSITORIES: bool = True
     GITHUB_INSTALLATION_POLL_SHUTDOWN_TIMEOUT_SECONDS: int = 10
+
+    BADGE_IMAGE_DIR: Path = Path("data/badge_images")
 
     @computed_field  # type: ignore[prop-decorator]
     @property

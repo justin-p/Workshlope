@@ -13,6 +13,7 @@ from app.models import (
     LessonManifestSync,
     LessonPart,
     LessonRepo,
+    WorkshopBadgeDefinition,
     get_datetime_utc,
 )
 from app.services.lesson_manifest import ManifestValidationError, parse_lesson_manifest
@@ -31,6 +32,8 @@ class _PreparedLessonSync:
     summary: str | None
     parts: list[tuple[int, str, str, str, int | None, str]]
     # ordering, slug, title, path, estimated_minutes, body_md
+    badges: list[tuple[str, str, int, str | None]]
+    # manifest_badge_slug, title, points, description
 
 
 def _reject_unsafe_repo_path(path: str) -> None:
@@ -118,6 +121,11 @@ def prepare_lesson_sync_ops_from_path_map(
                 ),
             )
 
+        badges_out: list[tuple[str, str, int, str | None]] = []
+        if manifest.badges:
+            for b in manifest.badges:
+                badges_out.append((b.slug, b.title, b.points, b.description))
+
         prepared.append(
             _PreparedLessonSync(
                 manifest_repo_path=manifest_path,
@@ -126,6 +134,7 @@ def prepare_lesson_sync_ops_from_path_map(
                 title=manifest.lesson.title,
                 summary=manifest.lesson.summary,
                 parts=parts_out,
+                badges=badges_out,
             ),
         )
 
@@ -186,6 +195,33 @@ def apply_prepared_lesson_sync_to_repo(
                     body_md=body_md,
                 ),
             )
+
+        for m_badge_slug, b_title, b_points, b_description in item.badges:
+            full_slug = f"{item.lesson_slug}__{m_badge_slug}"
+            if len(full_slug) > 128:
+                raise LessonRepoSyncError(
+                    f"composed badge slug exceeds 128 characters: {full_slug!r}",
+                )
+            existing_badge = session.exec(
+                select(WorkshopBadgeDefinition).where(
+                    WorkshopBadgeDefinition.slug == full_slug
+                )
+            ).first()
+            if existing_badge is None:
+                session.add(
+                    WorkshopBadgeDefinition(
+                        slug=full_slug,
+                        title=b_title,
+                        description=b_description,
+                        points=b_points,
+                        lesson_id=lesson.id,
+                    )
+                )
+            else:
+                existing_badge.title = b_title
+                existing_badge.points = b_points
+                existing_badge.description = b_description
+                existing_badge.lesson_id = lesson.id
 
         lesson.lesson_sync_generation = lesson.lesson_sync_generation + 1
         session.add(lesson)

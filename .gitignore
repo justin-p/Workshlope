@@ -11,3 +11,4 @@ node_modules/
 .gitnexus/
 .vite/
 **/tsconfig.tsbuildinfo
+data/badge_images/
