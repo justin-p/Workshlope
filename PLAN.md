@@ -11,8 +11,8 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — Slice B validation pass: full workshop instructor-led Playwright flow stayed green (18/18) after merging setup-prompt slice; no additional functional regressions discovered in create/prepare/roster/entry/realtime/progression/prework/closeout path. |
-| **Branch** | **`test/workshop/e2e-validation-pass`** |
+| **Last synced** | **2026-05-12** — Slice C P0 bug sweep pass: no reproducible blockers found across auth/role redirects, workshop progression/roster/session APIs, and lesson-content/sync handling paths. Validation stayed green on frontend (`45 passed`) and backend workshop-session APIs (`121 passed`). |
+| **Branch** | **`fix/workshop/p0-execution-bug-sweep`** |
 | **PR** | _(open after push)_ |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
@@ -674,6 +674,7 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 - Playwright: trainee timer visibility regression guard — in the dual-role workshop flow, instructor `workshop-timer-start` must surface trainee `workshop-trainee-timer-status` (running/countdown) without a page reload.
 - Playwright: scheduled instructor page shows setup prompt (`workshop-instructor-setup-prompt`) before start with invite/pre-work guidance, and prompt clears after `Start session`.
 - Playwright validation pass (Slice B): full `tests/workshop.spec.ts` instructor-led end-to-end suite green (`18 passed`) with no additional hardening changes required.
+- P0 sweep validation (Slice C): `tests/workshop.spec.ts` + `tests/dashboard-routing.spec.ts` + `tests/login.spec.ts` green (`45 passed`), and backend `tests/api/routes/test_workshop_sessions.py` green in compose backend runtime (`121 passed`).
 - Playwright (in-flight local): expanded dashboard/workshops role routing and stub-rail shortcuts (`dashboard-routing.spec.ts`) plus non-instructor `/workshops` redirect and resilient blocked-count assertion (`workshop.spec.ts`); added stale-token regression coverage (`login tolerates stale access token without redirect loop`) and login guard now clears invalid local token instead of ping-ponging `/` ↔ `/login`; added instructor prerequisite-roster analytics coverage on live session view (`workshop-prework-instructor-panel` and gaps summary) and workshops-hub blocked-analytics summary (`workshop-blocked-analytics*`).
 - Backend/contracts (in-flight local): added `lesson_manifest_sync` audit table keyed by repo + manifest path with persisted `manifest_sha256` on sync (`backend/app/models.py`, `backend/app/services/lesson_repo_sync.py`, migration `f7a8b9c0d1e2`, service test coverage in `backend/tests/services/test_lesson_repo_sync.py`).
 - Backend/contract (in-flight local): `POST /api/v1/private/users/` now accepts `is_instructor` for deterministic E2E role seeding; covered by `backend/tests/api/routes/test_private.py::test_create_user_can_set_instructor_flag`.
