@@ -42,16 +42,24 @@ test.describe("Badge hub, org grant, global leaderboard", () => {
     const badge = badges.data.find((b) => b.slug === slug)
     expect(badge).toBeTruthy()
 
-    const grant = await request.post(
+    const token = await getApiTokenAsSuperuser()
+    const grantRes = await fetch(
       `${apiBase}/api/v1/workshop/badges/org/grant`,
       {
-        headers: { Authorization: `Bearer ${await getApiTokenAsSuperuser()}` },
-        json: { user_id: String(trainee.id), badge_id: String(badge!.id) },
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: String(trainee.id),
+          badge_id: String(badge!.id),
+        }),
       },
     )
-    if (!grant.ok()) {
+    if (!grantRes.ok) {
       throw new Error(
-        `org grant failed: ${grant.status()} ${await grant.text()}`,
+        `org grant failed: ${grantRes.status} ${await grantRes.text()}`,
       )
     }
 
