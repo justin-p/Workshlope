@@ -1445,63 +1445,6 @@ export const WorkshopBadgeDefinitionPublicSchema = {
     title: 'WorkshopBadgeDefinitionPublic'
 } as const;
 
-export const WorkshopBadgeDefinitionUpdateSchema = {
-    properties: {
-        slug: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 128
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Slug'
-        },
-        title: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 255
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Title'
-        },
-        description: {
-            anyOf: [
-                {
-                    type: 'string',
-                    maxLength: 1024
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Description'
-        },
-        points: {
-            anyOf: [
-                {
-                    type: 'integer',
-                    maximum: 1000,
-                    minimum: 0
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Points'
-        }
-    },
-    type: 'object',
-    title: 'WorkshopBadgeDefinitionUpdate',
-    description: 'Partial update for instructor-managed badge rows (manifest-linked rows may restrict slug).'
-} as const;
-
 export const WorkshopBadgeDefinitionsPublicSchema = {
     properties: {
         data: {
@@ -1554,11 +1497,25 @@ export const WorkshopBadgeGrantRecipientPublicSchema = {
                 }
             ],
             title: 'Granted At'
+        },
+        session_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Session Id',
+            description: `\`\`null\`\` for organization-wide grants.`
         }
     },
     type: 'object',
     required: ['user_id', 'email'],
-    title: 'WorkshopBadgeGrantRecipientPublic'
+    title: 'WorkshopBadgeGrantRecipientPublic',
+    description: 'One active grant for a badge (hub recipients table).'
 } as const;
 
 export const WorkshopBadgeGrantRecipientsPublicSchema = {

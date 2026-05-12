@@ -317,11 +317,18 @@ export type WorkshopBadgeDefinitionsPublic = {
     count: number;
 };
 
+/**
+ * One active grant for a badge (hub recipients table).
+ */
 export type WorkshopBadgeGrantRecipientPublic = {
     user_id: string;
     email: string;
     full_name?: (string | null);
     granted_at?: (string | null);
+    /**
+     * ``null`` for organization-wide grants.
+     */
+    session_id?: (string | null);
 };
 
 export type WorkshopBadgeGrantRecipientsPublic = {

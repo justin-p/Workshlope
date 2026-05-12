@@ -28,16 +28,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
   Table,
   TableBody,
   TableCell,
@@ -149,7 +139,7 @@ function WorkshopBadgesHub() {
     enabled: grantBadgeId !== null,
   })
 
-  const recipientsQuery = useQuery({
+  const _recipientsQuery = useQuery({
     queryKey: ["workshop-badge-recipients", recipientsBadgeId],
     queryFn: () =>
       WorkshopBadgesService.readWorkshopBadgeGrantRecipients({
@@ -229,7 +219,7 @@ function WorkshopBadgesHub() {
     enabled: recipientBadgeId !== null,
   })
 
-  const deleteMutation = useMutation({
+  const _deleteMutation = useMutation({
     mutationFn: (badgeId: string) =>
       WorkshopBadgesService.deleteWorkshopBadge({ badgeId }),
     onSuccess: async () => {
@@ -238,7 +228,7 @@ function WorkshopBadgesHub() {
     },
   })
 
-  const orgRevokeMutation = useMutation({
+  const _orgRevokeMutation = useMutation({
     mutationFn: ({
       userId,
       badgeId,

@@ -830,18 +830,6 @@ class WorkshopBadgeGrantRevokeForBadgeRequest(SQLModel):
     reason: str = Field(max_length=255)
 
 
-class WorkshopBadgeGrantRecipientPublic(SQLModel):
-    user_id: uuid.UUID
-    email: str
-    full_name: str | None = None
-    granted_at: datetime | None = None
-
-
-class WorkshopBadgeGrantRecipientsPublic(SQLModel):
-    data: list[WorkshopBadgeGrantRecipientPublic]
-    count: int
-
-
 class WorkshopSessionLeaderboardRowPublic(SQLModel):
     user_id: uuid.UUID
     total_points: int = Field(ge=0)
