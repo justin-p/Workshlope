@@ -20,16 +20,31 @@ interface MainProps {
   items: Item[]
 }
 
-function navItemIsActive(currentPath: string, itemPath: string): boolean {
+function navItemMatchesPath(currentPath: string, itemPath: string): boolean {
   if (currentPath === itemPath) return true
   if (itemPath.length <= 1) return false
   return currentPath.startsWith(`${itemPath}/`)
+}
+
+/** When two items share a prefix (e.g. /workshop/badges vs /workshop/badges/leaderboard), only the longest matching path is active. */
+function activeNavPathForItems(
+  currentPath: string,
+  navItems: Item[],
+): string | null {
+  const matches = navItems.filter((item) =>
+    navItemMatchesPath(currentPath, item.path),
+  )
+  if (matches.length === 0) return null
+  return matches.reduce((best, item) =>
+    item.path.length > best.path.length ? item : best,
+  ).path
 }
 
 export function Main({ items }: MainProps) {
   const { isMobile, setOpenMobile } = useSidebar()
   const router = useRouterState()
   const currentPath = router.location.pathname
+  const activeNavPath = activeNavPathForItems(currentPath, items)
 
   const handleMenuClick = () => {
     if (isMobile) {
@@ -42,7 +57,7 @@ export function Main({ items }: MainProps) {
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => {
-            const isActive = navItemIsActive(currentPath, item.path)
+            const isActive = activeNavPath === item.path
 
             return (
               <SidebarMenuItem key={item.title}>

@@ -1355,6 +1355,24 @@ function WorkshopSessionPage() {
             Trainee roster ({rosterParticipants.length})
           </div>
 
+          {detailQuery.data?.session.status === "ended" &&
+          lessonContentAvailable ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-2">
+              <span className="text-xs text-muted-foreground">
+                Session ended. Grant lesson-linked badges to verified trainees.
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                data-testid="workshop-open-post-end-badge-wizard"
+                onClick={() => setBadgeEndSummaryOpen(true)}
+              >
+                Open badge wizard
+              </Button>
+            </div>
+          ) : null}
+
           <div className="space-y-2">
             <div className="flex flex-wrap items-end gap-2 justify-between">
               <label

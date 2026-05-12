@@ -22,6 +22,7 @@ from app.models import (
     WorkshopBadgeDefinitionCreate,
     WorkshopBadgeDefinitionPublic,
     WorkshopBadgeDefinitionsPublic,
+    WorkshopBadgeDefinitionUpdate,
     WorkshopBadgeGrant,
     WorkshopBadgeGrantRecipientPublic,
     WorkshopBadgeGrantRecipientsPublic,
@@ -263,12 +264,28 @@ def create_workshop_badge(
             status_code=status.HTTP_409_CONFLICT,
             detail="badge_slug_conflict",
         )
+    lesson_id: uuid.UUID | None = None
+    lesson_slug: str | None = None
+    lesson_title: str | None = None
+    lesson_repo_id: uuid.UUID | None = None
+    if body.lesson_id is not None:
+        les = session.get(Lesson, body.lesson_id)
+        if les is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="lesson_not_found",
+            )
+        lesson_id = body.lesson_id
+        lesson_slug = les.slug
+        lesson_title = les.title
+        lesson_repo_id = les.repo_id
+
     row = WorkshopBadgeDefinition(
         slug=body.slug,
         title=body.title,
         description=body.description,
         points=body.points,
-        lesson_id=None,
+        lesson_id=lesson_id,
     )
     session.add(row)
     session.commit()
@@ -276,9 +293,101 @@ def create_workshop_badge(
     return _badge_definition_public(
         api_prefix=settings.API_V1_STR,
         row=row,
-        lesson_slug=None,
-        lesson_title=None,
-        lesson_repo_id=None,
+        lesson_slug=lesson_slug,
+        lesson_title=lesson_title,
+        lesson_repo_id=lesson_repo_id,
+    )
+
+
+@router.get("/{badge_id}", response_model=WorkshopBadgeDefinitionPublic)
+def read_workshop_badge(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    badge_id: uuid.UUID,
+) -> WorkshopBadgeDefinitionPublic:
+    _require_superuser_or_instructor(current_user)
+    row = session.get(WorkshopBadgeDefinition, badge_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Badge not found",
+        )
+    lesson_slug: str | None = None
+    lesson_title: str | None = None
+    lesson_repo_id: uuid.UUID | None = None
+    if row.lesson_id is not None:
+        les = session.get(Lesson, row.lesson_id)
+        if les is not None:
+            lesson_slug = les.slug
+            lesson_title = les.title
+            lesson_repo_id = les.repo_id
+    return _badge_definition_public(
+        api_prefix=settings.API_V1_STR,
+        row=row,
+        lesson_slug=lesson_slug,
+        lesson_title=lesson_title,
+        lesson_repo_id=lesson_repo_id,
+    )
+
+
+@router.patch("/{badge_id}", response_model=WorkshopBadgeDefinitionPublic)
+def update_workshop_badge(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    badge_id: uuid.UUID,
+    body: WorkshopBadgeDefinitionUpdate,
+) -> WorkshopBadgeDefinitionPublic:
+    _require_superuser_or_instructor(current_user)
+    row = session.get(WorkshopBadgeDefinition, badge_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Badge not found",
+        )
+    if body.slug is not None and row.lesson_id is not None and body.slug != row.slug:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="lesson_linked_badge_slug_readonly",
+        )
+    if body.slug is not None and body.slug != row.slug:
+        exists = session.exec(
+            select(WorkshopBadgeDefinition).where(
+                WorkshopBadgeDefinition.slug == body.slug,
+                col(WorkshopBadgeDefinition.id) != badge_id,
+            )
+        ).first()
+        if exists is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="badge_slug_conflict",
+            )
+        row.slug = body.slug
+    if body.title is not None:
+        row.title = body.title
+    if body.description is not None:
+        row.description = body.description
+    if body.points is not None:
+        row.points = body.points
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    lesson_slug: str | None = None
+    lesson_title: str | None = None
+    lesson_repo_id: uuid.UUID | None = None
+    if row.lesson_id is not None:
+        les = session.get(Lesson, row.lesson_id)
+        if les is not None:
+            lesson_slug = les.slug
+            lesson_title = les.title
+            lesson_repo_id = les.repo_id
+    return _badge_definition_public(
+        api_prefix=settings.API_V1_STR,
+        row=row,
+        lesson_slug=lesson_slug,
+        lesson_title=lesson_title,
+        lesson_repo_id=lesson_repo_id,
     )
 
 

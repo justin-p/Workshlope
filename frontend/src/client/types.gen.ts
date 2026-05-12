@@ -290,6 +290,10 @@ export type WorkshopBadgeDefinitionCreate = {
     title: string;
     description?: (string | null);
     points?: number;
+    /**
+     * Optional link to a lesson; session grant UI lists only badges for the session's lesson.
+     */
+    lesson_id?: (string | null);
 };
 
 export type WorkshopBadgeDefinitionPublic = {
@@ -317,11 +321,28 @@ export type WorkshopBadgeDefinitionsPublic = {
     count: number;
 };
 
+/**
+ * Partial update for instructor-managed badge rows (manifest-linked rows may restrict slug).
+ */
+export type WorkshopBadgeDefinitionUpdate = {
+    slug?: (string | null);
+    title?: (string | null);
+    description?: (string | null);
+    points?: (number | null);
+};
+
+/**
+ * One active grant for a badge (hub recipients table).
+ */
 export type WorkshopBadgeGrantRecipientPublic = {
     user_id: string;
     email: string;
     full_name?: (string | null);
     granted_at?: (string | null);
+    /**
+     * ``null`` for organization-wide grants.
+     */
+    session_id?: (string | null);
 };
 
 export type WorkshopBadgeGrantRecipientsPublic = {
@@ -943,6 +964,19 @@ export type WorkshopBadgesCreateWorkshopBadgeData = {
 export type WorkshopBadgesCreateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
 
 export type WorkshopBadgesReadWorkshopGlobalBadgeLeaderboardResponse = (WorkshopGlobalLeaderboardPublic);
+
+export type WorkshopBadgesReadWorkshopBadgeData = {
+    badgeId: string;
+};
+
+export type WorkshopBadgesReadWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
+
+export type WorkshopBadgesUpdateWorkshopBadgeData = {
+    badgeId: string;
+    requestBody: WorkshopBadgeDefinitionUpdate;
+};
+
+export type WorkshopBadgesUpdateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
 
 export type WorkshopBadgesGrantWorkshopBadgeData = {
     requestBody: WorkshopBadgeGrantRequest;
