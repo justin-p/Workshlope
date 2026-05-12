@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **Pause freezes part navigation (E2E):** [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) asserts instructor **Advance** / **Back** are disabled while the room is paused (main flow + dedicated test with `omit_participant_seat` so WS role is instructor); after resume, **Back** is enabled on a mid-lesson part and **Advance** stays disabled on the last part. Backend already covers `part.advance` while paused ([`test_ws_part_advance_denied_when_session_paused`](backend/tests/api/routes/test_workshop_sessions.py)). Prior: workshop lesson code blocks (**#74**); post-session read (**#73**); pre-create wizard **#72**. |
-| **Branch** | **`feat/workshop/pause-disables-part-nav`** |
-| **PR** | [#75](https://github.com/justin-p/testing/pull/75) |
+| **Last synced** | **2026-05-12** — **Pause freezes part navigation (E2E)** landed on **`main`** via **[#75](https://github.com/justin-p/testing/pull/75)** (merged): [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) asserts instructor **Advance** / **Back** are disabled while the room is paused (main flow + dedicated test with `omit_participant_seat` so WS role is instructor); after resume, **Back** is enabled on a mid-lesson part and **Advance** stays disabled on the last part. Backend already covers `part.advance` while paused ([`test_ws_part_advance_denied_when_session_paused`](backend/tests/api/routes/test_workshop_sessions.py)). Prior: workshop lesson code blocks (**#74**); post-session read (**#73**); pre-create wizard **#72**. |
+| **Branch** | **`main`** |
+| **PR** | *(merged [#75](https://github.com/justin-p/testing/pull/75))* |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
