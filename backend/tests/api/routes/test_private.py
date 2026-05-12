@@ -109,6 +109,9 @@ def test_private_bootstrap_e2e_workshop_with_e2e_badge(
     ).first()
     assert badge is not None
     assert badge.title == "E2E Grant Badge"
+    ws = db.get(WorkshopSession, sid)
+    assert ws is not None
+    assert badge.lesson_id == ws.lesson_id
 
 
 def test_private_e2e_bump_lesson_sync_generation(

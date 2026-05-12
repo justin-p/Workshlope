@@ -172,6 +172,7 @@ def bootstrap_e2e_workshop_live_session(
                 title="E2E Grant Badge",
                 description="Created by e2e-live-session bootstrap for grant tests.",
                 points=10,
+                lesson_id=lesson.id,
             )
         )
 
