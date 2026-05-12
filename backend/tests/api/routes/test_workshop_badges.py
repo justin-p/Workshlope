@@ -130,6 +130,19 @@ def test_grant_revoke_and_leaderboard(client: TestClient, db: Session) -> None:
     )
     assert grant.status_code == 200
 
+    detail = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert detail.status_code == 200
+    djson = detail.json()
+    assert djson["view"] == "instructor"
+    active = djson["active_badge_grants"]
+    assert len(active) == 1
+    assert active[0]["user_id"] == str(trainee.id)
+    assert active[0]["badge_id"] == badge_id
+    assert active[0]["slug"] == create.json()["slug"]
+
     duplicate_grant = client.post(
         f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/grant",
         headers=headers,
@@ -156,6 +169,13 @@ def test_grant_revoke_and_leaderboard(client: TestClient, db: Session) -> None:
         },
     )
     assert revoke.status_code == 200
+
+    detail_after = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert detail_after.status_code == 200
+    assert detail_after.json()["active_badge_grants"] == []
 
     revoke_retry = client.post(
         f"{settings.API_V1_STR}/workshop/badges/sessions/{session_row.id}/revoke",

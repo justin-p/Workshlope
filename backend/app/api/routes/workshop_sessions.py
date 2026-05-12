@@ -64,6 +64,7 @@ from app.models import (
     WorkshopSessionPatch,
     WorkshopSessionPublicInstructor,
     WorkshopSessionPublicParticipant,
+    WorkshopSessionRosterActiveBadgeGrantPublic,
     WorkshopSessionSelfBadgeGrantPublic,
     WorkshopSessionsPublic,
     WorkshopSessionTimer,
@@ -975,6 +976,7 @@ def create_workshop_session(
         current_part_index=0,
         current_part_slug=(first_part.slug if first_part is not None else None),
         part_generation=1,
+        lesson_sync_ack_generation=lesson.lesson_sync_generation,
     )
     session.add(created)
     session.flush()
@@ -1041,6 +1043,7 @@ def _workshop_session_detail_shared(
             current_part_index=workshop_row.current_part_index,
             current_part_slug=workshop_row.current_part_slug,
             part_generation=workshop_row.part_generation,
+            lesson_sync_ack_generation=workshop_row.lesson_sync_ack_generation,
             created_at=workshop_row.created_at,
         )
         return (
@@ -1062,6 +1065,7 @@ def _workshop_session_detail_shared(
         current_part_index=workshop_row.current_part_index,
         current_part_slug=workshop_row.current_part_slug,
         part_generation=workshop_row.part_generation,
+        lesson_sync_ack_generation=workshop_row.lesson_sync_ack_generation,
         created_at=workshop_row.created_at,
     )
     lesson_repo = session.get(LessonRepo, lesson.repo_id)
@@ -1072,6 +1076,7 @@ def _workshop_session_detail_shared(
                 id=lesson.id,
                 title=lesson.title,
                 slug=lesson.slug,
+                lesson_sync_generation=lesson.lesson_sync_generation,
                 lesson_repo_health="unhealthy",
                 lesson_content_available=False,
                 lesson_content_issue="lesson_repo_missing",
@@ -1083,6 +1088,7 @@ def _workshop_session_detail_shared(
         id=lesson.id,
         title=lesson.title,
         slug=lesson.slug,
+        lesson_sync_generation=lesson.lesson_sync_generation,
         lesson_repo_health=lesson_repo.health,
         lesson_repo_last_synced_at=lesson_repo.last_synced_at,
     )
@@ -1133,6 +1139,41 @@ def _workshop_session_detail_shared(
         lesson_summary.lesson_content_available = False
         lesson_summary.lesson_content_issue = "no_parts_synced"
     return core, lesson_summary, parts
+
+
+def _clamp_workshop_session_part_to_parts(
+    session_db: Session,
+    *,
+    workshop_row: WorkshopSession,
+    lesson_id: uuid.UUID,
+) -> None:
+    """If current part index/slug is invalid for the lesson's parts, clamp in-place."""
+    ordered = session_db.exec(
+        select(LessonPart)
+        .where(LessonPart.lesson_id == lesson_id)
+        .order_by(col(LessonPart.ordering))
+    ).all()
+    if not ordered:
+        workshop_row.current_part_index = 0
+        workshop_row.current_part_slug = None
+        return
+    min_o = int(ordered[0].ordering)
+    max_o = int(ordered[-1].ordering)
+    ci = int(workshop_row.current_part_index)
+    if ci > max_o:
+        ci = max_o
+    elif ci < min_o:
+        ci = min_o
+    at_ordering = ci
+    match = next((p for p in ordered if int(p.ordering) == at_ordering), None)
+    if match is None:
+        below = [p for p in ordered if int(p.ordering) <= ci]
+        pick = below[-1] if below else ordered[0]
+        at_ordering = int(pick.ordering)
+        workshop_row.current_part_slug = pick.slug
+    else:
+        workshop_row.current_part_slug = match.slug
+    workshop_row.current_part_index = at_ordering
 
 
 def _normalize_repo_asset_path(path: str) -> str:
@@ -1401,12 +1442,34 @@ def read_workshop_session_detail(
         for seat, user in instructors_out
     ]
 
+    grant_pairs = session.exec(
+        select(WorkshopBadgeGrant, WorkshopBadgeDefinition)
+        .join(
+            WorkshopBadgeDefinition,
+            col(WorkshopBadgeGrant.badge_id) == WorkshopBadgeDefinition.id,
+        )
+        .where(
+            WorkshopBadgeGrant.session_id == session_id,
+            col(WorkshopBadgeGrant.revoked_at).is_(None),
+        )
+    ).all()
+    active_badge_grants = [
+        WorkshopSessionRosterActiveBadgeGrantPublic(
+            user_id=grant.user_id,
+            badge_id=defn.id,
+            title=defn.title,
+            slug=defn.slug,
+        )
+        for grant, defn in grant_pairs
+    ]
+
     return WorkshopSessionPublicInstructor(
         session=core,
         lesson=lesson_summary,
         parts=parts,
         participants=participants_public,
         instructors=instructors_public,
+        active_badge_grants=active_badge_grants,
     )
 
 
@@ -1433,11 +1496,13 @@ async def patch_workshop_session(
     has_seat_role = body.instructor_seat is not None
     has_primary_handoff = body.primary_instructor_user_id is not None
     has_remove = body.remove_instructor_user_id is not None
+    has_lesson_sync_ack = body.lesson_sync_ack_generation is not None
     if (
         not has_status
         and not has_seat_role
         and not has_primary_handoff
         and not has_remove
+        and not has_lesson_sync_ack
     ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1549,6 +1614,26 @@ async def patch_workshop_session(
             )
         remove_seat.removed_at = datetime.now(timezone.utc)
         session.add(remove_seat)
+
+    if has_lesson_sync_ack and body.lesson_sync_ack_generation is not None:
+        lesson_row = session.get(Lesson, workshop_session.lesson_id)
+        if lesson_row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Lesson not found",
+            )
+        if body.lesson_sync_ack_generation != lesson_row.lesson_sync_generation:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="lesson_sync_ack_mismatch",
+            )
+        workshop_session.lesson_sync_ack_generation = body.lesson_sync_ack_generation
+        _clamp_workshop_session_part_to_parts(
+            session,
+            workshop_row=workshop_session,
+            lesson_id=lesson_row.id,
+        )
+        session.add(workshop_session)
 
     session.commit()
     if status_changed and body.status is not None:

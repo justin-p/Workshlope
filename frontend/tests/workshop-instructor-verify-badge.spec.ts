@@ -76,6 +76,55 @@ test.describe("Workshop instructor verify and badge grant", () => {
       ),
     ).toBeVisible({ timeout: 15_000 })
 
+    await page.getByRole("button", { name: "Revoke E2E Grant Badge" }).click()
+    await page.getByTestId("workshop-roster-revoke-reason").fill("test revoke")
+    await page.getByTestId("workshop-roster-revoke-confirm").click()
+    await expect(page.getByTestId("workshop-roster-revoke-reason")).toBeHidden({
+      timeout: 15_000,
+    })
+
+    await participantPage.reload()
+    await participantPage.waitForLoadState("networkidle")
+    await expect(
+      participantPage.getByTestId(
+        `workshop-trainee-session-badge-e2e-grant-${session_id}`,
+      ),
+    ).toHaveCount(0)
+
     await participantContext.close()
+  })
+
+  test("instructor acknowledges lesson sync drift after bump", async ({
+    page,
+    request,
+  }) => {
+    const bootstrap = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/`,
+    )
+    expect(bootstrap.ok()).toBeTruthy()
+    const { session_id } = await bootstrap.json()
+
+    await page.goto(`/workshop/${session_id}`)
+    await page.waitForLoadState("networkidle")
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      { timeout: 15_000 },
+    )
+
+    const bump = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-bump-lesson-sync/${session_id}/`,
+    )
+    expect(bump.ok()).toBeTruthy()
+
+    await page.reload()
+    await page.waitForLoadState("networkidle")
+    await expect(
+      page.getByTestId("workshop-lesson-sync-drift-alert"),
+    ).toBeVisible({ timeout: 15_000 })
+    await page.getByTestId("workshop-lesson-sync-drift-open-dialog").click()
+    await page.getByTestId("workshop-lesson-sync-drift-switch-latest").click()
+    await expect(
+      page.getByTestId("workshop-lesson-sync-drift-alert"),
+    ).toBeHidden({ timeout: 15_000 })
   })
 })

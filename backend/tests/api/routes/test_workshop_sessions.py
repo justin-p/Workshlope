@@ -249,6 +249,123 @@ def test_participant_session_detail_includes_all_parts_when_session_ended(
     assert r_enter.json()["detail"] == "Session has ended"
 
 
+def test_instructor_detail_lesson_sync_fields_and_patch_ack(
+    client: TestClient, db: Session
+) -> None:
+    """Drift fields on GET; PATCH ack must match current lesson generation; then aligned."""
+    session_row = _create_live_session(db)
+    _add_two_parts_to_session_lesson(db, session_row)
+
+    instructor_email = f"instr-sync-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    inst_user = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert inst_user is not None
+    inst_user.is_instructor = True
+    db.add(inst_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=inst_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    lesson.lesson_sync_generation = 4
+    db.add(lesson)
+    db.commit()
+    db.refresh(session_row)
+
+    r_detail = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert r_detail.status_code == 200
+    body = r_detail.json()
+    assert body["view"] == "instructor"
+    assert body["lesson"]["lesson_sync_generation"] == 4
+    assert body["session"]["lesson_sync_ack_generation"] == 1
+    assert isinstance(body["active_badge_grants"], list)
+
+    bad = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"lesson_sync_ack_generation": 3},
+    )
+    assert bad.status_code == 422
+    assert bad.json()["detail"] == "lesson_sync_ack_mismatch"
+
+    ok = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"lesson_sync_ack_generation": 4},
+    )
+    assert ok.status_code == 200
+
+    r2 = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+    )
+    assert r2.status_code == 200
+    b2 = r2.json()
+    assert b2["lesson"]["lesson_sync_generation"] == 4
+    assert b2["session"]["lesson_sync_ack_generation"] == 4
+
+
+def test_patch_lesson_sync_ack_clamps_current_part_index(
+    client: TestClient, db: Session
+) -> None:
+    session_row = _create_live_session(db)
+    _add_two_parts_to_session_lesson(db, session_row)
+    session_row.current_part_index = 99
+    session_row.current_part_slug = "stale-slug"
+    db.add(session_row)
+    db.commit()
+
+    instructor_email = f"instr-clamp-{uuid.uuid4()}@example.com"
+    headers = authentication_token_from_email(
+        client=client, email=instructor_email, db=db
+    )
+    inst_user = db.exec(select(User).where(User.email == instructor_email)).first()
+    assert inst_user is not None
+    inst_user.is_instructor = True
+    db.add(inst_user)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=inst_user.id,
+            role="lead",
+        )
+    )
+    db.commit()
+
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    lesson.lesson_sync_generation = 2
+    db.add(lesson)
+    db.commit()
+
+    r = client.patch(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=headers,
+        json={"lesson_sync_ack_generation": 2},
+    )
+    assert r.status_code == 200
+
+    db.refresh(session_row)
+    assert session_row.current_part_index == 1
+    parts = db.exec(
+        select(LessonPart)
+        .where(LessonPart.lesson_id == lesson.id)
+        .order_by(col(LessonPart.ordering))
+    ).all()
+    assert session_row.current_part_slug == parts[-1].slug
+
+
 def test_ws_ticket_rejected_when_session_ended(
     client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
 ) -> None:

@@ -56,6 +56,10 @@ class PrivateWorkshopE2ELiveSessionResponse(BaseModel):
     session_id: uuid.UUID
 
 
+class PrivateE2ELessonSyncBumpResponse(BaseModel):
+    lesson_sync_generation: int
+
+
 @router.post(
     "/workshop/e2e-live-session/",
     response_model=PrivateWorkshopE2ELiveSessionResponse,
@@ -177,6 +181,7 @@ def bootstrap_e2e_workshop_live_session(
         status=initial_status,
         created_at=datetime.now(timezone.utc),
         current_part_index=0,
+        lesson_sync_ack_generation=lesson.lesson_sync_generation,
     )
     session.add(workshop_session)
     if not omit_participant_seat:
@@ -220,3 +225,34 @@ def bootstrap_e2e_workshop_live_session(
     session.commit()
 
     return PrivateWorkshopE2ELiveSessionResponse(session_id=sid)
+
+
+@router.post(
+    "/workshop/e2e-bump-lesson-sync/{session_id}/",
+    response_model=PrivateE2ELessonSyncBumpResponse,
+)
+def e2e_bump_workshop_lesson_sync_generation(
+    *,
+    session: SessionDep,
+    session_id: uuid.UUID,
+) -> PrivateE2ELessonSyncBumpResponse:
+    """Increment ``lesson_sync_generation`` for the session's lesson (local E2E only)."""
+    workshop_session = session.get(WorkshopSession, session_id)
+    if workshop_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+    lesson_row = session.get(Lesson, workshop_session.lesson_id)
+    if lesson_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found",
+        )
+    lesson_row.lesson_sync_generation = int(lesson_row.lesson_sync_generation) + 1
+    session.add(lesson_row)
+    session.commit()
+    session.refresh(lesson_row)
+    return PrivateE2ELessonSyncBumpResponse(
+        lesson_sync_generation=lesson_row.lesson_sync_generation
+    )

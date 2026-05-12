@@ -310,6 +310,7 @@ class WorkshopSession(SQLModel, table=True):
     current_part_index: int = Field(default=0, ge=0)
     current_part_slug: str | None = Field(default=None, max_length=255)
     part_generation: int = Field(default=1, ge=1)
+    lesson_sync_ack_generation: int = Field(default=1, ge=1)
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
@@ -603,6 +604,7 @@ class WorkshopSessionPatch(SQLModel):
     instructor_seat: WorkshopSessionInstructorSeatRoleUpdate | None = None
     primary_instructor_user_id: uuid.UUID | None = None
     remove_instructor_user_id: uuid.UUID | None = None
+    lesson_sync_ack_generation: int | None = Field(default=None, ge=1)
 
 
 class WorkshopLessonPrerequisiteCreate(SQLModel):
@@ -787,6 +789,7 @@ class WorkshopSessionCorePublic(SQLModel):
     current_part_index: int
     current_part_slug: str | None
     part_generation: int
+    lesson_sync_ack_generation: int = Field(ge=1)
     created_at: datetime | None
 
 
@@ -794,6 +797,7 @@ class WorkshopLessonSummaryPublic(SQLModel):
     id: uuid.UUID
     title: str
     slug: str
+    lesson_sync_generation: int = Field(default=1, ge=1)
     lesson_repo_health: str = "healthy"
     lesson_repo_last_synced_at: datetime | None = None
     lesson_content_available: bool = True
@@ -856,6 +860,15 @@ class WorkshopRosterInstructorRowPublic(SQLModel):
     assigned_at: datetime | None
 
 
+class WorkshopSessionRosterActiveBadgeGrantPublic(SQLModel):
+    """Non-revoked badge grant on the roster (instructor view; for revoke targeting)."""
+
+    user_id: uuid.UUID
+    badge_id: uuid.UUID
+    title: str
+    slug: str
+
+
 class WorkshopSessionPublicInstructor(SQLModel):
     """Instructor-visible session detail with roster."""
 
@@ -865,6 +878,10 @@ class WorkshopSessionPublicInstructor(SQLModel):
     parts: list[WorkshopLessonPartBrief]
     participants: list[WorkshopRosterParticipantRowPublic]
     instructors: list[WorkshopRosterInstructorRowPublic]
+    active_badge_grants: list[WorkshopSessionRosterActiveBadgeGrantPublic] = Field(
+        default_factory=list,
+        description="Active (non-revoked) badge grants in this session.",
+    )
 
 
 # Generic message
