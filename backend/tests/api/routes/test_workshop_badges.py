@@ -87,6 +87,32 @@ def test_badge_catalog_requires_instructor(client: TestClient, db: Session) -> N
     assert listed.json()["count"] >= 1
 
 
+def test_badge_catalog_includes_lesson_repo_id_for_lesson_badges(
+    client: TestClient,
+    db: Session,
+) -> None:
+    headers, _ = _instructor_headers(client, db)
+    session_row = _create_live_session(db)
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    badge = WorkshopBadgeDefinition(
+        slug=f"{lesson.slug}__finisher",
+        title="Finisher",
+        points=3,
+        lesson_id=lesson.id,
+    )
+    db.add(badge)
+    db.commit()
+    db.refresh(badge)
+
+    listed = client.get(f"{settings.API_V1_STR}/workshop/badges", headers=headers)
+    assert listed.status_code == 200
+    rows = listed.json()["data"]
+    match = next((r for r in rows if r["id"] == str(badge.id)), None)
+    assert match is not None
+    assert match["lesson_repo_id"] == str(lesson.repo_id)
+
+
 def test_grant_revoke_and_leaderboard(client: TestClient, db: Session) -> None:
     headers, instructor = _instructor_headers(client, db)
     session_row = _create_live_session(db)

@@ -1402,6 +1402,19 @@ export const WorkshopBadgeDefinitionPublicSchema = {
             ],
             title: 'Lesson Title'
         },
+        lesson_repo_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Lesson Repo Id',
+            description: 'Owning lesson repository when this badge is tied to a lesson.'
+        },
         image_url: {
             anyOf: [
                 {

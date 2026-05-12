@@ -118,6 +118,7 @@ def _badge_definition_public(
     row: WorkshopBadgeDefinition,
     lesson_slug: str | None,
     lesson_title: str | None,
+    lesson_repo_id: uuid.UUID | None = None,
 ) -> WorkshopBadgeDefinitionPublic:
     image_url = (
         f"{api_prefix}/workshop/badges/{row.id}/image" if row.image_filename else None
@@ -131,6 +132,7 @@ def _badge_definition_public(
         lesson_id=row.lesson_id,
         lesson_slug=lesson_slug,
         lesson_title=lesson_title,
+        lesson_repo_id=lesson_repo_id,
         image_url=image_url,
         archived_at=row.archived_at,
     )
@@ -164,11 +166,13 @@ def read_workshop_badges(
     rows = session.exec(stmt).all()
     lesson_ids = {r.lesson_id for r in rows if r.lesson_id is not None}
     lessons_by_id: dict[uuid.UUID, tuple[str, str]] = {}
+    lesson_repo_by_id: dict[uuid.UUID, uuid.UUID] = {}
     if lesson_ids:
         for les in session.exec(
             select(Lesson).where(col(Lesson.id).in_(lesson_ids))
         ).all():
             lessons_by_id[les.id] = (les.slug, les.title)
+            lesson_repo_by_id[les.id] = les.repo_id
 
     data = [
         _badge_definition_public(
@@ -178,6 +182,9 @@ def read_workshop_badges(
             if row.lesson_id
             else None,
             lesson_title=lessons_by_id.get(row.lesson_id, (None, None))[1]
+            if row.lesson_id
+            else None,
+            lesson_repo_id=lesson_repo_by_id.get(row.lesson_id)
             if row.lesson_id
             else None,
         )
@@ -271,6 +278,7 @@ def create_workshop_badge(
         row=row,
         lesson_slug=None,
         lesson_title=None,
+        lesson_repo_id=None,
     )
 
 
@@ -734,14 +742,17 @@ async def upload_workshop_badge_image(
     session.refresh(row)
     lesson_slug: str | None = None
     lesson_title: str | None = None
+    lesson_repo_id: uuid.UUID | None = None
     if row.lesson_id is not None:
         les = session.get(Lesson, row.lesson_id)
         if les is not None:
             lesson_slug = les.slug
             lesson_title = les.title
+            lesson_repo_id = les.repo_id
     return _badge_definition_public(
         api_prefix=settings.API_V1_STR,
         row=row,
         lesson_slug=lesson_slug,
         lesson_title=lesson_title,
+        lesson_repo_id=lesson_repo_id,
     )
