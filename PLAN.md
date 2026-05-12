@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-12** — **§2 Badge end-to-end** removed from [Remaining work](#remaining-work-authoritative) (implemented on **`feat/workshop/badge-end-to-end`**: hub, manifest v2 `badges[]`, org grants, global leaderboard, migration **`g1h2i3j4k5l6`**). **Blocking backlog:** **§1 Workshop** only. Prior on **`main`**: verify + grant (**[#76](https://github.com/justin-p/testing/pull/76)**); drift + revoke (**[#77](https://github.com/justin-p/testing/pull/77)**). |
 | **Branch** | **`feat/workshop/badge-end-to-end`** |
-| **PR** | *(open / update when badge slice is pushed)* |
+| **PR** | **[#78](https://github.com/justin-p/testing/pull/78)** — badge hub, manifest v2 `badges[]`, org grants, global leaderboard |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
