@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-12** — **`feat/workshop/badge-image-anonymous-get`**: OpenAPI + client for anonymous **`GET /workshop/badges/{id}/image`** (binary 200, `security: []`); removed unused `AuthenticatedBadgeImage`; hub artwork E2E (`workshop-badge-hub-artwork.spec.ts`). Prior: **[#81](https://github.com/justin-p/testing/pull/81)** (badge hub lesson config). |
 | **Branch** | **`feat/workshop/badge-image-anonymous-get`** |
-| **PR** | — (open from branch after push) |
+| **PR** | **[#82](https://github.com/justin-p/testing/pull/82)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
