@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **Instructor badge revoke + lesson sync drift ack** landed on **`main`** via **[#77](https://github.com/justin-p/testing/pull/77)** (squash-merged): `lesson_sync_ack_generation` (migration + backfill), session detail `lesson_sync_generation` / ack + **`active_badge_grants`**, **`PATCH …/workshop/sessions/{id}`** ack + part clamp, cockpit revoke + drift **Alert/Dialog**, local **`POST …/private/workshop/e2e-bump-lesson-sync/{session_id}/`** for Playwright. Prior: verify + grant (**[#76](https://github.com/justin-p/testing/pull/76)**), pause part-nav (**#75**), code highlight (**#74**). |
-| **Branch** | **`main`** |
-| **PR** | *(merged [#77](https://github.com/justin-p/testing/pull/77); prior [#76](https://github.com/justin-p/testing/pull/76))* |
+| **Last synced** | **2026-05-12** — **`main`** includes **[#77](https://github.com/justin-p/testing/pull/77)** (drift ack, revoke, `active_badge_grants`, e2e bump). Open **[#78](https://github.com/justin-p/testing/pull/78)** on **`feat/workshop/badge-end-to-end`**: badge hub, manifest v2 `badges[]`, org grants, global leaderboard, migrations **`g1h2i3j4k5l6`** + merge head **`a6357a27fcd7`**. **Blocking:** **§1 Workshop** only. Prior: **[#76](https://github.com/justin-p/testing/pull/76)**. |
+| **Branch** | **`feat/workshop/badge-end-to-end`** |
+| **PR** | **[#78](https://github.com/justin-p/testing/pull/78)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -29,10 +29,6 @@
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
 - Lesson sync **drift** after repo changes: instructor **acknowledge** via PATCH (generation match + part clamp); immutable “keep old Markdown” snapshot remains **out of scope** while `LessonPart` rows are shared (see PR description).
-
-**2. Badge end-to-end (blocking)**
-
-- Instructor **revoke** with required reason + roster **active grant** visibility for targeting (shipped on drift slice branch); trainee sees removal after refresh.
 
 ## Deferred polish backlog (skip log)
 
@@ -202,7 +198,7 @@ Each lesson folder must contain `lesson.manifest.yaml`.
 
 ### Required schema
 
-- `version` (integer): manifest schema version; MVP requires `1`.
+- `version` (integer): **`1`** or **`2`** (see [Manifest version 2](#manifest-version-2-optional-badge-catalog)).
 - `lesson` (object):
   - `slug` (string, kebab-case, unique per repo)
   - `title` (string)
@@ -216,6 +212,12 @@ Each lesson folder must contain `lesson.manifest.yaml`.
 - `lesson.summary` (string)
 - `part.estimated_minutes` (integer >= 0)
 - `part.objectives` (array of strings)
+
+### Manifest version 2 (optional badge catalog)
+
+- When `version` is **`2`**, an optional top-level **`badges`** array may declare badge **metadata** for sync (no images in YAML — operators upload images in the badge hub).
+- Each `badges[*]` object: required **`slug`** (kebab-case, unique within the lesson), **`title`**, **`points`** (integer 0–1000); optional **`description`**.
+- **`version: 1` must not declare `badges`** (even as an empty array).
 
 ### Validation rules
 
@@ -247,6 +249,24 @@ parts:
     title: Build Your First Endpoint
     path: 02-first-endpoint.md
     estimated_minutes: 20
+```
+
+### Example (version 2 with badges)
+
+```yaml
+version: 2
+lesson:
+  slug: fastapi-workshop-basics
+  title: FastAPI Workshop Basics
+parts:
+  - slug: setup-and-prereqs
+    title: Setup and Prerequisites
+    path: 01-setup.md
+badges:
+  - slug: workshop-graduate
+    title: Workshop graduate
+    points: 50
+    description: Completed all parts in the live session track.
 ```
 
 ### JSON Schema (draft 2020-12)
@@ -321,6 +341,8 @@ parts:
   }
 }
 ```
+
+**Version 2:** same object shape with `"version": { "const": 2 }` and optional `"badges"` array; each badge item uses `additionalProperties: false` with required `slug`, `title`, `points` and optional `description` (same slug/title constraints as parts where applicable).
 
 Implementation note: JSON Schema cannot reliably validate symlink-escape checks; enforce symlink root containment in backend filesystem validation after schema validation.
 

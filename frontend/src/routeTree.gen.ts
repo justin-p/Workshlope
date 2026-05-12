@@ -21,10 +21,14 @@ import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutWorkshopNewRouteImport } from './routes/_layout/workshop.new'
+import { Route as LayoutWorkshopBadgesRouteImport } from './routes/_layout/workshop.badges'
 import { Route as LayoutWorkshopSessionIdRouteImport } from './routes/_layout/workshop.$sessionId'
 import { Route as LayoutDashboardTraineeRouteImport } from './routes/_layout/dashboard/trainee'
 import { Route as LayoutDashboardInstructorRouteImport } from './routes/_layout/dashboard/instructor'
 import { Route as LayoutDashboardAdminRouteImport } from './routes/_layout/dashboard/admin'
+import { Route as LayoutWorkshopBadgesIndexRouteImport } from './routes/_layout/workshop.badges.index'
+import { Route as LayoutWorkshopBadgesNewRouteImport } from './routes/_layout/workshop.badges.new'
+import { Route as LayoutWorkshopBadgesLeaderboardRouteImport } from './routes/_layout/workshop.badges.leaderboard'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -85,6 +89,11 @@ const LayoutWorkshopNewRoute = LayoutWorkshopNewRouteImport.update({
   path: '/workshop/new',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutWorkshopBadgesRoute = LayoutWorkshopBadgesRouteImport.update({
+  id: '/workshop/badges',
+  path: '/workshop/badges',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutWorkshopSessionIdRoute = LayoutWorkshopSessionIdRouteImport.update({
   id: '/workshop/$sessionId',
   path: '/workshop/$sessionId',
@@ -106,6 +115,23 @@ const LayoutDashboardAdminRoute = LayoutDashboardAdminRouteImport.update({
   path: '/dashboard/admin',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutWorkshopBadgesIndexRoute =
+  LayoutWorkshopBadgesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => LayoutWorkshopBadgesRoute,
+  } as any)
+const LayoutWorkshopBadgesNewRoute = LayoutWorkshopBadgesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => LayoutWorkshopBadgesRoute,
+} as any)
+const LayoutWorkshopBadgesLeaderboardRoute =
+  LayoutWorkshopBadgesLeaderboardRouteImport.update({
+    id: '/leaderboard',
+    path: '/leaderboard',
+    getParentRoute: () => LayoutWorkshopBadgesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
@@ -122,7 +148,11 @@ export interface FileRoutesByFullPath {
   '/dashboard/instructor': typeof LayoutDashboardInstructorRoute
   '/dashboard/trainee': typeof LayoutDashboardTraineeRoute
   '/workshop/$sessionId': typeof LayoutWorkshopSessionIdRoute
+  '/workshop/badges': typeof LayoutWorkshopBadgesRouteWithChildren
   '/workshop/new': typeof LayoutWorkshopNewRoute
+  '/workshop/badges/leaderboard': typeof LayoutWorkshopBadgesLeaderboardRoute
+  '/workshop/badges/new': typeof LayoutWorkshopBadgesNewRoute
+  '/workshop/badges/': typeof LayoutWorkshopBadgesIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -140,6 +170,9 @@ export interface FileRoutesByTo {
   '/dashboard/trainee': typeof LayoutDashboardTraineeRoute
   '/workshop/$sessionId': typeof LayoutWorkshopSessionIdRoute
   '/workshop/new': typeof LayoutWorkshopNewRoute
+  '/workshop/badges/leaderboard': typeof LayoutWorkshopBadgesLeaderboardRoute
+  '/workshop/badges/new': typeof LayoutWorkshopBadgesNewRoute
+  '/workshop/badges': typeof LayoutWorkshopBadgesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -158,7 +191,11 @@ export interface FileRoutesById {
   '/_layout/dashboard/instructor': typeof LayoutDashboardInstructorRoute
   '/_layout/dashboard/trainee': typeof LayoutDashboardTraineeRoute
   '/_layout/workshop/$sessionId': typeof LayoutWorkshopSessionIdRoute
+  '/_layout/workshop/badges': typeof LayoutWorkshopBadgesRouteWithChildren
   '/_layout/workshop/new': typeof LayoutWorkshopNewRoute
+  '/_layout/workshop/badges/leaderboard': typeof LayoutWorkshopBadgesLeaderboardRoute
+  '/_layout/workshop/badges/new': typeof LayoutWorkshopBadgesNewRoute
+  '/_layout/workshop/badges/': typeof LayoutWorkshopBadgesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -177,7 +214,11 @@ export interface FileRouteTypes {
     | '/dashboard/instructor'
     | '/dashboard/trainee'
     | '/workshop/$sessionId'
+    | '/workshop/badges'
     | '/workshop/new'
+    | '/workshop/badges/leaderboard'
+    | '/workshop/badges/new'
+    | '/workshop/badges/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -195,6 +236,9 @@ export interface FileRouteTypes {
     | '/dashboard/trainee'
     | '/workshop/$sessionId'
     | '/workshop/new'
+    | '/workshop/badges/leaderboard'
+    | '/workshop/badges/new'
+    | '/workshop/badges'
   id:
     | '__root__'
     | '/_layout'
@@ -212,7 +256,11 @@ export interface FileRouteTypes {
     | '/_layout/dashboard/instructor'
     | '/_layout/dashboard/trainee'
     | '/_layout/workshop/$sessionId'
+    | '/_layout/workshop/badges'
     | '/_layout/workshop/new'
+    | '/_layout/workshop/badges/leaderboard'
+    | '/_layout/workshop/badges/new'
+    | '/_layout/workshop/badges/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -310,6 +358,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutWorkshopNewRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/workshop/badges': {
+      id: '/_layout/workshop/badges'
+      path: '/workshop/badges'
+      fullPath: '/workshop/badges'
+      preLoaderRoute: typeof LayoutWorkshopBadgesRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/workshop/$sessionId': {
       id: '/_layout/workshop/$sessionId'
       path: '/workshop/$sessionId'
@@ -338,8 +393,44 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutDashboardAdminRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/workshop/badges/': {
+      id: '/_layout/workshop/badges/'
+      path: '/'
+      fullPath: '/workshop/badges/'
+      preLoaderRoute: typeof LayoutWorkshopBadgesIndexRouteImport
+      parentRoute: typeof LayoutWorkshopBadgesRoute
+    }
+    '/_layout/workshop/badges/new': {
+      id: '/_layout/workshop/badges/new'
+      path: '/new'
+      fullPath: '/workshop/badges/new'
+      preLoaderRoute: typeof LayoutWorkshopBadgesNewRouteImport
+      parentRoute: typeof LayoutWorkshopBadgesRoute
+    }
+    '/_layout/workshop/badges/leaderboard': {
+      id: '/_layout/workshop/badges/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/workshop/badges/leaderboard'
+      preLoaderRoute: typeof LayoutWorkshopBadgesLeaderboardRouteImport
+      parentRoute: typeof LayoutWorkshopBadgesRoute
+    }
   }
 }
+
+interface LayoutWorkshopBadgesRouteChildren {
+  LayoutWorkshopBadgesLeaderboardRoute: typeof LayoutWorkshopBadgesLeaderboardRoute
+  LayoutWorkshopBadgesNewRoute: typeof LayoutWorkshopBadgesNewRoute
+  LayoutWorkshopBadgesIndexRoute: typeof LayoutWorkshopBadgesIndexRoute
+}
+
+const LayoutWorkshopBadgesRouteChildren: LayoutWorkshopBadgesRouteChildren = {
+  LayoutWorkshopBadgesLeaderboardRoute: LayoutWorkshopBadgesLeaderboardRoute,
+  LayoutWorkshopBadgesNewRoute: LayoutWorkshopBadgesNewRoute,
+  LayoutWorkshopBadgesIndexRoute: LayoutWorkshopBadgesIndexRoute,
+}
+
+const LayoutWorkshopBadgesRouteWithChildren =
+  LayoutWorkshopBadgesRoute._addFileChildren(LayoutWorkshopBadgesRouteChildren)
 
 interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
@@ -351,6 +442,7 @@ interface LayoutRouteChildren {
   LayoutDashboardInstructorRoute: typeof LayoutDashboardInstructorRoute
   LayoutDashboardTraineeRoute: typeof LayoutDashboardTraineeRoute
   LayoutWorkshopSessionIdRoute: typeof LayoutWorkshopSessionIdRoute
+  LayoutWorkshopBadgesRoute: typeof LayoutWorkshopBadgesRouteWithChildren
   LayoutWorkshopNewRoute: typeof LayoutWorkshopNewRoute
 }
 
@@ -364,6 +456,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutDashboardInstructorRoute: LayoutDashboardInstructorRoute,
   LayoutDashboardTraineeRoute: LayoutDashboardTraineeRoute,
   LayoutWorkshopSessionIdRoute: LayoutWorkshopSessionIdRoute,
+  LayoutWorkshopBadgesRoute: LayoutWorkshopBadgesRouteWithChildren,
   LayoutWorkshopNewRoute: LayoutWorkshopNewRoute,
 }
 

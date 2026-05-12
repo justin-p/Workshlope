@@ -512,3 +512,83 @@ def test_revoke_grant_lifecycle_edges(client: TestClient, db: Session) -> None:
     )
     assert idempotent.status_code == 200
     assert idempotent.json()["message"] == "Badge already revoked"
+
+
+def test_org_grant_and_global_leaderboard(client: TestClient, db: Session) -> None:
+    headers, instructor = _instructor_headers(client, db)
+    trainee_email = f"org-lb-{uuid.uuid4()}@example.com"
+    trainee_headers = authentication_token_from_email(
+        client=client, email=trainee_email, db=db
+    )
+    trainee = db.exec(select(User).where(User.email == trainee_email)).first()
+    assert trainee is not None
+
+    create = client.post(
+        f"{settings.API_V1_STR}/workshop/badges",
+        headers=headers,
+        json={
+            "slug": f"org-badge-{uuid.uuid4().hex}",
+            "title": "Org only",
+            "points": 7,
+        },
+    )
+    assert create.status_code == 200
+    badge_id = create.json()["id"]
+
+    grant = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/org/grant",
+        headers=headers,
+        json={"user_id": str(trainee.id), "badge_id": badge_id},
+    )
+    assert grant.status_code == 200
+
+    dup = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/org/grant",
+        headers=headers,
+        json={"user_id": str(trainee.id), "badge_id": badge_id},
+    )
+    assert dup.status_code == 409
+
+    global_lb = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/leaderboard",
+        headers=trainee_headers,
+    )
+    assert global_lb.status_code == 200
+    body = global_lb.json()
+    assert body["count"] >= 1
+    row = next(r for r in body["data"] if r["user_id"] == str(trainee.id))
+    assert row["total_points"] == 7
+    assert row["badge_count"] == 1
+    assert row["rank"] >= 1
+
+    revoke = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/org/revoke",
+        headers=headers,
+        json={
+            "user_id": str(trainee.id),
+            "badge_id": badge_id,
+            "reason": "test cleanup",
+        },
+    )
+    assert revoke.status_code == 200
+
+    after = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/leaderboard",
+        headers=trainee_headers,
+    )
+    assert after.status_code == 200
+    ids = {r["user_id"] for r in after.json()["data"]}
+    assert str(trainee.id) not in ids
+
+
+def test_org_grant_requires_instructor(client: TestClient, db: Session) -> None:
+    trainee_email = f"org-denied-{uuid.uuid4()}@example.com"
+    th = authentication_token_from_email(client=client, email=trainee_email, db=db)
+    trainee = db.exec(select(User).where(User.email == trainee_email)).first()
+    assert trainee is not None
+    r = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/org/grant",
+        headers=th,
+        json={"user_id": str(trainee.id), "badge_id": str(uuid.uuid4())},
+    )
+    assert r.status_code == 403

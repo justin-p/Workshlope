@@ -81,18 +81,37 @@ class LessonPartMeta(BaseModel):
         return value
 
 
+class LessonBadgeMeta(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    slug: str
+    title: str = Field(min_length=1)
+    points: int = Field(ge=0, le=1000)
+    description: str | None = Field(default=None, max_length=1024)
+
+    @field_validator("slug")
+    @classmethod
+    def slug_must_be_kebab_case(cls, value: str) -> str:
+        if not _KEBAB_SLUG_RE.fullmatch(value):
+            raise ValueError(
+                "badge slug must be lowercase kebab-case (letters, digits, single hyphens)"
+            )
+        return value
+
+
 class LessonManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: int
     lesson: LessonMeta
     parts: list[LessonPartMeta]
+    badges: list[LessonBadgeMeta] | None = Field(default=None)
 
     @field_validator("version")
     @classmethod
     def validate_version(cls, value: int) -> int:
-        if value != 1:
-            raise ValueError("version must be 1")
+        if value not in (1, 2):
+            raise ValueError("version must be 1 or 2")
         return value
 
     @field_validator("parts")
@@ -109,6 +128,21 @@ class LessonManifest(BaseModel):
         slugs = [p.slug for p in self.parts]
         if len(slugs) != len(set(slugs)):
             raise ValueError("duplicate part slug within the same lesson")
+        return self
+
+    @model_validator(mode="after")
+    def badges_only_on_version_2(self) -> Self:
+        if self.version == 1 and self.badges is not None:
+            raise ValueError("manifest version 1 must not declare badges")
+        return self
+
+    @model_validator(mode="after")
+    def badge_slugs_unique_within_lesson(self) -> Self:
+        if not self.badges:
+            return self
+        slugs = [b.slug for b in self.badges]
+        if len(slugs) != len(set(slugs)):
+            raise ValueError("duplicate badge slug within the same lesson")
         return self
 
 

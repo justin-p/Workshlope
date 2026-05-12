@@ -233,3 +233,51 @@ parts:
 
     db.refresh(repo)
     assert repo.health == "unhealthy"
+
+
+def test_sync_v2_manifest_upserts_badges(db: Session) -> None:
+    from app.models import WorkshopBadgeDefinition
+
+    rid = uuid.uuid4()
+    repo = LessonRepo(
+        full_name=f"org/badges-{rid}",
+        default_branch="main",
+        health="healthy",
+    )
+    db.add(repo)
+    db.commit()
+    db.refresh(repo)
+
+    tree = {
+        "lessons/a/lesson.manifest.yaml": """
+version: 2
+lesson:
+  slug: lesson-badges
+  title: With badges
+parts:
+  - slug: one
+    title: One
+    path: one.md
+badges:
+  - slug: gold
+    title: Gold star
+    points: 25
+""",
+        "lessons/a/one.md": "# One",
+    }
+
+    n = sync_lesson_repo_from_path_map(
+        session=db, lesson_repo=repo, path_to_content=tree
+    )
+    assert n == 1
+    lesson = db.exec(select(Lesson).where(Lesson.repo_id == repo.id)).first()
+    assert lesson is not None
+    badge = db.exec(
+        select(WorkshopBadgeDefinition).where(
+            WorkshopBadgeDefinition.slug == "lesson-badges__gold"
+        )
+    ).first()
+    assert badge is not None
+    assert badge.title == "Gold star"
+    assert badge.points == 25
+    assert badge.lesson_id == lesson.id

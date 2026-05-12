@@ -452,10 +452,17 @@ class WorkshopBadgeDefinition(SQLModel, table=True):
     __tablename__ = "workshop_badge_definition"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    slug: str = Field(max_length=64, unique=True, index=True)
+    slug: str = Field(max_length=128, unique=True, index=True)
     title: str = Field(max_length=255)
     description: str | None = Field(default=None, max_length=1024)
     points: int = Field(default=1, ge=0, le=1000)
+    lesson_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="lesson.id",
+        nullable=True,
+        ondelete="SET NULL",
+    )
+    image_filename: str | None = Field(default=None, max_length=255)
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
@@ -464,15 +471,13 @@ class WorkshopBadgeDefinition(SQLModel, table=True):
 
 class WorkshopBadgeGrant(SQLModel, table=True):
     __tablename__ = "workshop_badge_grant"
-    __table_args__ = (
-        UniqueConstraint(
-            "session_id", "user_id", "badge_id", name="uq_workshop_badge_grant_once"
-        ),
-    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    session_id: uuid.UUID = Field(
-        foreign_key="workshop_session.id", nullable=False, ondelete="CASCADE"
+    session_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="workshop_session.id",
+        nullable=True,
+        ondelete="CASCADE",
     )
     user_id: uuid.UUID = Field(
         foreign_key="user.id", nullable=False, ondelete="CASCADE"
@@ -742,7 +747,7 @@ class WorkshopSessionTimerEventsPublic(SQLModel):
 
 
 class WorkshopBadgeDefinitionCreate(SQLModel):
-    slug: str = Field(max_length=64)
+    slug: str = Field(max_length=128)
     title: str = Field(max_length=255)
     description: str | None = Field(default=None, max_length=1024)
     points: int = Field(default=1, ge=0, le=1000)
@@ -754,6 +759,13 @@ class WorkshopBadgeDefinitionPublic(SQLModel):
     title: str
     description: str | None = None
     points: int
+    lesson_id: uuid.UUID | None = None
+    lesson_slug: str | None = None
+    lesson_title: str | None = None
+    image_url: str | None = Field(
+        default=None,
+        description="Relative API path to uploaded image, or null to use UI default artwork.",
+    )
 
 
 class WorkshopBadgeDefinitionsPublic(SQLModel):
@@ -780,6 +792,21 @@ class WorkshopSessionLeaderboardRowPublic(SQLModel):
 
 class WorkshopSessionLeaderboardPublic(SQLModel):
     data: list[WorkshopSessionLeaderboardRowPublic]
+    count: int
+
+
+class WorkshopGlobalLeaderboardRowPublic(SQLModel):
+    rank: int = Field(ge=1)
+    user_id: uuid.UUID
+    full_name: str | None = None
+    email: str
+    avatar_url: str | None = None
+    total_points: int = Field(ge=0)
+    badge_count: int = Field(ge=0)
+
+
+class WorkshopGlobalLeaderboardPublic(SQLModel):
+    data: list[WorkshopGlobalLeaderboardRowPublic]
     count: int
 
 

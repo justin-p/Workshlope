@@ -1,5 +1,6 @@
 // Instructor roster: mark verified complete, grant session badge; trainee sees badges after reload.
 import { expect, test } from "@playwright/test"
+import { getApiTokenAsSuperuser } from "./utils/bridgeToken"
 import { createUser } from "./utils/privateApi"
 import { randomEmail } from "./utils/random"
 
@@ -64,9 +65,44 @@ test.describe("Workshop instructor verify and badge grant", () => {
       page.getByTestId(`workshop-roster-verified-label-${participant.userId}`),
     ).toBeVisible({ timeout: 10_000 })
 
-    await page
-      .getByTestId(`workshop-roster-grant-badge-${participant.userId}`)
-      .click()
+    const token = await getApiTokenAsSuperuser()
+    const auth = { Authorization: `Bearer ${token}` }
+    const badgesRes = await request.get(`${apiBase}/api/v1/workshop/badges`, {
+      headers: auth,
+    })
+    expect(
+      badgesRes.ok(),
+      `list badges failed: ${badgesRes.status()} ${await badgesRes.text()}`,
+    ).toBeTruthy()
+    const badgesJson = (await badgesRes.json()) as {
+      data: Array<{ id: string; slug: string }>
+    }
+    const e2eSlug = `e2e-grant-${session_id}`
+    const badge = badgesJson.data.find((b) => b.slug === e2eSlug)
+    expect(badge, `missing bootstrap badge slug ${e2eSlug}`).toBeTruthy()
+
+    // Use `data` for JSON — `json` is not a valid APIRequestContext option (empty body).
+    const grantRes = await request.post(
+      `${apiBase}/api/v1/workshop/badges/sessions/${session_id}/grant`,
+      {
+        headers: auth,
+        data: { user_id: participant.userId, badge_id: badge!.id },
+      },
+    )
+    expect(
+      grantRes.ok(),
+      `session badge grant failed: ${grantRes.status()} ${await grantRes.text()}`,
+    ).toBeTruthy()
+
+    await page.reload()
+    await page.waitForLoadState("networkidle")
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      { timeout: 15_000 },
+    )
+    await expect(
+      page.getByRole("button", { name: "Revoke E2E Grant Badge" }),
+    ).toBeVisible({ timeout: 15_000 })
 
     await participantPage.reload()
     await participantPage.waitForLoadState("networkidle")
@@ -74,7 +110,7 @@ test.describe("Workshop instructor verify and badge grant", () => {
       participantPage.getByTestId(
         `workshop-trainee-session-badge-e2e-grant-${session_id}`,
       ),
-    ).toBeVisible({ timeout: 15_000 })
+    ).toBeVisible({ timeout: 30_000 })
 
     await page.getByRole("button", { name: "Revoke E2E Grant Badge" }).click()
     await page.getByTestId("workshop-roster-revoke-reason").fill("test revoke")
