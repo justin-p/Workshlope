@@ -65,7 +65,7 @@ def test_private_bootstrap_e2e_workshop_initial_status_ended(
     row = db.get(WorkshopSession, sid)
     assert row is not None
     assert row.status == "ended"
-    assert row.current_part_index == 1
+    assert row.current_part_index == 0
 
 
 def test_private_bootstrap_e2e_workshop_live_session(

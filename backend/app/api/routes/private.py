@@ -76,8 +76,7 @@ def bootstrap_e2e_workshop_live_session(
     **instructor** role while the frontend skips ``POST …/enter`` for that flow.
     Pass ``initial_status=scheduled`` to exercise instructor start flows.
     Pass ``initial_status=ended`` for post-session read-only UI (trainee loads
-    the session after it finished; ``current_part_index`` is set to 1 when two
-    parts exist so ``Jump to last taught part`` is testable).
+    the session after it finished).
     Pass ``with_incomplete_required_prerequisite=true`` to add one **required**
     lesson prerequisite with **no** completion row for the rostered trainee
     (participant flows / Playwright pre-work UI).
@@ -163,7 +162,7 @@ def bootstrap_e2e_workshop_live_session(
         lesson_id=lesson.id,
         status=initial_status,
         created_at=datetime.now(timezone.utc),
-        current_part_index=1 if initial_status == "ended" else 0,
+        current_part_index=0,
     )
     session.add(workshop_session)
     if not omit_participant_seat:

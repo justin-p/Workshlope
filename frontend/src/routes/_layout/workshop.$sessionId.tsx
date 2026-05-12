@@ -1077,17 +1077,6 @@ function WorkshopSessionPage() {
                 >
                   Next part
                 </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  data-testid="workshop-read-only-jump-last-taught"
-                  onClick={() => {
-                    setReadOnlyPartIndex(liveWorkshopPartIndex)
-                  }}
-                >
-                  Jump to last taught part
-                </Button>
               </div>
             ) : null}
           </div>

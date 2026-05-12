@@ -607,7 +607,7 @@ Trainees without instructor flag land on **My Learning Home** and see trainee en
 - **Prework card:** prerequisite checklist with completion actions/status before session starts.
 - **Live:** **Enter** (sets **joined_at**); then **lesson Markdown** + **your** **Busy/Done** (red/green for **your** row only—instructor UI aligns colors; trainee only ever sees **their** state). Secondary: **I’m finished with this lesson** (**finished_at**, confirm dialog). **No roster rail, leaderboard, or avatar stack.**
 - **Paused:** banner; toggles disabled; content frozen.
-- **Ended:** **Read-only lesson review** for rostered trainees: **all** synced parts with **Previous part** / **Next part** / **Jump to last taught part**; **POST …/enter** still rejected. **Realtime** row states session ended (no live connection). Incomplete required pre-work uses a **non-destructive** alert (“does not block reading after the session”). HTTP session detail cache updates to **`ended`** when **`session.status_changed`** WS fires so the UI transitions without a full reload.
+- **Ended:** **Read-only lesson review** for rostered trainees: **all** synced parts with **Previous part** / **Next part**; **POST …/enter** still rejected. **Realtime** row states session ended (no live connection). Incomplete required pre-work uses a **non-destructive** alert (“does not block reading after the session”). HTTP session detail cache updates to **`ended`** when **`session.status_changed`** WS fires so the UI transitions without a full reload.
 - **Reconnect:** toast + resilient **ws-ticket** refresh.
 
 Accessibility: unchanged for **personal** toggles + **aria-live** for **your** view when instructor advances parts (announcement text like “Moved to Part 3” — **no** peer names).

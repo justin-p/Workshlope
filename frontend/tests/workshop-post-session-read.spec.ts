@@ -54,8 +54,5 @@ test.describe("Workshop post-session read-only", () => {
 
     await page.getByTestId("workshop-read-only-part-prev").click()
     await expect(partBody).toContainText("Part 0")
-
-    await page.getByTestId("workshop-read-only-jump-last-taught").click()
-    await expect(partBody).toContainText("Part 1")
   })
 })
