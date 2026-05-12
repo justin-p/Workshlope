@@ -1366,7 +1366,7 @@ function WorkshopSessionPage() {
                 size="sm"
                 variant="secondary"
                 data-testid="workshop-open-post-end-badge-wizard"
-                onClick={() => setPostEndBadgeWizardOpen(true)}
+                onClick={() => setBadgeEndSummaryOpen(true)}
               >
                 Open badge wizard
               </Button>

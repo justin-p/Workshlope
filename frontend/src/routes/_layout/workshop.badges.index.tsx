@@ -139,7 +139,7 @@ function WorkshopBadgesHub() {
     enabled: grantBadgeId !== null,
   })
 
-  const _recipientsQuery = useQuery({
+  const recipientsQuery = useQuery({
     queryKey: ["workshop-badge-recipients", recipientsBadgeId],
     queryFn: () =>
       WorkshopBadgesService.readWorkshopBadgeGrantRecipients({
@@ -207,52 +207,6 @@ function WorkshopBadgesHub() {
       } else {
         setRecipientsError(e instanceof Error ? e.message : "Revoke failed")
       }
-    },
-  })
-
-  const recipientsQuery = useQuery({
-    queryKey: ["workshop-badge-grants", recipientBadgeId],
-    queryFn: () =>
-      WorkshopBadgesService.readWorkshopBadgeGrantRecipients({
-        badgeId: recipientBadgeId!,
-      }),
-    enabled: recipientBadgeId !== null,
-  })
-
-  const _deleteMutation = useMutation({
-    mutationFn: (badgeId: string) =>
-      WorkshopBadgesService.deleteWorkshopBadge({ badgeId }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["workshop-badges"] })
-      setDeleteTargetId(null)
-    },
-  })
-
-  const _orgRevokeMutation = useMutation({
-    mutationFn: ({
-      userId,
-      badgeId,
-      reason,
-    }: {
-      userId: string
-      badgeId: string
-      reason: string
-    }) =>
-      WorkshopBadgesService.revokeWorkshopBadgeOrg({
-        requestBody: {
-          user_id: userId,
-          badge_id: badgeId,
-          reason,
-        },
-      }),
-    onSuccess: async () => {
-      await recipientsQuery.refetch()
-      await queryClient.invalidateQueries({ queryKey: ["workshop-badges"] })
-      await queryClient.invalidateQueries({
-        queryKey: ["workshop-badges-global-leaderboard"],
-      })
-      setOrgRevoke(null)
-      setOrgRevokeReason("")
     },
   })
 

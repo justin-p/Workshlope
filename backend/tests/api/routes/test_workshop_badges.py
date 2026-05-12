@@ -357,6 +357,42 @@ def test_create_badge_rejects_duplicate_slug(client: TestClient, db: Session) ->
     assert conflict.status_code == 409
 
 
+def test_read_and_patch_workshop_badge(client: TestClient, db: Session) -> None:
+    headers, _ = _instructor_headers(client, db)
+    slug = f"badge-edit-{uuid.uuid4().hex}"
+    create = client.post(
+        f"{settings.API_V1_STR}/workshop/badges",
+        headers=headers,
+        json={"slug": slug, "title": "Before", "points": 3, "description": "d0"},
+    )
+    assert create.status_code == 200
+    badge_id = create.json()["id"]
+
+    missing = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/{uuid.uuid4()}",
+        headers=headers,
+    )
+    assert missing.status_code == 404
+
+    got = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/{badge_id}",
+        headers=headers,
+    )
+    assert got.status_code == 200
+    assert got.json()["title"] == "Before"
+    assert got.json()["points"] == 3
+
+    patched = client.patch(
+        f"{settings.API_V1_STR}/workshop/badges/{badge_id}",
+        headers=headers,
+        json={"title": "After", "points": 7, "description": "d1", "slug": slug},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["title"] == "After"
+    assert patched.json()["points"] == 7
+    assert patched.json()["description"] == "d1"
+
+
 def test_superuser_grant_bypasses_session_instructor_check(
     client: TestClient, db: Session
 ) -> None:

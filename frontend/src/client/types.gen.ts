@@ -318,6 +318,16 @@ export type WorkshopBadgeDefinitionsPublic = {
 };
 
 /**
+ * Partial update for instructor-managed badge rows (manifest-linked rows may restrict slug).
+ */
+export type WorkshopBadgeDefinitionUpdate = {
+    slug?: (string | null);
+    title?: (string | null);
+    description?: (string | null);
+    points?: (number | null);
+};
+
+/**
  * One active grant for a badge (hub recipients table).
  */
 export type WorkshopBadgeGrantRecipientPublic = {
@@ -950,6 +960,19 @@ export type WorkshopBadgesCreateWorkshopBadgeData = {
 export type WorkshopBadgesCreateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
 
 export type WorkshopBadgesReadWorkshopGlobalBadgeLeaderboardResponse = (WorkshopGlobalLeaderboardPublic);
+
+export type WorkshopBadgesReadWorkshopBadgeData = {
+    badgeId: string;
+};
+
+export type WorkshopBadgesReadWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
+
+export type WorkshopBadgesUpdateWorkshopBadgeData = {
+    badgeId: string;
+    requestBody: WorkshopBadgeDefinitionUpdate;
+};
+
+export type WorkshopBadgesUpdateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
 
 export type WorkshopBadgesGrantWorkshopBadgeData = {
     requestBody: WorkshopBadgeGrantRequest;

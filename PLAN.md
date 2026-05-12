@@ -11,7 +11,7 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **`feat/workshop/badges-unified-model`** / **[#80](https://github.com/justin-p/testing/pull/80)**: unified badge hub (org user search grant + recipients revoke), session-end auto-award for lesson-linked definitions, `archived_at` when manifest drops a slug with existing grants, global active-grant uniqueness, post-end dialog preview-only + link to hub; participant detail lists lesson-scoped hub grants; API + Playwright updated. Prior merged: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. |
+| **Last synced** | **2026-05-12** — **`feat/workshop/badges-unified-model`** / **[#80](https://github.com/justin-p/testing/pull/80)**: same slice as prior row, plus **GET/PATCH `/workshop/badges/{id}`** for hub edit page + OpenAPI client; hub recipients dialog duplicate-query cleanup; post-end roster CTA opens existing **badge end summary** dialog (`setBadgeEndSummaryOpen`); `models.py` duplicate DTO removal after main merge. Prior merged: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. |
 | **Branch** | **`feat/workshop/badges-unified-model`** |
 | **PR** | **[#80](https://github.com/justin-p/testing/pull/80)** |
 | **Integrate against** | **`main`** |
