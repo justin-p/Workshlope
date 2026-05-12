@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-12** — **Pre-create session wizard:** [`/workshop/new`](frontend/src/routes/_layout/workshop.new.tsx) + [`WorkshopLessonRepoSyncCard`](frontend/src/components/dashboard/WorkshopLessonRepoSyncCard.tsx); backend `participant_user_ids` on create + `GET /workshop/lessons/{id}/roster-user-picker`; Playwright [`dashboard-routing.spec.ts`](frontend/tests/dashboard-routing.spec.ts). Prior: [#68](https://github.com/justin-p/testing/pull/68)-[#70](https://github.com/justin-p/testing/pull/70). |
 | **Branch** | **`feat/workshop/pre-create-session-wizard`** |
-| **PR** | _(open after push)_ |
+| **PR** | [#72](https://github.com/justin-p/testing/pull/72) |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
