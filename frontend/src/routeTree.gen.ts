@@ -29,6 +29,7 @@ import { Route as LayoutDashboardAdminRouteImport } from './routes/_layout/dashb
 import { Route as LayoutWorkshopBadgesIndexRouteImport } from './routes/_layout/workshop.badges.index'
 import { Route as LayoutWorkshopBadgesNewRouteImport } from './routes/_layout/workshop.badges.new'
 import { Route as LayoutWorkshopBadgesLeaderboardRouteImport } from './routes/_layout/workshop.badges.leaderboard'
+import { Route as LayoutWorkshopBadgesBadgeIdEditRouteImport } from './routes/_layout/workshop.badges.$badgeId.edit'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -132,6 +133,12 @@ const LayoutWorkshopBadgesLeaderboardRoute =
     path: '/leaderboard',
     getParentRoute: () => LayoutWorkshopBadgesRoute,
   } as any)
+const LayoutWorkshopBadgesBadgeIdEditRoute =
+  LayoutWorkshopBadgesBadgeIdEditRouteImport.update({
+    id: '/$badgeId/edit',
+    path: '/$badgeId/edit',
+    getParentRoute: () => LayoutWorkshopBadgesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/workshop/badges/leaderboard': typeof LayoutWorkshopBadgesLeaderboardRoute
   '/workshop/badges/new': typeof LayoutWorkshopBadgesNewRoute
   '/workshop/badges/': typeof LayoutWorkshopBadgesIndexRoute
+  '/workshop/badges/$badgeId/edit': typeof LayoutWorkshopBadgesBadgeIdEditRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -173,6 +181,7 @@ export interface FileRoutesByTo {
   '/workshop/badges/leaderboard': typeof LayoutWorkshopBadgesLeaderboardRoute
   '/workshop/badges/new': typeof LayoutWorkshopBadgesNewRoute
   '/workshop/badges': typeof LayoutWorkshopBadgesIndexRoute
+  '/workshop/badges/$badgeId/edit': typeof LayoutWorkshopBadgesBadgeIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -196,6 +205,7 @@ export interface FileRoutesById {
   '/_layout/workshop/badges/leaderboard': typeof LayoutWorkshopBadgesLeaderboardRoute
   '/_layout/workshop/badges/new': typeof LayoutWorkshopBadgesNewRoute
   '/_layout/workshop/badges/': typeof LayoutWorkshopBadgesIndexRoute
+  '/_layout/workshop/badges/$badgeId/edit': typeof LayoutWorkshopBadgesBadgeIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/workshop/badges/leaderboard'
     | '/workshop/badges/new'
     | '/workshop/badges/'
+    | '/workshop/badges/$badgeId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/workshop/badges/leaderboard'
     | '/workshop/badges/new'
     | '/workshop/badges'
+    | '/workshop/badges/$badgeId/edit'
   id:
     | '__root__'
     | '/_layout'
@@ -261,6 +273,7 @@ export interface FileRouteTypes {
     | '/_layout/workshop/badges/leaderboard'
     | '/_layout/workshop/badges/new'
     | '/_layout/workshop/badges/'
+    | '/_layout/workshop/badges/$badgeId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -414,6 +427,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutWorkshopBadgesLeaderboardRouteImport
       parentRoute: typeof LayoutWorkshopBadgesRoute
     }
+    '/_layout/workshop/badges/$badgeId/edit': {
+      id: '/_layout/workshop/badges/$badgeId/edit'
+      path: '/$badgeId/edit'
+      fullPath: '/workshop/badges/$badgeId/edit'
+      preLoaderRoute: typeof LayoutWorkshopBadgesBadgeIdEditRouteImport
+      parentRoute: typeof LayoutWorkshopBadgesRoute
+    }
   }
 }
 
@@ -421,12 +441,14 @@ interface LayoutWorkshopBadgesRouteChildren {
   LayoutWorkshopBadgesLeaderboardRoute: typeof LayoutWorkshopBadgesLeaderboardRoute
   LayoutWorkshopBadgesNewRoute: typeof LayoutWorkshopBadgesNewRoute
   LayoutWorkshopBadgesIndexRoute: typeof LayoutWorkshopBadgesIndexRoute
+  LayoutWorkshopBadgesBadgeIdEditRoute: typeof LayoutWorkshopBadgesBadgeIdEditRoute
 }
 
 const LayoutWorkshopBadgesRouteChildren: LayoutWorkshopBadgesRouteChildren = {
   LayoutWorkshopBadgesLeaderboardRoute: LayoutWorkshopBadgesLeaderboardRoute,
   LayoutWorkshopBadgesNewRoute: LayoutWorkshopBadgesNewRoute,
   LayoutWorkshopBadgesIndexRoute: LayoutWorkshopBadgesIndexRoute,
+  LayoutWorkshopBadgesBadgeIdEditRoute: LayoutWorkshopBadgesBadgeIdEditRoute,
 }
 
 const LayoutWorkshopBadgesRouteWithChildren =

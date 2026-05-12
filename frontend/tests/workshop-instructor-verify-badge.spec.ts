@@ -1,4 +1,4 @@
-// Instructor roster: mark verified complete, grant session badge; trainee sees badges after reload.
+// Instructor roster: mark verified complete, end session, grant via post-end badge wizard; trainee sees badges; revoke from wizard.
 import { expect, test } from "@playwright/test"
 import { getApiTokenAsSuperuser } from "./utils/bridgeToken"
 import { createUser } from "./utils/privateApi"
@@ -67,31 +67,13 @@ test.describe("Workshop instructor verify and badge grant", () => {
 
     const token = await getApiTokenAsSuperuser()
     const auth = { Authorization: `Bearer ${token}` }
-    const badgesRes = await request.get(`${apiBase}/api/v1/workshop/badges`, {
-      headers: auth,
-    })
-    expect(
-      badgesRes.ok(),
-      `list badges failed: ${badgesRes.status()} ${await badgesRes.text()}`,
-    ).toBeTruthy()
-    const badgesJson = (await badgesRes.json()) as {
-      data: Array<{ id: string; slug: string }>
-    }
-    const e2eSlug = `e2e-grant-${session_id}`
-    const badge = badgesJson.data.find((b) => b.slug === e2eSlug)
-    expect(badge, `missing bootstrap badge slug ${e2eSlug}`).toBeTruthy()
-
-    // Use `data` for JSON — `json` is not a valid APIRequestContext option (empty body).
-    const grantRes = await request.post(
-      `${apiBase}/api/v1/workshop/badges/sessions/${session_id}/grant`,
-      {
-        headers: auth,
-        data: { user_id: participant.userId, badge_id: badge!.id },
-      },
+    const endRes = await request.post(
+      `${apiBase}/api/v1/workshop/sessions/${session_id}/end`,
+      { headers: auth },
     )
     expect(
-      grantRes.ok(),
-      `session badge grant failed: ${grantRes.status()} ${await grantRes.text()}`,
+      endRes.ok(),
+      `end session failed: ${endRes.status()} ${await endRes.text()}`,
     ).toBeTruthy()
 
     await page.reload()
@@ -100,6 +82,14 @@ test.describe("Workshop instructor verify and badge grant", () => {
       /connected/i,
       { timeout: 15_000 },
     )
+
+    await expect(
+      page.getByTestId("workshop-post-end-badge-dialog"),
+    ).toBeVisible({ timeout: 15_000 })
+
+    await page
+      .getByTestId(`workshop-roster-grant-badge-${participant.userId}`)
+      .click()
     await expect(
       page.getByRole("button", { name: "Revoke E2E Grant Badge" }),
     ).toBeVisible({ timeout: 15_000 })

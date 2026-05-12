@@ -290,6 +290,10 @@ export type WorkshopBadgeDefinitionCreate = {
     title: string;
     description?: (string | null);
     points?: number;
+    /**
+     * Optional link to a lesson; session grant UI lists only badges for the session's lesson.
+     */
+    lesson_id?: (string | null);
 };
 
 export type WorkshopBadgeDefinitionPublic = {
@@ -309,6 +313,35 @@ export type WorkshopBadgeDefinitionPublic = {
 
 export type WorkshopBadgeDefinitionsPublic = {
     data: Array<WorkshopBadgeDefinitionPublic>;
+    count: number;
+};
+
+/**
+ * Partial update for instructor-managed badge rows (manifest-linked rows may restrict slug).
+ */
+export type WorkshopBadgeDefinitionUpdate = {
+    slug?: (string | null);
+    title?: (string | null);
+    description?: (string | null);
+    points?: (number | null);
+};
+
+/**
+ * One active grant for a badge (hub recipients table).
+ */
+export type WorkshopBadgeGrantRecipientPublic = {
+    user_id: string;
+    email: string;
+    full_name?: (string | null);
+    granted_at?: (string | null);
+    /**
+     * ``null`` for organization-wide grants.
+     */
+    session_id?: (string | null);
+};
+
+export type WorkshopBadgeGrantRecipientsPublic = {
+    data: Array<WorkshopBadgeGrantRecipientPublic>;
     count: number;
 };
 
@@ -945,6 +978,37 @@ export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData = {
 };
 
 export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse = (WorkshopSessionLeaderboardPublic);
+
+export type WorkshopBadgesReadWorkshopBadgeDefinitionsForSessionData = {
+    sessionId: string;
+};
+
+export type WorkshopBadgesReadWorkshopBadgeDefinitionsForSessionResponse = (WorkshopBadgeDefinitionsPublic);
+
+export type WorkshopBadgesReadWorkshopBadgeGrantRecipientsData = {
+    badgeId: string;
+};
+
+export type WorkshopBadgesReadWorkshopBadgeGrantRecipientsResponse = (WorkshopBadgeGrantRecipientsPublic);
+
+export type WorkshopBadgesReadWorkshopBadgeData = {
+    badgeId: string;
+};
+
+export type WorkshopBadgesReadWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
+
+export type WorkshopBadgesUpdateWorkshopBadgeData = {
+    badgeId: string;
+    requestBody: WorkshopBadgeDefinitionUpdate;
+};
+
+export type WorkshopBadgesUpdateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
+
+export type WorkshopBadgesDeleteWorkshopBadgeData = {
+    badgeId: string;
+};
+
+export type WorkshopBadgesDeleteWorkshopBadgeResponse = (Message);
 
 export type WorkshopBadgesReadWorkshopBadgeImageData = {
     badgeId: string;
