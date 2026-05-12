@@ -88,6 +88,10 @@ test.describe("Workshop live session", () => {
     await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
       "session.pause.ack",
     )
+    await expect(page.getByTestId("workshop-instructor-advance")).toBeDisabled()
+    await expect(
+      page.getByTestId("workshop-instructor-back-part"),
+    ).toBeDisabled()
     await page.getByTestId("workshop-instructor-resume").click()
     await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
       "session.resume.ack",
@@ -114,6 +118,52 @@ test.describe("Workshop live session", () => {
     ).toContainText(/read-only/i)
 
     await participantContext.close()
+  })
+
+  test("instructor advance and back are disabled while session is paused", async ({
+    page,
+    request,
+  }) => {
+    const bootstrap = await request.post(
+      `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
+    )
+    expect(bootstrap.ok()).toBeTruthy()
+    const { session_id } = await bootstrap.json()
+
+    await page.goto(`/workshop/${session_id}`)
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      { timeout: 15_000 },
+    )
+    await expect(page.getByTestId("workshop-instructor-advance")).toBeEnabled({
+      timeout: 15_000,
+    })
+
+    await page.getByTestId("workshop-instructor-advance").click()
+    await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
+      "part.advance.ack",
+    )
+    await expect(
+      page.getByTestId("workshop-instructor-back-part"),
+    ).toBeEnabled()
+
+    await page.getByTestId("workshop-instructor-pause").click()
+    await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
+      "session.pause.ack",
+    )
+    await expect(page.getByTestId("workshop-instructor-advance")).toBeDisabled()
+    await expect(
+      page.getByTestId("workshop-instructor-back-part"),
+    ).toBeDisabled()
+
+    await page.getByTestId("workshop-instructor-resume").click()
+    await expect(page.getByTestId("workshop-ws-last-ack")).toContainText(
+      "session.resume.ack",
+    )
+    await expect(
+      page.getByTestId("workshop-instructor-back-part"),
+    ).toBeEnabled()
+    await expect(page.getByTestId("workshop-instructor-advance")).toBeDisabled()
   })
 
   test("participant is gated until required pre-work is complete", async ({
