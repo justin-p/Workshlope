@@ -127,6 +127,11 @@ function WorkshopSessionPage() {
   const sessionInLobby =
     Boolean(detailQuery.isSuccess) && detail?.session.status === "scheduled"
 
+  const isParticipantReadOnlyReview =
+    detail !== undefined &&
+    detail.view === "participant" &&
+    detail.session.status === "ended"
+
   /** HTTP detail is instructor-first when user has both seats; WS still uses participant. */
   const userSeesTraineePrework =
     detail?.view === "participant" ||
@@ -202,7 +207,9 @@ function WorkshopSessionPage() {
     queryFn: () =>
       WorkshopSessionsService.readWorkshopSessionTimer({ sessionId }),
     enabled:
-      uuidOk && (detailView === "instructor" || detailView === "participant"),
+      uuidOk &&
+      (detailView === "instructor" || detailView === "participant") &&
+      !isParticipantReadOnlyReview,
     retry: false,
     // Fast tick while running; slow poll when inactive during live/paused workshop
     // so roster clients pick up instructor-started timers without a full reload.
@@ -409,6 +416,7 @@ function WorkshopSessionPage() {
   const [realtimePartIndex, setRealtimePartIndex] = useState<number | null>(
     null,
   )
+  const [readOnlyPartIndex, setReadOnlyPartIndex] = useState(0)
   const [timerExtendMinutes, setTimerExtendMinutes] = useState<number>(5)
   const [newTraineeUserId, setNewTraineeUserId] = useState<string>("")
   const ROSTER_PICKER_LIMIT = 25
@@ -435,6 +443,16 @@ function WorkshopSessionPage() {
   const wsSessionReadyRef = useRef(false)
   const wsStaleReconnectAttemptsRef = useRef(0)
   const [_wsReconnectNonce, setWsReconnectNonce] = useState(0)
+
+  useEffect(() => {
+    setReadOnlyPartIndex(0)
+  }, [])
+
+  useEffect(() => {
+    const n = detailQuery.data?.parts.length ?? 0
+    if (n === 0) return
+    setReadOnlyPartIndex((i) => Math.min(Math.max(0, i), n - 1))
+  }, [detailQuery.data?.parts.length])
 
   useEffect(() => {
     const t = window.setTimeout(
@@ -622,6 +640,12 @@ function WorkshopSessionPage() {
               >(["workshopSessionDetail", sessionId], (cached) => {
                 if (!cached) return cached
                 const cur = cached.session.status
+                if (nextStatus === "ended") {
+                  return {
+                    ...cached,
+                    session: { ...cached.session, status: "ended" },
+                  }
+                }
                 if (cur !== "scheduled" || nextStatus !== "live") return cached
                 return {
                   ...cached,
@@ -758,12 +782,19 @@ function WorkshopSessionPage() {
   const isPreworkGateError = errorDetail === "Required prerequisites incomplete"
   const participantRemainingRequiredCount = overdueRequiredPrerequisites.length
   const instructorBlockedTraineesCount = gapsQuery.data?.count ?? 0
-  const currentPartIndex =
+  const liveWorkshopPartIndex =
     realtimePartIndex ?? detailQuery.data?.session.current_part_index ?? 0
-  const currentPart = detailQuery.data?.parts[currentPartIndex] ?? null
   const totalParts = detailQuery.data?.parts.length ?? 0
-  const previousPartIndex = currentPartIndex - 1
-  const nextPartIndex = currentPartIndex + 1
+  const readOnlyPartIndexClamped =
+    totalParts === 0
+      ? 0
+      : Math.min(Math.max(0, readOnlyPartIndex), totalParts - 1)
+  const viewedPartIndex = isParticipantReadOnlyReview
+    ? readOnlyPartIndexClamped
+    : liveWorkshopPartIndex
+  const currentPart = detailQuery.data?.parts[viewedPartIndex] ?? null
+  const previousPartIndex = liveWorkshopPartIndex - 1
+  const nextPartIndex = liveWorkshopPartIndex + 1
   const canReturnToPreviousPart = previousPartIndex >= 0
   const canAdvanceToNextPart = nextPartIndex < totalParts
   const lessonRepoHealth =
@@ -903,7 +934,7 @@ function WorkshopSessionPage() {
           </div>
         </Alert>
       ) : null}
-      {detailView === "participant" ? (
+      {detailView === "participant" && !isParticipantReadOnlyReview ? (
         <p
           className="text-xs text-muted-foreground"
           data-testid="workshop-prework-header-count"
@@ -911,7 +942,9 @@ function WorkshopSessionPage() {
           Required pre-work remaining: {participantRemainingRequiredCount}
         </p>
       ) : null}
-      {detailView === "participant" && timerStatus !== "inactive" ? (
+      {detailView === "participant" &&
+      timerStatus !== "inactive" &&
+      !isParticipantReadOnlyReview ? (
         <p
           className="text-xs text-muted-foreground"
           data-testid="workshop-trainee-timer-status"
@@ -968,6 +1001,14 @@ function WorkshopSessionPage() {
           </AlertDescription>
         </Alert>
       ) : null}
+      {isParticipantReadOnlyReview ? (
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="workshop-read-only-session-banner"
+        >
+          Session ended — read-only. Browse all lesson parts below.
+        </p>
+      ) : null}
       {sessionInLobby ? (
         <Alert
           variant="default"
@@ -999,12 +1040,56 @@ function WorkshopSessionPage() {
           className="rounded-lg border bg-card p-4 space-y-3"
           data-testid="workshop-current-part"
         >
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-lg font-semibold">{currentPart.title}</h2>
-            <span className="text-xs text-muted-foreground">
-              Part {currentPart.ordering + 1} of{" "}
-              {detailQuery.data?.parts.length ?? 0}
-            </span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+              <h2 className="text-lg font-semibold">{currentPart.title}</h2>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                Part {currentPart.ordering + 1} of{" "}
+                {detailQuery.data?.parts.length ?? 0}
+              </span>
+            </div>
+            {isParticipantReadOnlyReview && totalParts > 0 ? (
+              <div
+                className="flex flex-wrap items-center gap-2"
+                data-testid="workshop-read-only-part-nav"
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="workshop-read-only-part-prev"
+                  disabled={readOnlyPartIndexClamped <= 0}
+                  onClick={() =>
+                    setReadOnlyPartIndex((i) => Math.max(0, i - 1))
+                  }
+                >
+                  Previous part
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="workshop-read-only-part-next"
+                  disabled={readOnlyPartIndexClamped >= totalParts - 1}
+                  onClick={() =>
+                    setReadOnlyPartIndex((i) => Math.min(totalParts - 1, i + 1))
+                  }
+                >
+                  Next part
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  data-testid="workshop-read-only-jump-last-taught"
+                  onClick={() => {
+                    setReadOnlyPartIndex(liveWorkshopPartIndex)
+                  }}
+                >
+                  Jump to last taught part
+                </Button>
+              </div>
+            ) : null}
           </div>
           <article
             className="workshop-markdown max-w-none"
@@ -1019,19 +1104,30 @@ function WorkshopSessionPage() {
       overdueRequiredPrerequisites.length > 0 &&
       !myPrerequisitesQuery.isFetching ? (
         <Alert
-          variant="destructive"
+          variant={isParticipantReadOnlyReview ? "default" : "destructive"}
           data-testid="workshop-prework-participant-banner"
+          className={
+            isParticipantReadOnlyReview
+              ? "border-muted-foreground/30 bg-muted/30"
+              : undefined
+          }
         >
           <AlertTitle>Incomplete pre-work</AlertTitle>
           <AlertDescription>
-            <span className="block mb-2">
-              Finish these before class so you&apos;re ready to start.
+            <span className="mb-2 block">
+              {isParticipantReadOnlyReview
+                ? "This does not block reading the lesson after the session. You can still mark items complete if you want them on your record."
+                : "Finish these before class so you're ready to start."}
             </span>
             <ul className="list-none space-y-2 pl-0">
               {overdueRequiredPrerequisites.map((p) => (
                 <li
                   key={p.id}
-                  className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2"
+                  className={
+                    isParticipantReadOnlyReview
+                      ? "flex flex-wrap items-start justify-between gap-2 rounded-md border border-muted-foreground/25 bg-background px-3 py-2"
+                      : "flex flex-wrap items-start justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2"
+                  }
                 >
                   <span className="min-w-0 text-sm">
                     {p.url ? (
@@ -1513,22 +1609,40 @@ function WorkshopSessionPage() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-sm text-muted-foreground">Realtime:</span>
-        <span data-testid="workshop-ws-status" className="text-sm font-medium">
-          {sessionInLobby && phase !== "ready"
-            ? "waiting for start"
-            : phase === "ready"
-              ? "connected"
-              : phase === "error"
-                ? isPreworkGateError
-                  ? "gated"
-                  : "error"
-                : phase === "idle"
-                  ? "…"
-                  : "connecting"}
-        </span>
-      </div>
+      {isParticipantReadOnlyReview ? (
+        <div
+          className="flex flex-wrap items-center gap-2"
+          data-testid="workshop-read-only-ws-row"
+        >
+          <span className="text-sm text-muted-foreground">Realtime:</span>
+          <span
+            data-testid="workshop-ws-status"
+            className="text-sm font-medium"
+          >
+            Session ended — read-only (no live connection)
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Realtime:</span>
+          <span
+            data-testid="workshop-ws-status"
+            className="text-sm font-medium"
+          >
+            {sessionInLobby && phase !== "ready"
+              ? "waiting for start"
+              : phase === "ready"
+                ? "connected"
+                : phase === "error"
+                  ? isPreworkGateError
+                    ? "gated"
+                    : "error"
+                  : phase === "idle"
+                    ? "…"
+                    : "connecting"}
+          </span>
+        </div>
+      )}
 
       {errorDetail && !isPreworkGateError ? (
         <p className="text-sm text-destructive" data-testid="workshop-error">
@@ -1545,7 +1659,7 @@ function WorkshopSessionPage() {
         </Alert>
       ) : null}
 
-      {connectedRole === "participant" ? (
+      {connectedRole === "participant" && !isParticipantReadOnlyReview ? (
         <div className="flex gap-2">
           <Button
             type="button"
@@ -1787,7 +1901,7 @@ function WorkshopSessionPage() {
         </div>
       ) : null}
 
-      {lastEvent ? (
+      {!isParticipantReadOnlyReview && lastEvent ? (
         <pre
           data-testid="workshop-ws-last-raw"
           className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-48"
@@ -1795,7 +1909,7 @@ function WorkshopSessionPage() {
           {lastEvent}
         </pre>
       ) : null}
-      {lastAckEvent ? (
+      {!isParticipantReadOnlyReview && lastAckEvent ? (
         <pre
           data-testid="workshop-ws-last-ack"
           className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-48"

@@ -54,6 +54,20 @@ def test_create_user_can_set_instructor_flag(client: TestClient, db: Session) ->
     assert user.is_instructor is True
 
 
+def test_private_bootstrap_e2e_workshop_initial_status_ended(
+    client: TestClient, db: Session
+) -> None:
+    r = client.post(
+        f"{settings.API_V1_STR}/private/workshop/e2e-live-session/?initial_status=ended",
+    )
+    assert r.status_code == 200
+    sid = uuid.UUID(r.json()["session_id"])
+    row = db.get(WorkshopSession, sid)
+    assert row is not None
+    assert row.status == "ended"
+    assert row.current_part_index == 1
+
+
 def test_private_bootstrap_e2e_workshop_live_session(
     client: TestClient, db: Session
 ) -> None:

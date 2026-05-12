@@ -107,8 +107,11 @@ test.describe("Workshop live session", () => {
       '"status":"ended"',
     )
     await expect(
-      participantPage.getByTestId("workshop-ws-last-raw"),
-    ).toContainText('"status":"ended"')
+      participantPage.getByTestId("workshop-read-only-session-banner"),
+    ).toBeVisible({ timeout: 15_000 })
+    await expect(
+      participantPage.getByTestId("workshop-ws-status"),
+    ).toContainText(/read-only/i)
 
     await participantContext.close()
   })

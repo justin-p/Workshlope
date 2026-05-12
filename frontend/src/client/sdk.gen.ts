@@ -385,6 +385,9 @@ export class PrivateService {
      * instructor (no ``WorkshopParticipant`` row), so ``ws-ticket`` yields the
      * **instructor** role while the frontend skips ``POST …/enter`` for that flow.
      * Pass ``initial_status=scheduled`` to exercise instructor start flows.
+     * Pass ``initial_status=ended`` for post-session read-only UI (trainee loads
+     * the session after it finished; ``current_part_index`` is set to 1 when two
+     * parts exist so ``Jump to last taught part`` is testable).
      * Pass ``with_incomplete_required_prerequisite=true`` to add one **required**
      * lesson prerequisite with **no** completion row for the rostered trainee
      * (participant flows / Playwright pre-work UI).
