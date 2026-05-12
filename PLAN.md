@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-12** — **Workshop lesson code blocks:** fenced Markdown in session lesson bodies keeps `language-*` classes through nh3; [`WorkshopMarkdownHtml`](frontend/src/components/WorkshopMarkdownHtml.tsx) applies highlight.js (curated grammars) plus per-block copy on [`workshop.$sessionId`](frontend/src/routes/_layout/workshop.$sessionId.tsx); GitHub / GitHub Dark hljs themes for light vs `.dark`; Playwright asserts copy control on post-session read. Prior: post-session trainee lesson read (**#73**); pre-create wizard **#72** / [#68](https://github.com/justin-p/testing/pull/68)-[#70](https://github.com/justin-p/testing/pull/70). |
 | **Branch** | **`feat/workshop/markdown-code-highlight-copy`** |
-| **PR** | *(open after push)* |
+| **PR** | [#74](https://github.com/justin-p/testing/pull/74) |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
