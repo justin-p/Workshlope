@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **Workshop lesson code blocks:** fenced Markdown in session lesson bodies keeps `language-*` classes through nh3; [`WorkshopMarkdownHtml`](frontend/src/components/WorkshopMarkdownHtml.tsx) applies highlight.js (curated grammars) plus per-block copy on [`workshop.$sessionId`](frontend/src/routes/_layout/workshop.$sessionId.tsx); GitHub / GitHub Dark hljs themes for light vs `.dark`; Playwright asserts copy control on post-session read. Prior: post-session trainee lesson read (**#73**); pre-create wizard **#72** / [#68](https://github.com/justin-p/testing/pull/68)-[#70](https://github.com/justin-p/testing/pull/70). |
-| **Branch** | **`feat/workshop/markdown-code-highlight-copy`** |
-| **PR** | [#74](https://github.com/justin-p/testing/pull/74) |
+| **Last synced** | **2026-05-12** — **Pause freezes part navigation (E2E):** [`workshop.spec.ts`](frontend/tests/workshop.spec.ts) asserts instructor **Advance** / **Back** are disabled while the room is paused (main flow + dedicated test with `omit_participant_seat` so WS role is instructor); after resume, **Back** is enabled on a mid-lesson part and **Advance** stays disabled on the last part. Backend already covers `part.advance` while paused ([`test_ws_part_advance_denied_when_session_paused`](backend/tests/api/routes/test_workshop_sessions.py)). Prior: workshop lesson code blocks (**#74**); post-session read (**#73**); pre-create wizard **#72**. |
+| **Branch** | **`feat/workshop/pause-disables-part-nav`** |
+| **PR** | [#75](https://github.com/justin-p/testing/pull/75) |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -26,8 +26,6 @@
 **1. Workshop end-to-end (blocking)**
 
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
-  - P0 issues
-    - **Session-from-lesson setup (workshops hub):** **Use lesson** / **Start workshop** opens the **pre-create wizard** ([`/workshop/new`](frontend/src/routes/_layout/workshop.new.tsx)) so the instructor reviews lesson prerequisites, optionally picks trainees (soft warnings; empty roster allowed), and **only then** creates the session (`POST /workshop/sessions/` with optional `participant_user_ids` in one DB transaction). **Scheduled-session lobby** copy from [#68](https://github.com/justin-p/testing/pull/68) still applies after the session exists.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
 
