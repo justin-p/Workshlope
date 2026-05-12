@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — Slice C P0 bug sweep pass: no reproducible blockers found across auth/role redirects, workshop progression/roster/session APIs, and lesson-content/sync handling paths. Validation stayed green on frontend (`45 passed`) and backend workshop-session APIs (`121 passed`). |
-| **Branch** | **`fix/workshop/p0-execution-bug-sweep`** |
-| **PR** | _(open after push)_ |
+| **Last synced** | **2026-05-12** — Workshop §1 slices **A → B → C** landed on `main`: [#68](https://github.com/justin-p/testing/pull/68) instructor setup prompt (scheduled session), [#69](https://github.com/justin-p/testing/pull/69) full E2E validation record, [#70](https://github.com/justin-p/testing/pull/70) P0 bug sweep (no reproducible blockers; frontend + workshop-session API tests green in pass). Next: **[Remaining work](#remaining-work-authoritative)** P0 gap check (session-from-lesson entry points vs shipped lobby prompt). |
+| **Branch** | **`main`** |
+| **PR** | Merged stack **#68–#70** (no open slice). |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -27,8 +27,7 @@
 
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
   - P0 issues
-    - When setting up a new session from a lesson, the instructor should be prompted to invite trainees and set prerequisite gates and any other things that are needed for the session.
-    -
+    - When setting up a new session from a lesson, the instructor should be prompted to invite trainees and set prerequisite gates and any other things that are needed for the session. **Shipped for scheduled-session lobby:** [#68](https://github.com/justin-p/testing/pull/68); confirm other create paths (e.g. workshops hub / post-create redirect) still need the same guidance.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
 
