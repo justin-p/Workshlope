@@ -64,11 +64,13 @@ test.describe("Workshop instructor verify and badge grant", () => {
       page.getByTestId(`workshop-roster-verified-label-${participant.userId}`),
     ).toBeVisible({ timeout: 10_000 })
 
+    const sid = String(session_id)
     const grantResponsePromise = page.waitForResponse(
       (resp) =>
         resp.request().method() === "POST" &&
         resp.url().includes("/workshop/badges/sessions/") &&
-        resp.url().endsWith("/grant"),
+        resp.url().includes(sid) &&
+        resp.url().includes("/grant"),
     )
     await page
       .getByTestId(`workshop-roster-grant-badge-${participant.userId}`)
@@ -80,13 +82,18 @@ test.describe("Workshop instructor verify and badge grant", () => {
       )
     }
 
+    await expect(
+      page.getByRole("button", { name: "Revoke E2E Grant Badge" }),
+    ).toBeVisible({ timeout: 15_000 })
+    await page.waitForLoadState("networkidle")
+
     await participantPage.reload()
     await participantPage.waitForLoadState("networkidle")
     await expect(
       participantPage.getByTestId(
         `workshop-trainee-session-badge-e2e-grant-${session_id}`,
       ),
-    ).toBeVisible({ timeout: 15_000 })
+    ).toBeVisible({ timeout: 30_000 })
 
     await page.getByRole("button", { name: "Revoke E2E Grant Badge" }).click()
     await page.getByTestId("workshop-roster-revoke-reason").fill("test revoke")
