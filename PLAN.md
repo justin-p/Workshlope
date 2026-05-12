@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **`feat/workshop/badges-unified-model`**: unified badge hub (org user search grant + recipients revoke), session-end auto-award for lesson-linked definitions, `archived_at` when manifest drops a slug with existing grants, global active-grant uniqueness, post-end dialog preview-only + link to hub; API tests in `test_workshop_badges.py`; Playwright `workshop-instructor-verify-badge.spec.ts` covers end-session auto award + hub revoke/re-grant. Prior merged: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. |
+| **Last synced** | **2026-05-12** — **`feat/workshop/badges-unified-model`** / **[#80](https://github.com/justin-p/testing/pull/80)**: unified badge hub (org user search grant + recipients revoke), session-end auto-award for lesson-linked definitions, `archived_at` when manifest drops a slug with existing grants, global active-grant uniqueness, post-end dialog preview-only + link to hub; participant detail lists lesson-scoped hub grants; API + Playwright updated. Prior merged: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. |
 | **Branch** | **`feat/workshop/badges-unified-model`** |
-| **PR** | Open after push (replace with `gh pr view` link). |
+| **PR** | **[#80](https://github.com/justin-p/testing/pull/80)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
