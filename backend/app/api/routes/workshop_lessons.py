@@ -5,6 +5,11 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlmodel import col, select
 
 from app.api.deps import CurrentUser, SessionDep
+from app.api.roster_user_picker_query import (
+    ROSTER_PICKER_DEFAULT_LIMIT,
+    ROSTER_PICKER_MAX_LIMIT,
+    workshop_roster_user_picker_public,
+)
 from app.models import (
     Lesson,
     LessonPrerequisite,
@@ -23,6 +28,7 @@ from app.models import (
     WorkshopLessonPrerequisitesMyPublic,
     WorkshopLessonPrerequisitesPublic,
     WorkshopParticipant,
+    WorkshopRosterUserPickerPublic,
     WorkshopSession,
 )
 
@@ -208,6 +214,39 @@ def read_lesson_prerequisites(
         data=[WorkshopLessonPrerequisitePublic.model_validate(row) for row in rows],
         count=len(rows),
     )
+
+
+@router.get(
+    "/{lesson_id}/roster-user-picker",
+    response_model=WorkshopRosterUserPickerPublic,
+)
+def read_lesson_roster_user_picker(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    lesson_id: uuid.UUID,
+    q: str | None = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(
+        ROSTER_PICKER_DEFAULT_LIMIT,
+        ge=1,
+        le=ROSTER_PICKER_MAX_LIMIT,
+    ),
+) -> WorkshopRosterUserPickerPublic:
+    """Instructor-only user browse/search before a session exists (session setup wizard)."""
+    _require_workshop_lesson_editor(current_user=current_user)
+    if session.get(Lesson, lesson_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found",
+        )
+    try:
+        return workshop_roster_user_picker_public(session, q=q, skip=skip, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get(

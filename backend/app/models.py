@@ -520,6 +520,11 @@ class WorkshopSessionsPublic(SQLModel):
 
 class WorkshopSessionCreate(SQLModel):
     lesson_id: uuid.UUID
+    participant_user_ids: list[uuid.UUID] | None = Field(
+        default=None,
+        description="Optional trainees to roster immediately after session creation "
+        "(same transaction as create).",
+    )
 
 
 class WorkshopSessionCreatedPublic(SQLModel):

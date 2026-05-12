@@ -1,12 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
+import { useNavigate } from "@tanstack/react-router"
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
-import {
-  ApiError,
-  WorkshopLessonReposService,
-  WorkshopSessionsService,
-} from "@/client"
+import { ApiError, WorkshopLessonReposService } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -136,12 +132,7 @@ export function WorkshopLessonRepoSyncCard() {
   const [repoSearch, setRepoSearch] = useState("")
   const [refreshError, setRefreshError] = useState<string | null>(null)
   const [advancedManualOpen, setAdvancedManualOpen] = useState(false)
-  const [createSessionErrorByLessonId, setCreateSessionErrorByLessonId] =
-    useState<Record<string, string | undefined>>({})
-  const [createdSessionByLessonId, setCreatedSessionByLessonId] = useState<
-    Record<string, string | undefined>
-  >({})
-  const [creatingLessonId, setCreatingLessonId] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     try {
@@ -195,48 +186,19 @@ export function WorkshopLessonRepoSyncCard() {
       setErrorDetail(e instanceof Error ? e.message : "Sync request failed")
     },
   })
-  const createSessionMutation = useMutation({
-    mutationFn: (lessonId: string) =>
-      WorkshopSessionsService.createWorkshopSession({
-        requestBody: { lesson_id: lessonId },
-      }),
-    onMutate: (lessonId) => {
-      setCreatingLessonId(lessonId)
-      setCreateSessionErrorByLessonId((prev) => ({
-        ...prev,
-        [lessonId]: undefined,
-      }))
-      setCreatedSessionByLessonId((prev) => ({
-        ...prev,
-        [lessonId]: undefined,
-      }))
-    },
-    onSuccess: async (data, lessonId) => {
-      setCreatedSessionByLessonId((prev) => ({
-        ...prev,
-        [lessonId]: data.session_id,
-      }))
-      await queryClient.invalidateQueries({
-        queryKey: ["workshopSessionsForUser"],
+
+  const goToSessionSetupWizard = useCallback(
+    (lesson: LessonRepoPreviewLesson) => {
+      void navigate({
+        to: "/workshop/new",
+        search: {
+          lessonId: lesson.lesson_id,
+          lessonTitle: lesson.lesson_title,
+        },
       })
     },
-    onError: (error, lessonId) => {
-      const detail =
-        error instanceof ApiError
-          ? ((error.body as { detail?: string } | undefined)?.detail ??
-            error.message)
-          : error instanceof Error
-            ? error.message
-            : "Could not create session"
-      setCreateSessionErrorByLessonId((prev) => ({
-        ...prev,
-        [lessonId]: detail,
-      }))
-    },
-    onSettled: () => {
-      setCreatingLessonId(null)
-    },
-  })
+    [navigate],
+  )
   const normalizedRepo = fullName.trim()
   const repoFormatValid =
     normalizedRepo.length === 0 || OWNER_REPO_RE.test(normalizedRepo)
@@ -634,7 +596,7 @@ export function WorkshopLessonRepoSyncCard() {
     const preview = cached ?? (await loadRepoPreview(repoId))
     if (!preview) return
     if (preview.lessons.length === 1) {
-      createSessionMutation.mutate(preview.lessons[0].lesson_id)
+      goToSessionSetupWizard(preview.lessons[0])
       return
     }
     setExpandedPreviewRepoIds((prev) => ({ ...prev, [repoId]: true }))
@@ -1294,44 +1256,6 @@ export function WorkshopLessonRepoSyncCard() {
                             : "Preview parts"}
                       </Button>
                     </div>
-                    {(() => {
-                      const pv = previewByRepoId[repo.lesson_repo_id]
-                      const sole =
-                        pv?.lessons.length === 1 ? pv.lessons[0] : null
-                      if (!sole) return null
-                      const lid = sole.lesson_id
-                      const creating = creatingLessonId === lid
-                      const createdId = createdSessionByLessonId[lid]
-                      const err = createSessionErrorByLessonId[lid]
-                      if (!creating && !createdId && !err) return null
-                      return (
-                        <div
-                          className="max-w-[14rem] text-right text-xs"
-                          data-testid="workshop-use-lesson-session-feedback"
-                        >
-                          {creating ? (
-                            <p className="text-muted-foreground">
-                              Creating session…
-                            </p>
-                          ) : null}
-                          {createdId ? (
-                            <p className="text-emerald-700 dark:text-emerald-400">
-                              Session created.{" "}
-                              <Link
-                                to="/workshop/$sessionId"
-                                params={{ sessionId: createdId }}
-                                className="underline underline-offset-4"
-                              >
-                                Open
-                              </Link>
-                            </p>
-                          ) : null}
-                          {err ? (
-                            <p className="text-destructive">{err}</p>
-                          ) : null}
-                        </div>
-                      )
-                    })()}
                   </div>
                 </li>
               ))}
@@ -1385,47 +1309,13 @@ export function WorkshopLessonRepoSyncCard() {
                                 size="sm"
                                 className="h-7 px-2 text-xs"
                                 data-testid={`workshop-repo-start-session-${lesson.lesson_id}`}
-                                disabled={createSessionMutation.isPending}
-                                onClick={() =>
-                                  createSessionMutation.mutate(lesson.lesson_id)
+                                disabled={
+                                  previewLoadingRepoId === repo.lesson_repo_id
                                 }
+                                onClick={() => goToSessionSetupWizard(lesson)}
                               >
                                 Start workshop
                               </Button>
-                              {(() => {
-                                const lid = lesson.lesson_id
-                                const creating = creatingLessonId === lid
-                                const createdId = createdSessionByLessonId[lid]
-                                const err = createSessionErrorByLessonId[lid]
-                                if (!creating && !createdId && !err) return null
-                                return (
-                                  <div
-                                    className="max-w-[20rem] text-xs"
-                                    data-testid={`workshop-use-lesson-session-feedback-${lid}`}
-                                  >
-                                    {creating ? (
-                                      <p className="text-muted-foreground">
-                                        Creating session…
-                                      </p>
-                                    ) : null}
-                                    {createdId ? (
-                                      <p className="text-emerald-700 dark:text-emerald-400">
-                                        Session created.{" "}
-                                        <Link
-                                          to="/workshop/$sessionId"
-                                          params={{ sessionId: createdId }}
-                                          className="underline underline-offset-4"
-                                        >
-                                          Open
-                                        </Link>
-                                      </p>
-                                    ) : null}
-                                    {err ? (
-                                      <p className="text-destructive">{err}</p>
-                                    ) : null}
-                                  </div>
-                                )
-                              })()}
                             </div>
                           ) : null}
                         </li>

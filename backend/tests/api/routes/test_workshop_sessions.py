@@ -2000,6 +2000,91 @@ def test_create_workshop_session_creates_scheduled_session_and_lead_seat(
     assert seat.role == "lead"
 
 
+def test_create_workshop_session_with_initial_participants_rosters_trainees(
+    client: TestClient, db: Session
+) -> None:
+    existing = _create_scheduled_session(db)
+    lesson = db.get(Lesson, existing.lesson_id)
+    assert lesson is not None
+
+    trainee_email = f"trainee-create-roster-{uuid.uuid4()}@example.com"
+    trainee = crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=trainee_email,
+            password="testpass123",
+            is_instructor=False,
+        ),
+    )
+
+    instructor_email = f"instr-create-roster-{uuid.uuid4()}@example.com"
+    password = "testpass123"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password=password,
+            is_instructor=True,
+        ),
+    )
+    headers = user_authentication_headers(
+        client=client, email=instructor_email, password=password
+    )
+
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/",
+        headers=headers,
+        json={
+            "lesson_id": str(lesson.id),
+            "participant_user_ids": [str(trainee.id)],
+        },
+    )
+    assert response.status_code == 200
+    created_id = uuid.UUID(response.json()["session_id"])
+
+    part = db.exec(
+        select(WorkshopParticipant).where(
+            WorkshopParticipant.session_id == created_id,
+            WorkshopParticipant.user_id == trainee.id,
+            col(WorkshopParticipant.removed_at).is_(None),
+        )
+    ).first()
+    assert part is not None
+
+
+def test_create_workshop_session_unknown_participant_returns_422(
+    client: TestClient, db: Session
+) -> None:
+    existing = _create_scheduled_session(db)
+    lesson = db.get(Lesson, existing.lesson_id)
+    assert lesson is not None
+
+    instructor_email = f"instr-create-bad-{uuid.uuid4()}@example.com"
+    password = "testpass123"
+    crud.create_user(
+        session=db,
+        user_create=UserCreate(
+            email=instructor_email,
+            password=password,
+            is_instructor=True,
+        ),
+    )
+    headers = user_authentication_headers(
+        client=client, email=instructor_email, password=password
+    )
+    missing_id = uuid.uuid4()
+    response = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/",
+        headers=headers,
+        json={
+            "lesson_id": str(lesson.id),
+            "participant_user_ids": [str(missing_id)],
+        },
+    )
+    assert response.status_code == 422
+    assert str(missing_id) in response.json()["detail"]
+
+
 def test_create_workshop_session_requires_instructor_or_superuser(
     client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
 ) -> None:

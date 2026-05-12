@@ -20,6 +20,7 @@ import { Route as LayoutWorkshopsRouteImport } from './routes/_layout/workshops'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
+import { Route as LayoutWorkshopNewRouteImport } from './routes/_layout/workshop.new'
 import { Route as LayoutWorkshopSessionIdRouteImport } from './routes/_layout/workshop.$sessionId'
 import { Route as LayoutDashboardTraineeRouteImport } from './routes/_layout/dashboard/trainee'
 import { Route as LayoutDashboardInstructorRouteImport } from './routes/_layout/dashboard/instructor'
@@ -79,6 +80,11 @@ const LayoutAdminRoute = LayoutAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutWorkshopNewRoute = LayoutWorkshopNewRouteImport.update({
+  id: '/workshop/new',
+  path: '/workshop/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutWorkshopSessionIdRoute = LayoutWorkshopSessionIdRouteImport.update({
   id: '/workshop/$sessionId',
   path: '/workshop/$sessionId',
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/instructor': typeof LayoutDashboardInstructorRoute
   '/dashboard/trainee': typeof LayoutDashboardTraineeRoute
   '/workshop/$sessionId': typeof LayoutWorkshopSessionIdRoute
+  '/workshop/new': typeof LayoutWorkshopNewRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/dashboard/instructor': typeof LayoutDashboardInstructorRoute
   '/dashboard/trainee': typeof LayoutDashboardTraineeRoute
   '/workshop/$sessionId': typeof LayoutWorkshopSessionIdRoute
+  '/workshop/new': typeof LayoutWorkshopNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/_layout/dashboard/instructor': typeof LayoutDashboardInstructorRoute
   '/_layout/dashboard/trainee': typeof LayoutDashboardTraineeRoute
   '/_layout/workshop/$sessionId': typeof LayoutWorkshopSessionIdRoute
+  '/_layout/workshop/new': typeof LayoutWorkshopNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | '/dashboard/instructor'
     | '/dashboard/trainee'
     | '/workshop/$sessionId'
+    | '/workshop/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
     | '/dashboard/instructor'
     | '/dashboard/trainee'
     | '/workshop/$sessionId'
+    | '/workshop/new'
   id:
     | '__root__'
     | '/_layout'
@@ -201,6 +212,7 @@ export interface FileRouteTypes {
     | '/_layout/dashboard/instructor'
     | '/_layout/dashboard/trainee'
     | '/_layout/workshop/$sessionId'
+    | '/_layout/workshop/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -291,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/workshop/new': {
+      id: '/_layout/workshop/new'
+      path: '/workshop/new'
+      fullPath: '/workshop/new'
+      preLoaderRoute: typeof LayoutWorkshopNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/workshop/$sessionId': {
       id: '/_layout/workshop/$sessionId'
       path: '/workshop/$sessionId'
@@ -332,6 +351,7 @@ interface LayoutRouteChildren {
   LayoutDashboardInstructorRoute: typeof LayoutDashboardInstructorRoute
   LayoutDashboardTraineeRoute: typeof LayoutDashboardTraineeRoute
   LayoutWorkshopSessionIdRoute: typeof LayoutWorkshopSessionIdRoute
+  LayoutWorkshopNewRoute: typeof LayoutWorkshopNewRoute
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
@@ -344,6 +364,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutDashboardInstructorRoute: LayoutDashboardInstructorRoute,
   LayoutDashboardTraineeRoute: LayoutDashboardTraineeRoute,
   LayoutWorkshopSessionIdRoute: LayoutWorkshopSessionIdRoute,
+  LayoutWorkshopNewRoute: LayoutWorkshopNewRoute,
 }
 
 const LayoutRouteWithChildren =

@@ -290,7 +290,7 @@ test("instructor sync card shows installation settings link and repo parts previ
   await context.close()
 })
 
-test("instructor sync card can create a session from use lesson action", async ({
+test("instructor sync card opens pre-create wizard and can create session from use lesson action", async ({
   browser,
 }) => {
   const email = randomEmail()
@@ -391,8 +391,56 @@ test("instructor sync card can create a session from use lesson action", async (
         }),
       }),
   )
-  await page.route("**/api/v1/workshop/sessions/", (route) =>
-    route.fulfill({
+  await page.route(
+    "**/api/v1/workshop/lessons/22222222-2222-4222-8222-222222222222/prerequisites**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [
+            {
+              id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              lesson_id: "22222222-2222-4222-8222-222222222222",
+              type: "task",
+              title: "Install tools",
+              details: null,
+              url: null,
+              ordering: 0,
+              required_flag: true,
+            },
+          ],
+          count: 1,
+        }),
+      }),
+  )
+  await page.route(
+    "**/api/v1/workshop/lessons/22222222-2222-4222-8222-222222222222/roster-user-picker**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [
+            {
+              user_id: "66666666-6666-4666-8666-666666666666",
+              email: "trainee-mock@example.com",
+              full_name: "Trainee Mock",
+              is_superuser: false,
+              is_instructor: false,
+              is_active: true,
+              match_score: null,
+            },
+          ],
+          count: 1,
+        }),
+      }),
+  )
+  await page.route("**/api/v1/workshop/sessions/", (route) => {
+    if (route.request().method() !== "POST") {
+      return route.continue()
+    }
+    return route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
@@ -400,8 +448,8 @@ test("instructor sync card can create a session from use lesson action", async (
         lesson_id: "22222222-2222-4222-8222-222222222222",
         status: "scheduled",
       }),
-    }),
-  )
+    })
+  })
 
   await page.goto("/login")
   await page.getByTestId("email-input").fill(email)
@@ -413,13 +461,165 @@ test("instructor sync card can create a session from use lesson action", async (
   await page.waitForURL("/workshops")
   await page.waitForLoadState("networkidle")
   await page.getByTestId("workshop-repo-use-lesson").click()
-  const syncCard = page.getByTestId("workshop-lesson-repo-sync-card")
-  const feedback = syncCard.getByTestId("workshop-use-lesson-session-feedback")
-  await expect(feedback).toContainText("Session created.")
-  await expect(feedback.getByRole("link", { name: "Open" })).toHaveAttribute(
-    "href",
-    "/workshop/33333333-3333-4333-8333-333333333333",
+  await page.waitForURL(
+    (url) =>
+      url.pathname === "/workshop/new" &&
+      url.searchParams.get("lessonId") ===
+        "22222222-2222-4222-8222-222222222222",
   )
+  const wizard = page.getByTestId("workshop-new-wizard")
+  await expect(wizard).toBeVisible()
+  await expect(wizard.getByTestId("workshop-new-lesson-title")).toContainText(
+    "Intro Lesson",
+  )
+  await wizard.getByRole("button", { name: "Next: Trainee roster" }).click()
+  await expect(wizard.getByTestId("workshop-new-step-roster")).toBeVisible()
+  await wizard.getByRole("button", { name: "Next: Review" }).click()
+  await expect(wizard.getByTestId("workshop-new-step-confirm")).toBeVisible()
+  await wizard.getByTestId("workshop-new-confirm-create").click()
+  await page.waitForURL("**/workshop/33333333-3333-4333-8333-333333333333")
+
+  await context.close()
+})
+
+test("instructor can cancel workshop session setup wizard from workshops hub", async ({
+  browser,
+}) => {
+  const email = randomEmail()
+  const password = "changethis123"
+  await createUser({ email, password, is_instructor: true })
+
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  })
+  const page = await context.newPage()
+
+  await page.route("**/api/v1/workshop/lesson-repos/installations**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          {
+            installation_id: 123456,
+            account_login: "acme-org",
+            account_type: "Organization",
+            repository_selection: "selected",
+            app_slug: "lesson-bot",
+            suspended: false,
+            entitled_repositories_count: 1,
+            entitled_repositories: ["acme-org/workshop-lessons"],
+            installation_settings_url:
+              "https://github.com/settings/installations/123456",
+          },
+        ],
+        count: 1,
+      }),
+    }),
+  )
+  await page.route("**/api/v1/workshop/lesson-repos?**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          {
+            lesson_repo_id: "11111111-1111-4111-8111-111111111111",
+            full_name: "acme-org/workshop-lessons",
+            default_branch: "main",
+            health: "healthy",
+            github_installation_id: 123456,
+            last_synced_at: "2026-05-07T10:00:00Z",
+            lesson_count: 1,
+            part_count: 2,
+            manifest_count: 1,
+            last_manifest_synced_at: "2026-05-07T10:02:00Z",
+          },
+        ],
+        count: 1,
+      }),
+    }),
+  )
+  await page.route(
+    "**/api/v1/workshop/lesson-repos/installations/123456/accessible-repositories**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          installation_id: 123456,
+          repository_selection: "selected",
+          full_names: ["acme-org/workshop-lessons"],
+          count: 1,
+        }),
+      }),
+  )
+  await page.route(
+    "**/api/v1/workshop/lesson-repos/11111111-1111-4111-8111-111111111111/preview",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          lesson_repo_id: "11111111-1111-4111-8111-111111111111",
+          full_name: "acme-org/workshop-lessons",
+          default_branch: "main",
+          health: "healthy",
+          lessons: [
+            {
+              lesson_id: "22222222-2222-4222-8222-222222222222",
+              lesson_slug: "intro",
+              lesson_title: "Intro Lesson",
+              parts: [
+                {
+                  slug: "welcome",
+                  title: "Welcome",
+                  ordering: 0,
+                  path: "welcome.md",
+                },
+              ],
+            },
+          ],
+        }),
+      }),
+  )
+  await page.route(
+    "**/api/v1/workshop/lessons/22222222-2222-4222-8222-222222222222/prerequisites**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [], count: 0 }),
+      }),
+  )
+
+  let sessionPostCount = 0
+  await page.route("**/api/v1/workshop/sessions/", (route) => {
+    if (route.request().method() === "POST") {
+      sessionPostCount += 1
+    }
+    return route.continue()
+  })
+
+  await page.goto("/login")
+  await page.getByTestId("email-input").fill(email)
+  await page.getByTestId("password-input").fill(password)
+  await page.getByRole("button", { name: "Log In" }).click()
+  await page.waitForURL("/dashboard/instructor")
+
+  await page.goto("/workshops")
+  await page.waitForURL("/workshops")
+  await page.waitForLoadState("networkidle")
+  await page.getByTestId("workshop-repo-use-lesson").click()
+  await page.waitForURL(
+    (url) =>
+      url.pathname === "/workshop/new" &&
+      url.searchParams.get("lessonId") ===
+        "22222222-2222-4222-8222-222222222222",
+  )
+  await page.getByTestId("workshop-new-cancel").click()
+  await page.waitForURL("/workshops")
+  expect(sessionPostCount).toBe(0)
 
   await context.close()
 })
@@ -542,8 +742,42 @@ test("instructor sync card can start workshop for a chosen lesson when repo has 
         }),
       }),
   )
-  await page.route("**/api/v1/workshop/sessions/", (route) =>
-    route.fulfill({
+  await page.route(
+    `**/api/v1/workshop/lessons/${lessonB}/prerequisites**`,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [], count: 0 }),
+      }),
+  )
+  await page.route(
+    `**/api/v1/workshop/lessons/${lessonB}/roster-user-picker**`,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [
+            {
+              user_id: "66666666-6666-4666-8666-666666666666",
+              email: "trainee-mock@example.com",
+              full_name: "Trainee Mock",
+              is_superuser: false,
+              is_instructor: false,
+              is_active: true,
+              match_score: null,
+            },
+          ],
+          count: 1,
+        }),
+      }),
+  )
+  await page.route("**/api/v1/workshop/sessions/", (route) => {
+    if (route.request().method() !== "POST") {
+      return route.continue()
+    }
+    return route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
@@ -551,8 +785,8 @@ test("instructor sync card can start workshop for a chosen lesson when repo has 
         lesson_id: lessonB,
         status: "scheduled",
       }),
-    }),
-  )
+    })
+  })
 
   await page.goto("/login")
   await page.getByTestId("email-input").fill(email)
@@ -576,14 +810,22 @@ test("instructor sync card can start workshop for a chosen lesson when repo has 
     "Second Lesson",
   )
   await page.getByTestId(`workshop-repo-start-session-${lessonB}`).click()
-  const feedback = page.getByTestId(
-    `workshop-use-lesson-session-feedback-${lessonB}`,
+  await page.waitForURL(
+    (url) =>
+      url.pathname === "/workshop/new" &&
+      url.searchParams.get("lessonId") === lessonB,
   )
-  await expect(feedback).toContainText("Session created.")
-  await expect(feedback.getByRole("link", { name: "Open" })).toHaveAttribute(
-    "href",
-    `/workshop/${sessionB}`,
+  const wizard = page.getByTestId("workshop-new-wizard")
+  await expect(wizard).toBeVisible()
+  await expect(wizard.getByTestId("workshop-new-lesson-title")).toContainText(
+    "Second Lesson",
   )
+  await wizard.getByRole("button", { name: "Next: Trainee roster" }).click()
+  await expect(wizard.getByTestId("workshop-new-step-roster")).toBeVisible()
+  await wizard.getByRole("button", { name: "Next: Review" }).click()
+  await expect(wizard.getByTestId("workshop-new-step-confirm")).toBeVisible()
+  await wizard.getByTestId("workshop-new-confirm-create").click()
+  await page.waitForURL(`**/workshop/${sessionB}`)
 
   await context.close()
 })
