@@ -9,6 +9,7 @@ from app.models import (
     LessonPrerequisite,
     SessionInstructor,
     User,
+    WorkshopBadgeDefinition,
     WorkshopParticipant,
     WorkshopSession,
 )
@@ -90,6 +91,23 @@ def test_private_bootstrap_e2e_workshop_live_session(
     ).first()
     assert seat is not None
     assert seat.joined_at is not None
+
+
+def test_private_bootstrap_e2e_workshop_with_e2e_badge(
+    client: TestClient, db: Session
+) -> None:
+    r = client.post(
+        f"{settings.API_V1_STR}/private/workshop/e2e-live-session/?with_e2e_badge=true",
+    )
+    assert r.status_code == 200
+    sid = uuid.UUID(r.json()["session_id"])
+    badge = db.exec(
+        select(WorkshopBadgeDefinition).where(
+            WorkshopBadgeDefinition.slug == f"e2e-grant-{sid}"
+        )
+    ).first()
+    assert badge is not None
+    assert badge.title == "E2E Grant Badge"
 
 
 def test_private_bootstrap_e2e_workshop_omits_participant_seat_when_requested(

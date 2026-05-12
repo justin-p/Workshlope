@@ -2030,6 +2030,14 @@ export const WorkshopParticipantSelfPublicSchema = {
         live_status: {
             type: 'string',
             title: 'Live Status'
+        },
+        session_badges: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopSessionSelfBadgeGrantPublic'
+            },
+            type: 'array',
+            title: 'Session Badges',
+            description: 'Non-revoked badge grants for this user in this session.'
         }
     },
     type: 'object',
@@ -2653,6 +2661,28 @@ export const WorkshopSessionPublicParticipantSchema = {
     required: ['session', 'lesson', 'parts', 'self'],
     title: 'WorkshopSessionPublicParticipant',
     description: 'Trainee-visible session detail — lesson + parts + self only (no roster).'
+} as const;
+
+export const WorkshopSessionSelfBadgeGrantPublicSchema = {
+    properties: {
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        }
+    },
+    type: 'object',
+    required: ['badge_id', 'title', 'slug'],
+    title: 'WorkshopSessionSelfBadgeGrantPublic',
+    description: 'Active badge grant for the current user in this session (participant view).'
 } as const;
 
 export const WorkshopSessionTimerEventPublicSchema = {

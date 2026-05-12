@@ -442,6 +442,10 @@ export type WorkshopParticipantSelfPublic = {
     joined_at: (string | null);
     finished_at: (string | null);
     live_status: string;
+    /**
+     * Non-revoked badge grants for this user in this session.
+     */
+    session_badges?: Array<WorkshopSessionSelfBadgeGrantPublic>;
 };
 
 export type WorkshopRosterInstructorRowPublic = {
@@ -600,6 +604,15 @@ export type WorkshopSessionPublicParticipant = {
     lesson: WorkshopLessonSummaryPublic;
     parts: Array<WorkshopLessonPartBrief>;
     self: WorkshopParticipantSelfPublic;
+};
+
+/**
+ * Active badge grant for the current user in this session (participant view).
+ */
+export type WorkshopSessionSelfBadgeGrantPublic = {
+    badge_id: string;
+    title: string;
+    slug: string;
 };
 
 export type WorkshopSessionsPublic = {
@@ -770,6 +783,7 @@ export type PrivateBootstrapE2eWorkshopLiveSessionData = {
     initialStatus?: 'live' | 'scheduled' | 'ended';
     omitParticipantSeat?: boolean;
     participantEmail?: (string | null);
+    withE2eBadge?: boolean;
     withIncompleteRequiredPrerequisite?: boolean;
 };
 

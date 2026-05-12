@@ -800,6 +800,14 @@ class WorkshopLessonSummaryPublic(SQLModel):
     lesson_content_issue: str | None = None
 
 
+class WorkshopSessionSelfBadgeGrantPublic(SQLModel):
+    """Active badge grant for the current user in this session (participant view)."""
+
+    badge_id: uuid.UUID
+    title: str
+    slug: str
+
+
 class WorkshopParticipantSelfPublic(SQLModel):
     """Caller’s own trainee seat snapshot (participant view only)."""
 
@@ -807,6 +815,10 @@ class WorkshopParticipantSelfPublic(SQLModel):
     joined_at: datetime | None
     finished_at: datetime | None
     live_status: str
+    session_badges: list[WorkshopSessionSelfBadgeGrantPublic] = Field(
+        default_factory=list,
+        description="Non-revoked badge grants for this user in this session.",
+    )
 
 
 class WorkshopSessionPublicParticipant(SQLModel):

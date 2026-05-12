@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import {
   ApiError,
+  WorkshopBadgesService,
   WorkshopLessonsService,
   type WorkshopSessionsReadWorkshopSessionDetailResponse,
   WorkshopSessionsService,
@@ -22,6 +23,13 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -179,6 +187,41 @@ function WorkshopSessionPage() {
       detailQuery.isSuccess &&
       lessonId !== undefined &&
       detailView === "instructor",
+    retry: false,
+  })
+
+  const workshopSessionStatusForBadges =
+    detailQuery.data?.session.status ?? "scheduled"
+  const lessonContentAvailableForBadges =
+    detailQuery.data?.lesson.lesson_content_available ?? true
+  const sessionAllowsVerificationOrBadgeQuery =
+    lessonContentAvailableForBadges &&
+    (workshopSessionStatusForBadges === "live" ||
+      workshopSessionStatusForBadges === "paused" ||
+      workshopSessionStatusForBadges === "ended")
+
+  const badgesQuery = useQuery({
+    queryKey: ["workshopBadgeDefinitions"],
+    queryFn: () => WorkshopBadgesService.readWorkshopBadges(),
+    enabled:
+      uuidOk &&
+      detailView === "instructor" &&
+      detailQuery.isSuccess &&
+      sessionAllowsVerificationOrBadgeQuery,
+    retry: false,
+  })
+
+  const sessionBadgeLeaderboardQuery = useQuery({
+    queryKey: ["workshopSessionBadgeLeaderboard", sessionId],
+    queryFn: () =>
+      WorkshopBadgesService.readWorkshopSessionBadgeLeaderboard({
+        sessionId,
+      }),
+    enabled:
+      uuidOk &&
+      detailView === "instructor" &&
+      detailQuery.isSuccess &&
+      sessionAllowsVerificationOrBadgeQuery,
     retry: false,
   })
 
@@ -408,6 +451,61 @@ function WorkshopSessionPage() {
     },
   })
 
+  const verifyParticipantCompletionMutation = useMutation({
+    mutationFn: (userId: string) =>
+      WorkshopSessionsService.patchWorkshopSessionParticipant({
+        sessionId,
+        userId,
+        requestBody: { finished_at: new Date().toISOString() },
+      }),
+    onSuccess: async () => {
+      setErrorDetail(null)
+      await Promise.all([
+        detailQuery.refetch(),
+        gapsQuery.refetch(),
+        aggregatesQuery.refetch(),
+        sessionBadgeLeaderboardQuery.refetch(),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopSessionsForUser"],
+        }),
+      ])
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
+  const grantParticipantBadgeMutation = useMutation({
+    mutationFn: ({ userId, badgeId }: { userId: string; badgeId: string }) =>
+      WorkshopBadgesService.grantWorkshopBadge({
+        sessionId,
+        requestBody: { user_id: userId, badge_id: badgeId },
+      }),
+    onSuccess: async () => {
+      setErrorDetail(null)
+      await Promise.all([
+        detailQuery.refetch(),
+        sessionBadgeLeaderboardQuery.refetch(),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopSessionsForUser"],
+        }),
+      ])
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
   const [phase, setPhase] = useState<
     "idle" | "entering" | "ws_connecting" | "ready" | "error"
   >("idle")
@@ -432,6 +530,9 @@ function WorkshopSessionPage() {
   const [removeParticipantUserId, setRemoveParticipantUserId] = useState<
     string | null
   >(null)
+  const [grantBadgeChoiceByUser, setGrantBadgeChoiceByUser] = useState<
+    Record<string, string>
+  >({})
   const [isAddingSelected, setIsAddingSelected] = useState(false)
   const [_pickerAddError, setPickerAddError] = useState<string | null>(null)
   const [connectedRole, setConnectedRole] = useState<
@@ -958,6 +1059,29 @@ function WorkshopSessionPage() {
               ? ` (${formatTimerRemainingSeconds(timerElapsedSeconds)} elapsed)`
               : ""}
         </p>
+      ) : null}
+      {detailView === "participant" &&
+      detailQuery.data !== undefined &&
+      "self" in detailQuery.data &&
+      (detailQuery.data.self.session_badges?.length ?? 0) > 0 ? (
+        <div
+          className="text-sm text-muted-foreground"
+          data-testid="workshop-trainee-session-badges"
+        >
+          <span className="font-medium text-foreground">
+            Badges earned in this session:
+          </span>
+          <ul className="mt-1 list-inside list-disc">
+            {(detailQuery.data.self.session_badges ?? []).map((b) => (
+              <li
+                key={b.badge_id}
+                data-testid={`workshop-trainee-session-badge-${b.slug}`}
+              >
+                {b.title}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
       {detailView === "instructor" ? (
         <p
@@ -1497,57 +1621,159 @@ function WorkshopSessionPage() {
                 className="space-y-1 text-xs"
                 data-testid="workshop-roster-list"
               >
-                {rosterParticipants.map((participant) => (
-                  <li
-                    key={participant.user_id}
-                    className="text-muted-foreground flex flex-wrap items-center justify-between gap-2"
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                      {participant.avatar_url ? (
-                        <img
-                          src={participant.avatar_url}
-                          alt=""
-                          className="size-5 shrink-0 rounded-full"
-                        />
-                      ) : null}
-                      <span className="min-w-0 truncate">
-                        {participant.full_name ?? participant.email}{" "}
-                        <span className="text-xs text-muted-foreground">
-                          ({participant.email})
-                        </span>{" "}
-                        · {participant.live_status}
-                      </span>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Badge
-                        variant={
-                          participant.live_status === "done"
-                            ? "default"
-                            : "outline"
-                        }
-                        data-testid={`workshop-roster-live-status-${participant.user_id}`}
-                      >
-                        {participant.live_status}
-                      </Badge>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        aria-label={`Remove ${participant.email} from roster`}
-                        data-testid={`workshop-roster-remove-trainee-${participant.user_id}`}
-                        disabled={
-                          removeTraineeMutation.isPending || !canRunLiveDelivery
-                        }
-                        onClick={() =>
-                          setRemoveParticipantUserId(participant.user_id)
-                        }
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </li>
-                ))}
+                {rosterParticipants.map((participant) => {
+                  const badgeOptions = badgesQuery.data?.data ?? []
+                  const lbRows = sessionBadgeLeaderboardQuery.data?.data ?? []
+                  const lbRow = lbRows.find(
+                    (r) => r.user_id === participant.user_id,
+                  )
+                  const singleBadgeMode = badgeOptions.length === 1
+                  const selectedBadgeId =
+                    grantBadgeChoiceByUser[participant.user_id] ??
+                    badgeOptions[0]?.id ??
+                    ""
+                  const hasDbGrantWithOnlyOneBadgeDef =
+                    singleBadgeMode && (lbRow?.badge_count ?? 0) >= 1
+                  const grantDisabled =
+                    !participant.finished_at ||
+                    !selectedBadgeId ||
+                    grantParticipantBadgeMutation.isPending ||
+                    removeTraineeMutation.isPending ||
+                    !sessionAllowsVerificationOrBadgeQuery ||
+                    badgeOptions.length === 0 ||
+                    hasDbGrantWithOnlyOneBadgeDef
+
+                  return (
+                    <li
+                      key={participant.user_id}
+                      className="text-muted-foreground flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        {participant.avatar_url ? (
+                          <img
+                            src={participant.avatar_url}
+                            alt=""
+                            className="size-5 shrink-0 rounded-full"
+                          />
+                        ) : null}
+                        <span className="min-w-0 truncate">
+                          {participant.full_name ?? participant.email}{" "}
+                          <span className="text-xs text-muted-foreground">
+                            ({participant.email})
+                          </span>{" "}
+                          · {participant.live_status}
+                        </span>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                        <Badge
+                          variant={
+                            participant.live_status === "done"
+                              ? "default"
+                              : "outline"
+                          }
+                          data-testid={`workshop-roster-live-status-${participant.user_id}`}
+                        >
+                          {participant.live_status}
+                        </Badge>
+                        {participant.finished_at ? (
+                          <span
+                            className="text-xs text-muted-foreground"
+                            data-testid={`workshop-roster-verified-label-${participant.user_id}`}
+                          >
+                            Verified complete
+                          </span>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          data-testid={`workshop-roster-verify-complete-${participant.user_id}`}
+                          disabled={
+                            verifyParticipantCompletionMutation.isPending ||
+                            removeTraineeMutation.isPending ||
+                            !sessionAllowsVerificationOrBadgeQuery ||
+                            Boolean(participant.finished_at)
+                          }
+                          onClick={() =>
+                            verifyParticipantCompletionMutation.mutate(
+                              participant.user_id,
+                            )
+                          }
+                        >
+                          {verifyParticipantCompletionMutation.isPending
+                            ? "Saving…"
+                            : "Mark verified complete"}
+                        </Button>
+                        {badgeOptions.length > 1 ? (
+                          <Select
+                            value={selectedBadgeId}
+                            onValueChange={(v) =>
+                              setGrantBadgeChoiceByUser((prev) => ({
+                                ...prev,
+                                [participant.user_id]: v,
+                              }))
+                            }
+                          >
+                            <SelectTrigger
+                              size="sm"
+                              className="h-8 w-[min(100%,12rem)]"
+                              data-testid={`workshop-roster-grant-badge-select-${participant.user_id}`}
+                            >
+                              <SelectValue placeholder="Choose badge" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {badgeOptions.map((b) => (
+                                <SelectItem key={b.id} value={b.id}>
+                                  {b.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : null}
+                        {badgeOptions.length > 0 ? (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid={`workshop-roster-grant-badge-${participant.user_id}`}
+                            disabled={grantDisabled}
+                            onClick={() => {
+                              const badgeId =
+                                grantBadgeChoiceByUser[participant.user_id] ??
+                                badgeOptions[0]?.id
+                              if (!badgeId) return
+                              grantParticipantBadgeMutation.mutate({
+                                userId: participant.user_id,
+                                badgeId,
+                              })
+                            }}
+                          >
+                            {grantParticipantBadgeMutation.isPending
+                              ? "Granting…"
+                              : "Grant badge"}
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={`Remove ${participant.email} from roster`}
+                          data-testid={`workshop-roster-remove-trainee-${participant.user_id}`}
+                          disabled={
+                            removeTraineeMutation.isPending ||
+                            !canRunLiveDelivery
+                          }
+                          onClick={() =>
+                            setRemoveParticipantUserId(participant.user_id)
+                          }
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             )}
 
