@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **Pre-create session wizard:** [`/workshop/new`](frontend/src/routes/_layout/workshop.new.tsx) + [`WorkshopLessonRepoSyncCard`](frontend/src/components/dashboard/WorkshopLessonRepoSyncCard.tsx); backend `participant_user_ids` on create + `GET /workshop/lessons/{id}/roster-user-picker`; Playwright [`dashboard-routing.spec.ts`](frontend/tests/dashboard-routing.spec.ts). Prior: [#68](https://github.com/justin-p/testing/pull/68)-[#70](https://github.com/justin-p/testing/pull/70). |
-| **Branch** | **`feat/workshop/pre-create-session-wizard`** |
-| **PR** | [#72](https://github.com/justin-p/testing/pull/72) |
+| **Last synced** | **2026-05-12** — **Post-session trainee lesson read:** ended sessions show read-only mode on [`workshop.$sessionId`](frontend/src/routes/_layout/workshop.$sessionId.tsx) (full part navigation, softened pre-work, `ended` patched into session detail on WS close); E2E bootstrap `initial_status=ended`; Playwright [`workshop-post-session-read.spec.ts`](frontend/tests/workshop-post-session-read.spec.ts) + API tests. Prior: pre-create wizard PR **#72** / [#68](https://github.com/justin-p/testing/pull/68)-[#70](https://github.com/justin-p/testing/pull/70). |
+| **Branch** | **`feat/workshop/post-session-lesson-read`** |
+| **PR** | [#73](https://github.com/justin-p/testing/pull/73) |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -607,7 +607,7 @@ Trainees without instructor flag land on **My Learning Home** and see trainee en
 - **Prework card:** prerequisite checklist with completion actions/status before session starts.
 - **Live:** **Enter** (sets **joined_at**); then **lesson Markdown** + **your** **Busy/Done** (red/green for **your** row only—instructor UI aligns colors; trainee only ever sees **their** state). Secondary: **I’m finished with this lesson** (**finished_at**, confirm dialog). **No roster rail, leaderboard, or avatar stack.**
 - **Paused:** banner; toggles disabled; content frozen.
-- **Ended:** closed state; optional last part read-only; no toggles.
+- **Ended:** **Read-only lesson review** for rostered trainees: **all** synced parts with **Previous part** / **Next part**; **POST …/enter** still rejected. **Realtime** row states session ended (no live connection). Incomplete required pre-work uses a **non-destructive** alert (“does not block reading after the session”). HTTP session detail cache updates to **`ended`** when **`session.status_changed`** WS fires so the UI transitions without a full reload.
 - **Reconnect:** toast + resilient **ws-ticket** refresh.
 
 Accessibility: unchanged for **personal** toggles + **aria-live** for **your** view when instructor advances parts (announcement text like “Moved to Part 3” — **no** peer names).

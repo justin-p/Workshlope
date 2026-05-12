@@ -64,7 +64,7 @@ def bootstrap_e2e_workshop_live_session(
     session: SessionDep,
     participant_email: Annotated[EmailStr | None, Query()] = None,
     omit_participant_seat: Annotated[bool, Query()] = False,
-    initial_status: Annotated[Literal["live", "scheduled"], Query()] = "live",
+    initial_status: Annotated[Literal["live", "scheduled", "ended"], Query()] = "live",
     with_incomplete_required_prerequisite: Annotated[bool, Query()] = False,
 ) -> PrivateWorkshopE2ELiveSessionResponse:
     """Create a live workshop session with lesson parts for local E2E only.
@@ -75,6 +75,8 @@ def bootstrap_e2e_workshop_live_session(
     instructor (no ``WorkshopParticipant`` row), so ``ws-ticket`` yields the
     **instructor** role while the frontend skips ``POST …/enter`` for that flow.
     Pass ``initial_status=scheduled`` to exercise instructor start flows.
+    Pass ``initial_status=ended`` for post-session read-only UI (trainee loads
+    the session after it finished).
     Pass ``with_incomplete_required_prerequisite=true`` to add one **required**
     lesson prerequisite with **no** completion row for the rostered trainee
     (participant flows / Playwright pre-work UI).
@@ -160,6 +162,7 @@ def bootstrap_e2e_workshop_live_session(
         lesson_id=lesson.id,
         status=initial_status,
         created_at=datetime.now(timezone.utc),
+        current_part_index=0,
     )
     session.add(workshop_session)
     if not omit_participant_seat:

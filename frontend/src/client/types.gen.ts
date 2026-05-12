@@ -767,7 +767,7 @@ export type PrivateCreateUserData = {
 export type PrivateCreateUserResponse = (UserPublic);
 
 export type PrivateBootstrapE2eWorkshopLiveSessionData = {
-    initialStatus?: 'live' | 'scheduled';
+    initialStatus?: 'live' | 'scheduled' | 'ended';
     omitParticipantSeat?: boolean;
     participantEmail?: (string | null);
     withIncompleteRequiredPrerequisite?: boolean;

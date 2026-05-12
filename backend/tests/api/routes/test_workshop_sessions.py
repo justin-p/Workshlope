@@ -208,6 +208,47 @@ def test_enter_rejected_when_session_ended(
     assert response.json()["detail"] == "Session has ended"
 
 
+def test_participant_session_detail_includes_all_parts_when_session_ended(
+    client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
+) -> None:
+    """Rostered trainees can load full lesson parts for review after the session ends."""
+    session_row = _create_live_session(db)
+    _add_two_parts_to_session_lesson(db, session_row)
+    user = db.exec(select(User).where(User.email == settings.EMAIL_TEST_USER)).first()
+    assert user is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=user.id,
+            invited_at=datetime.now(timezone.utc),
+            joined_at=datetime.now(timezone.utc),
+        )
+    )
+    session_row.status = "ended"
+    session_row.current_part_index = 1
+    db.add(session_row)
+    db.commit()
+
+    r_detail = client.get(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}",
+        headers=normal_user_token_headers,
+    )
+    assert r_detail.status_code == 200
+    body = r_detail.json()
+    assert body["view"] == "participant"
+    assert body["session"]["status"] == "ended"
+    assert len(body["parts"]) == 2
+    assert body["parts"][0]["body_html"] == "<h1>Part 0</h1>\n"
+    assert body["parts"][1]["body_html"] == "<h1>Part 1</h1>\n"
+
+    r_enter = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/enter",
+        headers=normal_user_token_headers,
+    )
+    assert r_enter.status_code == 403
+    assert r_enter.json()["detail"] == "Session has ended"
+
+
 def test_ws_ticket_rejected_when_session_ended(
     client: TestClient, db: Session, normal_user_token_headers: dict[str, str]
 ) -> None:
