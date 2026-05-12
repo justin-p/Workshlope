@@ -6,3 +6,5 @@ app.egg-info
 htmlcov
 .cache
 .venv
+data/badge_images/*
+!data/badge_images/.gitkeep

@@ -792,14 +792,31 @@ def revoke_workshop_badge_from_hub(
     )
 
 
-@router.get("/{badge_id}/image")
+@router.get(
+    "/{badge_id}/image",
+    response_class=FileResponse,
+    responses={
+        200: {
+            "description": "Raw badge image bytes for `<img src>` (no auth).",
+            "content": {
+                "image/png": {"schema": {"type": "string", "format": "binary"}},
+                "image/jpeg": {"schema": {"type": "string", "format": "binary"}},
+                "image/webp": {"schema": {"type": "string", "format": "binary"}},
+                "application/octet-stream": {
+                    "schema": {"type": "string", "format": "binary"}
+                },
+            },
+        },
+        404: {"description": "Badge missing, no image, or file absent on disk."},
+    },
+    openapi_extra={"security": []},
+)
 def read_workshop_badge_image(
     *,
     session: SessionDep,
-    current_user: CurrentUser,
     badge_id: uuid.UUID,
 ) -> FileResponse:
-    _ = current_user.id
+    """Public bytes for `<img src>`; badge metadata remains authenticated elsewhere."""
     row = session.get(WorkshopBadgeDefinition, badge_id)
     if row is None or not row.image_filename:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")

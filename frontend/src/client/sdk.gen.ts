@@ -972,9 +972,10 @@ export class WorkshopBadgesService {
     
     /**
      * Read Workshop Badge Image
+     * Public bytes for `<img src>`; badge metadata remains authenticated elsewhere.
      * @param data The data for the request.
      * @param data.badgeId
-     * @returns unknown Successful Response
+     * @returns binary Raw badge image bytes for `<img src>` (no auth).
      * @throws ApiError
      */
     public static readWorkshopBadgeImage(data: WorkshopBadgesReadWorkshopBadgeImageData): CancelablePromise<WorkshopBadgesReadWorkshopBadgeImageResponse> {
@@ -985,6 +986,7 @@ export class WorkshopBadgesService {
                 badge_id: data.badgeId
             },
             errors: {
+                404: 'Badge missing, no image, or file absent on disk.',
                 422: 'Validation Error'
             }
         });
