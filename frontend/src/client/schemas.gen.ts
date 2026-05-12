@@ -924,6 +924,18 @@ export const PendingGitHubLoginsPublicSchema = {
     title: 'PendingGitHubLoginsPublic'
 } as const;
 
+export const PrivateE2ELessonSyncBumpResponseSchema = {
+    properties: {
+        lesson_sync_generation: {
+            type: 'integer',
+            title: 'Lesson Sync Generation'
+        }
+    },
+    type: 'object',
+    required: ['lesson_sync_generation'],
+    title: 'PrivateE2ELessonSyncBumpResponse'
+} as const;
+
 export const PrivateUserCreateSchema = {
     properties: {
         email: {
@@ -2038,6 +2050,12 @@ export const WorkshopLessonSummaryPublicSchema = {
             type: 'string',
             title: 'Slug'
         },
+        lesson_sync_generation: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Lesson Sync Generation',
+            default: 1
+        },
         lesson_repo_health: {
             type: 'string',
             title: 'Lesson Repo Health',
@@ -2414,6 +2432,11 @@ export const WorkshopSessionCorePublicSchema = {
             type: 'integer',
             title: 'Part Generation'
         },
+        lesson_sync_ack_generation: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Lesson Sync Ack Generation'
+        },
         created_at: {
             anyOf: [
                 {
@@ -2428,7 +2451,7 @@ export const WorkshopSessionCorePublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'status', 'current_part_index', 'current_part_slug', 'part_generation', 'created_at'],
+    required: ['id', 'status', 'current_part_index', 'current_part_slug', 'part_generation', 'lesson_sync_ack_generation', 'created_at'],
     title: 'WorkshopSessionCorePublic'
 } as const;
 
@@ -2715,6 +2738,18 @@ export const WorkshopSessionPatchSchema = {
                 }
             ],
             title: 'Remove Instructor User Id'
+        },
+        lesson_sync_ack_generation: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Lesson Sync Ack Generation'
         }
     },
     type: 'object',
@@ -2756,6 +2791,14 @@ export const WorkshopSessionPublicInstructorSchema = {
             },
             type: 'array',
             title: 'Instructors'
+        },
+        active_badge_grants: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopSessionRosterActiveBadgeGrantPublic'
+            },
+            type: 'array',
+            title: 'Active Badge Grants',
+            description: 'Active (non-revoked) badge grants in this session.'
         }
     },
     type: 'object',
@@ -2793,6 +2836,33 @@ export const WorkshopSessionPublicParticipantSchema = {
     required: ['session', 'lesson', 'parts', 'self'],
     title: 'WorkshopSessionPublicParticipant',
     description: 'Trainee-visible session detail — lesson + parts + self only (no roster).'
+} as const;
+
+export const WorkshopSessionRosterActiveBadgeGrantPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'badge_id', 'title', 'slug'],
+    title: 'WorkshopSessionRosterActiveBadgeGrantPublic',
+    description: 'Non-revoked badge grant on the roster (instructor view; for revoke targeting).'
 } as const;
 
 export const WorkshopSessionSelfBadgeGrantPublicSchema = {

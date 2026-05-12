@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.models import (
+    Lesson,
     LessonPrerequisite,
     SessionInstructor,
     User,
@@ -108,6 +109,27 @@ def test_private_bootstrap_e2e_workshop_with_e2e_badge(
     ).first()
     assert badge is not None
     assert badge.title == "E2E Grant Badge"
+
+
+def test_private_e2e_bump_lesson_sync_generation(
+    client: TestClient, db: Session
+) -> None:
+    r = client.post(f"{settings.API_V1_STR}/private/workshop/e2e-live-session/")
+    assert r.status_code == 200
+    sid = uuid.UUID(r.json()["session_id"])
+    row = db.get(WorkshopSession, sid)
+    assert row is not None
+    lesson = db.get(Lesson, row.lesson_id)
+    assert lesson is not None
+    gen0 = lesson.lesson_sync_generation
+
+    bump = client.post(
+        f"{settings.API_V1_STR}/private/workshop/e2e-bump-lesson-sync/{sid}/",
+    )
+    assert bump.status_code == 200
+    assert bump.json()["lesson_sync_generation"] == gen0 + 1
+    db.refresh(lesson)
+    assert lesson.lesson_sync_generation == gen0 + 1
 
 
 def test_private_bootstrap_e2e_workshop_omits_participant_seat_when_requested(

@@ -205,6 +205,10 @@ export type PendingGitHubLoginsPublic = {
     count: number;
 };
 
+export type PrivateE2ELessonSyncBumpResponse = {
+    lesson_sync_generation: number;
+};
+
 export type PrivateUserCreate = {
     email: string;
     password: string;
@@ -445,6 +449,7 @@ export type WorkshopLessonSummaryPublic = {
     id: string;
     title: string;
     slug: string;
+    lesson_sync_generation?: number;
     lesson_repo_health?: string;
     lesson_repo_last_synced_at?: (string | null);
     lesson_content_available?: boolean;
@@ -521,6 +526,7 @@ export type WorkshopSessionCorePublic = {
     current_part_index: number;
     current_part_slug: (string | null);
     part_generation: number;
+    lesson_sync_ack_generation: number;
     created_at: (string | null);
 };
 
@@ -607,6 +613,7 @@ export type WorkshopSessionPatch = {
     instructor_seat?: (WorkshopSessionInstructorSeatRoleUpdate | null);
     primary_instructor_user_id?: (string | null);
     remove_instructor_user_id?: (string | null);
+    lesson_sync_ack_generation?: (number | null);
 };
 
 /**
@@ -619,6 +626,10 @@ export type WorkshopSessionPublicInstructor = {
     parts: Array<WorkshopLessonPartBrief>;
     participants: Array<WorkshopRosterParticipantRowPublic>;
     instructors: Array<WorkshopRosterInstructorRowPublic>;
+    /**
+     * Active (non-revoked) badge grants in this session.
+     */
+    active_badge_grants?: Array<WorkshopSessionRosterActiveBadgeGrantPublic>;
 };
 
 /**
@@ -630,6 +641,16 @@ export type WorkshopSessionPublicParticipant = {
     lesson: WorkshopLessonSummaryPublic;
     parts: Array<WorkshopLessonPartBrief>;
     self: WorkshopParticipantSelfPublic;
+};
+
+/**
+ * Non-revoked badge grant on the roster (instructor view; for revoke targeting).
+ */
+export type WorkshopSessionRosterActiveBadgeGrantPublic = {
+    user_id: string;
+    badge_id: string;
+    title: string;
+    slug: string;
 };
 
 /**
@@ -814,6 +835,12 @@ export type PrivateBootstrapE2eWorkshopLiveSessionData = {
 };
 
 export type PrivateBootstrapE2eWorkshopLiveSessionResponse = (PrivateWorkshopE2ELiveSessionResponse);
+
+export type PrivateE2eBumpWorkshopLessonSyncGenerationData = {
+    sessionId: string;
+};
+
+export type PrivateE2eBumpWorkshopLessonSyncGenerationResponse = (PrivateE2ELessonSyncBumpResponse);
 
 export type UsersReadUsersData = {
     limit?: number;

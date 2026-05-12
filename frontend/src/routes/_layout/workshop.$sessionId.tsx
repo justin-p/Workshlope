@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/table"
 import { WorkshopMarkdownHtml } from "@/components/WorkshopMarkdownHtml"
 import useAuth from "@/hooks/useAuth"
+import { cn } from "@/lib/utils"
 
 /** Matches UUID v4 from `uuid.uuid4()` used for workshop sessions. */
 const UUID_V4_RE =
@@ -506,6 +507,69 @@ function WorkshopSessionPage() {
     },
   })
 
+  const revokeParticipantBadgeMutation = useMutation({
+    mutationFn: ({
+      userId,
+      badgeId,
+      reason,
+    }: {
+      userId: string
+      badgeId: string
+      reason: string
+    }) =>
+      WorkshopBadgesService.revokeWorkshopBadge({
+        sessionId,
+        requestBody: {
+          user_id: userId,
+          badge_id: badgeId,
+          reason,
+        },
+      }),
+    onSuccess: async () => {
+      setErrorDetail(null)
+      setRevokeBadgeTarget(null)
+      setRevokeBadgeReason("")
+      await Promise.all([
+        detailQuery.refetch(),
+        sessionBadgeLeaderboardQuery.refetch(),
+        queryClient.invalidateQueries({
+          queryKey: ["workshopSessionsForUser"],
+        }),
+      ])
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
+  const acknowledgeLessonSyncMutation = useMutation({
+    mutationFn: (lessonSyncGeneration: number) =>
+      WorkshopSessionsService.patchWorkshopSession({
+        sessionId,
+        requestBody: {
+          lesson_sync_ack_generation: lessonSyncGeneration,
+        },
+      }),
+    onSuccess: async () => {
+      setErrorDetail(null)
+      setLessonSyncDriftDialogOpen(false)
+      await detailQuery.refetch()
+    },
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        const body = e.body as { detail?: string } | undefined
+        setErrorDetail(body?.detail ?? e.message)
+      } else {
+        setErrorDetail(e instanceof Error ? e.message : "Request failed")
+      }
+    },
+  })
+
   const [phase, setPhase] = useState<
     "idle" | "entering" | "ws_connecting" | "ready" | "error"
   >("idle")
@@ -533,6 +597,13 @@ function WorkshopSessionPage() {
   const [grantBadgeChoiceByUser, setGrantBadgeChoiceByUser] = useState<
     Record<string, string>
   >({})
+  const [revokeBadgeTarget, setRevokeBadgeTarget] = useState<{
+    userId: string
+    badgeId: string
+  } | null>(null)
+  const [revokeBadgeReason, setRevokeBadgeReason] = useState("")
+  const [lessonSyncDriftDialogOpen, setLessonSyncDriftDialogOpen] =
+    useState(false)
   const [isAddingSelected, setIsAddingSelected] = useState(false)
   const [_pickerAddError, setPickerAddError] = useState<string | null>(null)
   const [connectedRole, setConnectedRole] = useState<
@@ -913,6 +984,15 @@ function WorkshopSessionPage() {
     detailView === "instructor" &&
     sessionInLobby &&
     (rosterParticipants.length === 0 || requiredAggregateRows.length === 0)
+  const lessonSyncLessonGeneration =
+    detailQuery.data?.lesson.lesson_sync_generation ?? 1
+  const lessonSyncAckGeneration =
+    detailQuery.data?.session.lesson_sync_ack_generation ?? 1
+  const driftPending =
+    detailQuery.data?.view === "instructor" &&
+    (detailQuery.data.session.status === "live" ||
+      detailQuery.data.session.status === "paused") &&
+    lessonSyncLessonGeneration > lessonSyncAckGeneration
   const removeDialogParticipant =
     removeParticipantUserId === null
       ? undefined
@@ -1091,6 +1171,32 @@ function WorkshopSessionPage() {
           Roster trainees blocked by required pre-work:{" "}
           {instructorBlockedTraineesCount}
         </p>
+      ) : null}
+      {driftPending ? (
+        <Alert
+          variant="default"
+          className="border-amber-500/30 bg-amber-500/5"
+          data-testid="workshop-lesson-sync-drift-alert"
+        >
+          <AlertTitle>Lesson source was synced</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>
+              The lesson in the repository has a newer sync generation than you
+              last acknowledged for this session. You can switch to the latest
+              now or review later (this banner returns on reload until you
+              acknowledge).
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              data-testid="workshop-lesson-sync-drift-open-dialog"
+              onClick={() => setLessonSyncDriftDialogOpen(true)}
+            >
+              Choose action
+            </Button>
+          </AlertDescription>
+        </Alert>
       ) : null}
       {showInstructorSetupPrompt ? (
         <Alert
@@ -1642,6 +1748,12 @@ function WorkshopSessionPage() {
                     !sessionAllowsVerificationOrBadgeQuery ||
                     badgeOptions.length === 0 ||
                     hasDbGrantWithOnlyOneBadgeDef
+                  const activeGrantsForParticipant =
+                    detailQuery.data?.view === "instructor"
+                      ? (detailQuery.data.active_badge_grants ?? []).filter(
+                          (g) => g.user_id === participant.user_id,
+                        )
+                      : []
 
                   return (
                     <li
@@ -1753,6 +1865,28 @@ function WorkshopSessionPage() {
                               : "Grant badge"}
                           </Button>
                         ) : null}
+                        {activeGrantsForParticipant.map((g) => (
+                          <Button
+                            key={`${g.user_id}-${g.badge_id}`}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            data-testid={`workshop-roster-revoke-badge-${g.user_id}-${g.badge_id}`}
+                            disabled={
+                              revokeParticipantBadgeMutation.isPending ||
+                              removeTraineeMutation.isPending ||
+                              !sessionAllowsVerificationOrBadgeQuery
+                            }
+                            onClick={() =>
+                              setRevokeBadgeTarget({
+                                userId: g.user_id,
+                                badgeId: g.badge_id,
+                              })
+                            }
+                          >
+                            Revoke {g.title}
+                          </Button>
+                        ))}
                         <Button
                           type="button"
                           variant="ghost"
@@ -1815,6 +1949,123 @@ function WorkshopSessionPage() {
                     }}
                   >
                     {removeTraineeMutation.isPending ? "Removing…" : "Remove"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog
+              open={revokeBadgeTarget !== null}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setRevokeBadgeTarget(null)
+                  setRevokeBadgeReason("")
+                }
+              }}
+            >
+              <DialogContent showCloseButton>
+                <DialogHeader>
+                  <DialogTitle>Revoke badge?</DialogTitle>
+                  <DialogDescription>
+                    This removes the trainee's active grant for this session. A
+                    short reason is required.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2 py-2">
+                  <Label htmlFor="workshop-roster-revoke-reason">Reason</Label>
+                  <textarea
+                    id="workshop-roster-revoke-reason"
+                    data-testid="workshop-roster-revoke-reason"
+                    rows={4}
+                    value={revokeBadgeReason}
+                    onChange={(event) =>
+                      setRevokeBadgeReason(event.target.value)
+                    }
+                    className={cn(
+                      "border-input bg-background placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 flex w-full min-w-0 rounded-md border px-3 py-2 text-base shadow-xs outline-none md:text-sm",
+                      "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                    )}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setRevokeBadgeTarget(null)
+                      setRevokeBadgeReason("")
+                    }}
+                    disabled={revokeParticipantBadgeMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    data-testid="workshop-roster-revoke-confirm"
+                    disabled={
+                      revokeBadgeReason.trim().length === 0 ||
+                      revokeParticipantBadgeMutation.isPending ||
+                      revokeBadgeTarget === null
+                    }
+                    onClick={() => {
+                      if (revokeBadgeTarget === null) return
+                      revokeParticipantBadgeMutation.mutate({
+                        userId: revokeBadgeTarget.userId,
+                        badgeId: revokeBadgeTarget.badgeId,
+                        reason: revokeBadgeReason.trim(),
+                      })
+                    }}
+                  >
+                    {revokeParticipantBadgeMutation.isPending
+                      ? "Revoking…"
+                      : "Confirm revoke"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog
+              open={lessonSyncDriftDialogOpen}
+              onOpenChange={setLessonSyncDriftDialogOpen}
+            >
+              <DialogContent showCloseButton>
+                <DialogHeader>
+                  <DialogTitle>Lesson source was synced</DialogTitle>
+                  <DialogDescription>
+                    Switching updates this session to the current lesson sync
+                    generation. If parts were removed or reordered, the active
+                    part pointer is clamped to stay valid.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    data-testid="workshop-lesson-sync-drift-review-later"
+                    onClick={() => setLessonSyncDriftDialogOpen(false)}
+                  >
+                    Review later
+                  </Button>
+                  <Button
+                    type="button"
+                    data-testid="workshop-lesson-sync-drift-switch-latest"
+                    disabled={
+                      acknowledgeLessonSyncMutation.isPending ||
+                      detailQuery.data?.view !== "instructor"
+                    }
+                    onClick={() => {
+                      const gen =
+                        detailQuery.data?.view === "instructor"
+                          ? (detailQuery.data.lesson.lesson_sync_generation ??
+                            1)
+                          : 1
+                      acknowledgeLessonSyncMutation.mutate(gen)
+                    }}
+                  >
+                    {acknowledgeLessonSyncMutation.isPending
+                      ? "Updating…"
+                      : "Switch to latest"}
                   </Button>
                 </DialogFooter>
               </DialogContent>

@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **§2 Badge end-to-end** removed from [Remaining work](#remaining-work-authoritative) (implemented on **`feat/workshop/badge-end-to-end`**: hub, manifest v2 `badges[]`, org grants, global leaderboard, migration **`g1h2i3j4k5l6`**). **Blocking backlog:** **§1 Workshop** only. Prior on **`main`**: verify + grant (**[#76](https://github.com/justin-p/testing/pull/76)**); drift + revoke (**[#77](https://github.com/justin-p/testing/pull/77)**). |
+| **Last synced** | **2026-05-12** — **`main`** includes **[#77](https://github.com/justin-p/testing/pull/77)** (drift ack, revoke, `active_badge_grants`, e2e bump). Open **[#78](https://github.com/justin-p/testing/pull/78)** on **`feat/workshop/badge-end-to-end`**: badge hub, manifest v2 `badges[]`, org grants, global leaderboard, migration **`g1h2i3j4k5l6`**. **Blocking:** **§1 Workshop** only. Prior: **[#76](https://github.com/justin-p/testing/pull/76)**. |
 | **Branch** | **`feat/workshop/badge-end-to-end`** |
-| **PR** | **[#78](https://github.com/justin-p/testing/pull/78)** — badge hub, manifest v2 `badges[]`, org grants, global leaderboard |
+| **PR** | **[#78](https://github.com/justin-p/testing/pull/78)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -28,6 +28,7 @@
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
+- Lesson sync **drift** after repo changes: instructor **acknowledge** via PATCH (generation match + part clamp); immutable “keep old Markdown” snapshot remains **out of scope** while `LessonPart` rows are shared (see PR description).
 
 ## Deferred polish backlog (skip log)
 
