@@ -290,6 +290,10 @@ export type WorkshopBadgeDefinitionCreate = {
     title: string;
     description?: (string | null);
     points?: number;
+    /**
+     * Optional link to a lesson; session grant UI lists only badges for the session's lesson.
+     */
+    lesson_id?: (string | null);
 };
 
 export type WorkshopBadgeDefinitionPublic = {

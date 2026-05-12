@@ -22,6 +22,7 @@ from app.models import (
     WorkshopBadgeDefinitionCreate,
     WorkshopBadgeDefinitionPublic,
     WorkshopBadgeDefinitionsPublic,
+    WorkshopBadgeDefinitionUpdate,
     WorkshopBadgeGrant,
     WorkshopBadgeGrantRecipientPublic,
     WorkshopBadgeGrantRecipientsPublic,
@@ -256,12 +257,26 @@ def create_workshop_badge(
             status_code=status.HTTP_409_CONFLICT,
             detail="badge_slug_conflict",
         )
+    lesson_id: uuid.UUID | None = None
+    lesson_slug: str | None = None
+    lesson_title: str | None = None
+    if body.lesson_id is not None:
+        les = session.get(Lesson, body.lesson_id)
+        if les is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="lesson_not_found",
+            )
+        lesson_id = body.lesson_id
+        lesson_slug = les.slug
+        lesson_title = les.title
+
     row = WorkshopBadgeDefinition(
         slug=body.slug,
         title=body.title,
         description=body.description,
         points=body.points,
-        lesson_id=None,
+        lesson_id=lesson_id,
     )
     session.add(row)
     session.commit()
@@ -269,8 +284,8 @@ def create_workshop_badge(
     return _badge_definition_public(
         api_prefix=settings.API_V1_STR,
         row=row,
-        lesson_slug=None,
-        lesson_title=None,
+        lesson_slug=lesson_slug,
+        lesson_title=lesson_title,
     )
 
 

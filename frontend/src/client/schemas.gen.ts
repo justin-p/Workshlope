@@ -1331,6 +1331,19 @@ export const WorkshopBadgeDefinitionCreateSchema = {
             minimum: 0,
             title: 'Points',
             default: 1
+        },
+        lesson_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Lesson Id',
+            description: "Optional link to a lesson; session grant UI lists only badges for the session's lesson."
         }
     },
     type: 'object',
@@ -1430,6 +1443,63 @@ export const WorkshopBadgeDefinitionPublicSchema = {
     type: 'object',
     required: ['id', 'slug', 'title', 'points'],
     title: 'WorkshopBadgeDefinitionPublic'
+} as const;
+
+export const WorkshopBadgeDefinitionUpdateSchema = {
+    properties: {
+        slug: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 128
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Slug'
+        },
+        title: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1024
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        points: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 1000,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Points'
+        }
+    },
+    type: 'object',
+    title: 'WorkshopBadgeDefinitionUpdate',
+    description: 'Partial update for instructor-managed badge rows (manifest-linked rows may restrict slug).'
 } as const;
 
 export const WorkshopBadgeDefinitionsPublicSchema = {

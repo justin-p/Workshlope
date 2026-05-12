@@ -756,6 +756,19 @@ class WorkshopBadgeDefinitionCreate(SQLModel):
     title: str = Field(max_length=255)
     description: str | None = Field(default=None, max_length=1024)
     points: int = Field(default=1, ge=0, le=1000)
+    lesson_id: uuid.UUID | None = Field(
+        default=None,
+        description="Optional link to a lesson; session grant UI lists only badges for the session's lesson.",
+    )
+
+
+class WorkshopBadgeDefinitionUpdate(SQLModel):
+    """Partial update for instructor-managed badge rows (manifest-linked rows may restrict slug)."""
+
+    slug: str | None = Field(default=None, max_length=128)
+    title: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
+    points: int | None = Field(default=None, ge=0, le=1000)
 
 
 class WorkshopBadgeDefinitionPublic(SQLModel):
@@ -776,6 +789,24 @@ class WorkshopBadgeDefinitionPublic(SQLModel):
 
 class WorkshopBadgeDefinitionsPublic(SQLModel):
     data: list[WorkshopBadgeDefinitionPublic]
+    count: int
+
+
+class WorkshopBadgeGrantRecipientPublic(SQLModel):
+    """One active grant for a badge (hub recipients table)."""
+
+    user_id: uuid.UUID
+    email: str
+    full_name: str | None = None
+    granted_at: datetime | None = None
+    session_id: uuid.UUID | None = Field(
+        default=None,
+        description="``null`` for organization-wide grants.",
+    )
+
+
+class WorkshopBadgeGrantRecipientsPublic(SQLModel):
+    data: list[WorkshopBadgeGrantRecipientPublic]
     count: int
 
 

@@ -120,6 +120,7 @@ def test_grant_revoke_and_leaderboard(client: TestClient, db: Session) -> None:
             "slug": f"badge-{uuid.uuid4()}",
             "title": "Great helper",
             "points": 3,
+            "lesson_id": str(session_row.lesson_id),
         },
     )
     assert create.status_code == 200
@@ -236,6 +237,7 @@ def test_revoke_requires_non_empty_reason(client: TestClient, db: Session) -> No
             "slug": f"badge-{uuid.uuid4()}",
             "title": "Reason required",
             "points": 1,
+            "lesson_id": str(session_row.lesson_id),
         },
     )
     assert create.status_code == 200
@@ -324,6 +326,7 @@ def test_grant_requires_participant_roster_membership(
             "slug": f"badge-{uuid.uuid4()}",
             "title": "Roster only",
             "points": 2,
+            "lesson_id": str(session_row.lesson_id),
         },
     )
     assert create.status_code == 200
@@ -374,6 +377,7 @@ def test_superuser_grant_bypasses_session_instructor_check(
             "slug": f"b-su-{uuid.uuid4().hex}",
             "title": "Hero",
             "points": 2,
+            "lesson_id": str(session_row.lesson_id),
         },
     )
     assert badge.status_code == 200
@@ -410,7 +414,12 @@ def test_grant_and_leaderboard_requires_valid_ids(
     create = client.post(
         f"{settings.API_V1_STR}/workshop/badges",
         headers=headers,
-        json={"slug": f"m-{uuid.uuid4().hex}", "title": "T", "points": 1},
+        json={
+            "slug": f"m-{uuid.uuid4().hex}",
+            "title": "T",
+            "points": 1,
+            "lesson_id": str(session_row.lesson_id),
+        },
     )
     bid = create.json()["id"]
 
@@ -462,7 +471,12 @@ def test_revoke_grant_lifecycle_edges(client: TestClient, db: Session) -> None:
     create = client.post(
         f"{settings.API_V1_STR}/workshop/badges",
         headers=headers,
-        json={"slug": f"rev-{uuid.uuid4().hex}", "title": "R", "points": 3},
+        json={
+            "slug": f"rev-{uuid.uuid4().hex}",
+            "title": "R",
+            "points": 3,
+            "lesson_id": str(session_row.lesson_id),
+        },
     )
     bid = create.json()["id"]
     payload = {"user_id": str(trainee.id), "badge_id": bid}
