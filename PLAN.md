@@ -26,8 +26,6 @@
 **1. Workshop end-to-end (blocking)**
 
 - Validate the complete instructor-led flow in-product (create/prepare session, roster, trainee entry + realtime progression, prerequisite gating, completion/closeout) and keep **baseline serial Playwright** on that path green before expanding polish-heavy work; regressions stay **P0**.
-  - P0 issues
-    - **Session-from-lesson setup (workshops hub):** **Use lesson** / **Start workshop** opens the **pre-create wizard** ([`/workshop/new`](frontend/src/routes/_layout/workshop.new.tsx)) so the instructor reviews lesson prerequisites, optionally picks trainees (soft warnings; empty roster allowed), and **only then** creates the session (`POST /workshop/sessions/` with optional `participant_user_ids` in one DB transaction). **Scheduled-session lobby** copy from [#68](https://github.com/justin-p/testing/pull/68) still applies after the session exists.
 - Treat any bug that breaks workshop execution (auth loops, role redirects, sync failures, missing lesson content, broken part progression, roster mutation regressions) as P0 for current slice.
 - Keep tests focused on protecting newly shipped functional behavior; do not expand broad polish-only coverage until blocking flow is complete.
 
