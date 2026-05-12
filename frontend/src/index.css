@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "highlight.js/styles/github.css";
+@import "./styles/workshop-hljs-github-dark.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -165,7 +167,8 @@
     @apply text-primary underline underline-offset-4;
   }
 
-  .workshop-markdown code {
+  /* Inline code only; fenced blocks use hljs on `pre > code.hljs`. */
+  .workshop-markdown :not(pre) > code {
     @apply rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em];
   }
 
@@ -173,7 +176,15 @@
     @apply my-4 overflow-x-auto rounded-md border bg-muted/40 p-3 text-xs;
   }
 
-  .workshop-markdown pre code {
+  .workshop-markdown .workshop-code-block {
+    @apply overflow-hidden rounded-md border bg-muted/40;
+  }
+
+  .workshop-markdown .workshop-code-block pre {
+    @apply my-0 overflow-x-auto rounded-none border-0 bg-transparent p-0 text-xs;
+  }
+
+  .workshop-markdown pre code:not(.hljs) {
     @apply bg-transparent p-0 text-inherit;
   }
 

@@ -30,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { WorkshopMarkdownHtml } from "@/components/WorkshopMarkdownHtml"
 import useAuth from "@/hooks/useAuth"
 
 /** Matches UUID v4 from `uuid.uuid4()` used for workshop sessions. */
@@ -1080,11 +1081,9 @@ function WorkshopSessionPage() {
               </div>
             ) : null}
           </div>
-          <article
-            className="workshop-markdown max-w-none"
+          <WorkshopMarkdownHtml
+            html={currentPart.body_html ?? ""}
             data-testid="workshop-current-part-body"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: server sends nh3-sanitized html.
-            dangerouslySetInnerHTML={{ __html: currentPart.body_html ?? "" }}
           />
         </section>
       ) : null}

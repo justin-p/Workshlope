@@ -233,6 +233,9 @@ _SAFE_HTML_ATTRIBUTES = {
     "img": {"src", "alt", "title", "loading"},
     "td": {"colspan", "rowspan"},
     "th": {"colspan", "rowspan"},
+    # Fenced code uses class="language-…" for client-side syntax highlighting.
+    "code": {"class"},
+    "pre": {"class"},
 }
 
 

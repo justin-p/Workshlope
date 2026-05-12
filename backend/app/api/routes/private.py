@@ -129,7 +129,7 @@ def bootstrap_e2e_workshop_live_session(
             slug=f"part-0-{sid}",
             title="Part 0",
             path="01-part-0.md",
-            body_md="# Part 0",
+            body_md="# Part 0\n\n```bash\necho hi\n```",
             estimated_minutes=15,
         )
     )
