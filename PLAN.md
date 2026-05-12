@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-12** — In flight: **workshop badges UX plan** on **`feat/workshop/badges-ux-plan`** (sidebar longest-path active nav, authenticated badge images in hub, session-scoped definitions + post-end grant wizard, hub PATCH/DELETE/recipients + org revoke, e2e badge tied to lesson for session grants). Prior merged: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. **Blocking:** **§1 Workshop** only. |
 | **Branch** | **`feat/workshop/badges-ux-plan`** |
-| **PR** | Open after push (badges UX slice) |
+| **PR** | **[#79](https://github.com/justin-p/testing/pull/79)** (badges UX slice) |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
