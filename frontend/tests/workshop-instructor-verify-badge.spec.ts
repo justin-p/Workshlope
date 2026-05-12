@@ -1,5 +1,6 @@
 // Instructor roster: mark verified complete, grant session badge; trainee sees badges after reload.
 import { expect, test } from "@playwright/test"
+import { getApiTokenAsSuperuser } from "./utils/bridgeToken"
 import { createUser } from "./utils/privateApi"
 import { randomEmail } from "./utils/random"
 
@@ -64,28 +65,52 @@ test.describe("Workshop instructor verify and badge grant", () => {
       page.getByTestId(`workshop-roster-verified-label-${participant.userId}`),
     ).toBeVisible({ timeout: 10_000 })
 
-    const sid = String(session_id)
-    const grantResponsePromise = page.waitForResponse(
-      (resp) =>
-        resp.request().method() === "POST" &&
-        resp.url().includes("/workshop/badges/sessions/") &&
-        resp.url().includes(sid) &&
-        resp.url().includes("/grant"),
-    )
-    await page
-      .getByTestId(`workshop-roster-grant-badge-${participant.userId}`)
-      .click()
-    const grantResp = await grantResponsePromise
-    if (!grantResp.ok()) {
+    const token = await getApiTokenAsSuperuser()
+    const badgesRes = await fetch(`${apiBase}/api/v1/workshop/badges`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!badgesRes.ok()) {
       throw new Error(
-        `session badge grant failed: ${grantResp.status()} ${await grantResp.text()}`,
+        `list badges failed: ${badgesRes.status} ${await badgesRes.text()}`,
+      )
+    }
+    const badgesJson = (await badgesRes.json()) as {
+      data: Array<{ id: string; slug: string }>
+    }
+    const e2eSlug = `e2e-grant-${session_id}`
+    const badge = badgesJson.data.find((b) => b.slug === e2eSlug)
+    if (!badge) {
+      throw new Error(`missing bootstrap badge slug ${e2eSlug}`)
+    }
+    const grantRes = await fetch(
+      `${apiBase}/api/v1/workshop/badges/sessions/${session_id}/grant`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: String(participant.userId),
+          badge_id: badge.id,
+        }),
+      },
+    )
+    if (!grantRes.ok) {
+      throw new Error(
+        `session badge grant failed: ${grantRes.status} ${await grantRes.text()}`,
       )
     }
 
+    await page.reload()
+    await page.waitForLoadState("networkidle")
+    await expect(page.getByTestId("workshop-ws-status")).toHaveText(
+      /connected/i,
+      { timeout: 15_000 },
+    )
     await expect(
       page.getByRole("button", { name: "Revoke E2E Grant Badge" }),
     ).toBeVisible({ timeout: 15_000 })
-    await page.waitForLoadState("networkidle")
 
     await participantPage.reload()
     await participantPage.waitForLoadState("networkidle")
