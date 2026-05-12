@@ -5,11 +5,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlmodel import Session, col, func, select
 
 from app.api.deps import CurrentUser, SessionDep
+from app.api.roster_user_picker_query import workshop_roster_user_picker_public
 from app.core.config import settings
 from app.models import (
     Lesson,
@@ -26,10 +27,13 @@ from app.models import (
     WorkshopBadgeGrantRecipientPublic,
     WorkshopBadgeGrantRecipientsPublic,
     WorkshopBadgeGrantRequest,
+    WorkshopBadgeGrantRevokeForBadgeRequest,
+    WorkshopBadgeHubGrantRequest,
     WorkshopBadgeRevokeRequest,
     WorkshopGlobalLeaderboardPublic,
     WorkshopGlobalLeaderboardRowPublic,
     WorkshopParticipant,
+    WorkshopRosterUserPickerPublic,
     WorkshopSession,
     WorkshopSessionLeaderboardPublic,
     WorkshopSessionLeaderboardRowPublic,
@@ -93,6 +97,18 @@ def _require_active_session_participant(
     )
 
 
+def _active_grant_global(
+    session: Session, *, user_id: uuid.UUID, badge_id: uuid.UUID
+) -> WorkshopBadgeGrant | None:
+    return session.exec(
+        select(WorkshopBadgeGrant).where(
+            WorkshopBadgeGrant.user_id == user_id,
+            WorkshopBadgeGrant.badge_id == badge_id,
+            col(WorkshopBadgeGrant.revoked_at).is_(None),
+        )
+    ).first()
+
+
 def _badge_image_dir() -> Path:
     return Path(settings.BADGE_IMAGE_DIR)
 
@@ -117,6 +133,7 @@ def _badge_definition_public(
         lesson_slug=lesson_slug,
         lesson_title=lesson_title,
         image_url=image_url,
+        archived_at=row.archived_at,
     )
 
 
@@ -139,9 +156,13 @@ def read_workshop_badges(
     *,
     session: SessionDep,
     current_user: CurrentUser,
+    include_archived: bool = Query(default=False),
 ) -> WorkshopBadgeDefinitionsPublic:
     _require_superuser_or_instructor(current_user)
-    rows = session.exec(select(WorkshopBadgeDefinition)).all()
+    stmt = select(WorkshopBadgeDefinition)
+    if not include_archived:
+        stmt = stmt.where(col(WorkshopBadgeDefinition.archived_at).is_(None))
+    rows = session.exec(stmt).all()
     lesson_ids = {r.lesson_id for r in rows if r.lesson_id is not None}
     lessons_by_id: dict[uuid.UUID, tuple[str, str]] = {}
     if lesson_ids:
@@ -268,6 +289,92 @@ def create_workshop_badge(
     )
 
 
+@router.get("/{badge_id}", response_model=WorkshopBadgeDefinitionPublic)
+def read_workshop_badge(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    badge_id: uuid.UUID,
+) -> WorkshopBadgeDefinitionPublic:
+    _require_superuser_or_instructor(current_user)
+    row = session.get(WorkshopBadgeDefinition, badge_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Badge not found",
+        )
+    lesson_slug: str | None = None
+    lesson_title: str | None = None
+    if row.lesson_id is not None:
+        les = session.get(Lesson, row.lesson_id)
+        if les is not None:
+            lesson_slug = les.slug
+            lesson_title = les.title
+    return _badge_definition_public(
+        api_prefix=settings.API_V1_STR,
+        row=row,
+        lesson_slug=lesson_slug,
+        lesson_title=lesson_title,
+    )
+
+
+@router.patch("/{badge_id}", response_model=WorkshopBadgeDefinitionPublic)
+def update_workshop_badge(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    badge_id: uuid.UUID,
+    body: WorkshopBadgeDefinitionUpdate,
+) -> WorkshopBadgeDefinitionPublic:
+    _require_superuser_or_instructor(current_user)
+    row = session.get(WorkshopBadgeDefinition, badge_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Badge not found",
+        )
+    if body.slug is not None and row.lesson_id is not None and body.slug != row.slug:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="lesson_linked_badge_slug_readonly",
+        )
+    if body.slug is not None and body.slug != row.slug:
+        exists = session.exec(
+            select(WorkshopBadgeDefinition).where(
+                WorkshopBadgeDefinition.slug == body.slug,
+                col(WorkshopBadgeDefinition.id) != badge_id,
+            )
+        ).first()
+        if exists is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="badge_slug_conflict",
+            )
+        row.slug = body.slug
+    if body.title is not None:
+        row.title = body.title
+    if body.description is not None:
+        row.description = body.description
+    if body.points is not None:
+        row.points = body.points
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    lesson_slug: str | None = None
+    lesson_title: str | None = None
+    if row.lesson_id is not None:
+        les = session.get(Lesson, row.lesson_id)
+        if les is not None:
+            lesson_slug = les.slug
+            lesson_title = les.title
+    return _badge_definition_public(
+        api_prefix=settings.API_V1_STR,
+        row=row,
+        lesson_slug=lesson_slug,
+        lesson_title=lesson_title,
+    )
+
+
 @router.post("/sessions/{session_id}/grant", response_model=Message)
 def grant_workshop_badge(
     *,
@@ -292,24 +399,26 @@ def grant_workshop_badge(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Badge not found"
         )
-    if badge.lesson_id is not None and badge.lesson_id != workshop_session.lesson_id:
+    if badge.archived_at is not None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="badge_not_in_session_lesson",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="badge_archived",
         )
-    grant = session.exec(
-        select(WorkshopBadgeGrant).where(
-            WorkshopBadgeGrant.session_id == session_id,
-            WorkshopBadgeGrant.user_id == body.user_id,
-            WorkshopBadgeGrant.badge_id == body.badge_id,
-        )
-    ).first()
-    if grant is not None and grant.revoked_at is None:
+    if _active_grant_global(session, user_id=body.user_id, badge_id=body.badge_id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="badge_already_granted",
         )
-    was_regrant = grant is not None
+    grant = session.exec(
+        select(WorkshopBadgeGrant)
+        .where(
+            WorkshopBadgeGrant.session_id == session_id,
+            WorkshopBadgeGrant.user_id == body.user_id,
+            WorkshopBadgeGrant.badge_id == body.badge_id,
+        )
+        .order_by(col(WorkshopBadgeGrant.granted_at).desc())
+    ).first()
+    was_regrant = grant is not None and grant.revoked_at is not None
     if grant is None:
         grant = WorkshopBadgeGrant(
             session_id=session_id,
@@ -421,19 +530,26 @@ def grant_workshop_badge_org(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Badge not found"
         )
-    grant = session.exec(
-        select(WorkshopBadgeGrant).where(
-            col(WorkshopBadgeGrant.session_id).is_(None),
-            WorkshopBadgeGrant.user_id == body.user_id,
-            WorkshopBadgeGrant.badge_id == body.badge_id,
+    if badge.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="badge_archived",
         )
-    ).first()
-    if grant is not None and grant.revoked_at is None:
+    if _active_grant_global(session, user_id=body.user_id, badge_id=body.badge_id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="badge_already_granted",
         )
-    was_regrant = grant is not None
+    grant = session.exec(
+        select(WorkshopBadgeGrant)
+        .where(
+            col(WorkshopBadgeGrant.session_id).is_(None),
+            WorkshopBadgeGrant.user_id == body.user_id,
+            WorkshopBadgeGrant.badge_id == body.badge_id,
+        )
+        .order_by(col(WorkshopBadgeGrant.granted_at).desc())
+    ).first()
+    was_regrant = grant is not None and grant.revoked_at is not None
     if grant is None:
         grant = WorkshopBadgeGrant(
             session_id=None,
@@ -475,13 +591,7 @@ def revoke_workshop_badge_org(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="badge_revoke_reason_required",
         )
-    grant = session.exec(
-        select(WorkshopBadgeGrant).where(
-            col(WorkshopBadgeGrant.session_id).is_(None),
-            WorkshopBadgeGrant.user_id == body.user_id,
-            WorkshopBadgeGrant.badge_id == body.badge_id,
-        )
-    ).first()
+    grant = _active_grant_global(session, user_id=body.user_id, badge_id=body.badge_id)
     if grant is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Active badge grant not found"
@@ -557,42 +667,32 @@ def read_workshop_session_badge_leaderboard(
 
 
 @router.get(
-    "/sessions/{session_id}/definitions",
-    response_model=WorkshopBadgeDefinitionsPublic,
+    "/{badge_id}/grant-user-picker",
+    response_model=WorkshopRosterUserPickerPublic,
 )
-def read_workshop_badge_definitions_for_session(
+def read_workshop_badge_grant_user_picker(
     *,
     session: SessionDep,
     current_user: CurrentUser,
-    session_id: uuid.UUID,
-) -> WorkshopBadgeDefinitionsPublic:
-    """Badge definitions for the session's lesson only (session grant picker)."""
-    workshop_session = session.get(WorkshopSession, session_id)
-    if workshop_session is None:
+    badge_id: uuid.UUID,
+    q: str | None = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
+) -> WorkshopRosterUserPickerPublic:
+    _require_superuser_or_instructor(current_user)
+    row = session.get(WorkshopBadgeDefinition, badge_id)
+    if row is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Badge not found"
         )
-    _require_session_instructor_or_superuser(
-        session_db=session, session_id=session_id, current_user=current_user
-    )
-    rows = session.exec(
-        select(WorkshopBadgeDefinition).where(
-            WorkshopBadgeDefinition.lesson_id == workshop_session.lesson_id
-        )
-    ).all()
-    lesson = session.get(Lesson, workshop_session.lesson_id)
-    lesson_slug = lesson.slug if lesson else None
-    lesson_title = lesson.title if lesson else None
-    data = [
-        _badge_definition_public(
-            api_prefix=settings.API_V1_STR,
-            row=row,
-            lesson_slug=lesson_slug if row.lesson_id else None,
-            lesson_title=lesson_title if row.lesson_id else None,
-        )
-        for row in rows
-    ]
-    return WorkshopBadgeDefinitionsPublic(data=data, count=len(data))
+    _ = row.id
+    try:
+        return workshop_roster_user_picker_public(session, q=q, skip=skip, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get(
@@ -637,127 +737,43 @@ def read_workshop_badge_grant_recipients(
                 email=str(u.email),
                 full_name=u.full_name,
                 granted_at=g.granted_at,
-                session_id=g.session_id,
             )
         )
     return WorkshopBadgeGrantRecipientsPublic(data=data, count=len(data))
 
 
-@router.get("/{badge_id}", response_model=WorkshopBadgeDefinitionPublic)
-def read_workshop_badge(
+@router.post("/{badge_id}/grants", response_model=Message)
+def grant_workshop_badge_from_hub(
     *,
     session: SessionDep,
     current_user: CurrentUser,
     badge_id: uuid.UUID,
-) -> WorkshopBadgeDefinitionPublic:
-    _require_superuser_or_instructor(current_user)
-    row = session.get(WorkshopBadgeDefinition, badge_id)
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Badge not found"
-        )
-    lesson_slug: str | None = None
-    lesson_title: str | None = None
-    if row.lesson_id is not None:
-        les = session.get(Lesson, row.lesson_id)
-        if les is not None:
-            lesson_slug = les.slug
-            lesson_title = les.title
-    return _badge_definition_public(
-        api_prefix=settings.API_V1_STR,
-        row=row,
-        lesson_slug=lesson_slug,
-        lesson_title=lesson_title,
-    )
-
-
-@router.patch("/{badge_id}", response_model=WorkshopBadgeDefinitionPublic)
-def update_workshop_badge(
-    *,
-    session: SessionDep,
-    current_user: CurrentUser,
-    badge_id: uuid.UUID,
-    body: WorkshopBadgeDefinitionUpdate,
-) -> WorkshopBadgeDefinitionPublic:
-    _require_superuser_or_instructor(current_user)
-    row = session.get(WorkshopBadgeDefinition, badge_id)
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Badge not found"
-        )
-    if body.slug is not None and body.slug != row.slug and row.lesson_id is not None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="badge_slug_readonly_when_lesson_linked",
-        )
-    if body.slug is not None and body.slug != row.slug:
-        exists = session.exec(
-            select(WorkshopBadgeDefinition).where(
-                WorkshopBadgeDefinition.slug == body.slug,
-                col(WorkshopBadgeDefinition.id) != badge_id,
-            )
-        ).first()
-        if exists is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="badge_slug_conflict",
-            )
-        row.slug = body.slug
-    if body.title is not None:
-        row.title = body.title
-    if body.description is not None:
-        row.description = body.description
-    if body.points is not None:
-        row.points = body.points
-    session.add(row)
-    session.commit()
-    session.refresh(row)
-    lesson_slug: str | None = None
-    lesson_title: str | None = None
-    if row.lesson_id is not None:
-        les = session.get(Lesson, row.lesson_id)
-        if les is not None:
-            lesson_slug = les.slug
-            lesson_title = les.title
-    return _badge_definition_public(
-        api_prefix=settings.API_V1_STR,
-        row=row,
-        lesson_slug=lesson_slug,
-        lesson_title=lesson_title,
-    )
-
-
-@router.delete("/{badge_id}", response_model=Message)
-def delete_workshop_badge(
-    *,
-    session: SessionDep,
-    current_user: CurrentUser,
-    badge_id: uuid.UUID,
+    body: WorkshopBadgeHubGrantRequest,
 ) -> Message:
-    _require_superuser_or_instructor(current_user)
-    row = session.get(WorkshopBadgeDefinition, badge_id)
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Badge not found"
-        )
-    active = session.exec(
-        select(WorkshopBadgeGrant).where(
-            WorkshopBadgeGrant.badge_id == badge_id,
-            col(WorkshopBadgeGrant.revoked_at).is_(None),
-        )
-    ).first()
-    if active is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="badge_has_active_grants",
-        )
-    if row.image_filename:
-        path = _badge_image_dir() / row.image_filename
-        if path.is_file():
-            path.unlink(missing_ok=True)
-    session.delete(row)
-    session.commit()
-    return Message(message="Badge deleted")
+    return grant_workshop_badge_org(
+        session=session,
+        current_user=current_user,
+        body=WorkshopBadgeGrantRequest(user_id=body.user_id, badge_id=badge_id),
+    )
+
+
+@router.post("/{badge_id}/grants/revoke", response_model=Message)
+def revoke_workshop_badge_from_hub(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    badge_id: uuid.UUID,
+    body: WorkshopBadgeGrantRevokeForBadgeRequest,
+) -> Message:
+    return revoke_workshop_badge_org(
+        session=session,
+        current_user=current_user,
+        body=WorkshopBadgeRevokeRequest(
+            user_id=body.user_id,
+            badge_id=badge_id,
+            reason=body.reason,
+        ),
+    )
 
 
 @router.get("/{badge_id}/image")

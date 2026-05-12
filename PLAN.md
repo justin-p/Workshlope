@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — In flight: **workshop badges UX plan** on **`feat/workshop/badges-ux-plan`** (sidebar longest-path active nav, authenticated badge images in hub, session-scoped definitions + post-end grant wizard, hub PATCH/DELETE/recipients + org revoke, e2e badge tied to lesson for session grants). Prior merged: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. **Blocking:** **§1 Workshop** only. |
-| **Branch** | **`feat/workshop/badges-ux-plan`** |
-| **PR** | **[#79](https://github.com/justin-p/testing/pull/79)** (badges UX slice) |
+| **Last synced** | **2026-05-12** — **`feat/workshop/badges-unified-model`** / **[#80](https://github.com/justin-p/testing/pull/80)**: same slice as prior row, plus **GET/PATCH `/workshop/badges/{id}`** for hub edit page + OpenAPI client; hub recipients dialog duplicate-query cleanup; post-end roster CTA opens existing **badge end summary** dialog (`setBadgeEndSummaryOpen`); `models.py` duplicate DTO removal after main merge. Prior merged: **[#77](https://github.com/justin-p/testing/pull/77)**, **[#78](https://github.com/justin-p/testing/pull/78)**. |
+| **Branch** | **`feat/workshop/badges-unified-model`** |
+| **PR** | **[#80](https://github.com/justin-p/testing/pull/80)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -101,7 +101,7 @@ Rough themes to revisit **only after** **[Remaining work](#remaining-work-author
 - **Roster**: Instructor manages **WorkshopParticipant** rows (add/remove; soft-remove with **removed_at**). GitHub avatars are used across application identity surfaces when available; trainee session payloads still exclude peer identities/avatars.
 - **Signals**: **live_status** = busy | done for the **current part**, shown **only to that user and to instructors** — **trainees must not see other trainees’ status**, roster, joined/finished timestamps, or presence (privacy + reduces comparison anxiety). Instructor cockpit remains the aggregate view.
 - **Pause**: No participant busy/done writes; **no part navigation** (no **part_generation** bump) until **resume** or **end**.
-- **Awards**: Badge grants are issued **only after instructor verification** of completion (not immediately on trainee self-finish), and surfaced across profile, session views, instructor views, and a global leaderboard. Revocation requires auditable reasons and updates active counts/leaderboard views.
+- **Awards**: For each **lesson-linked** badge definition, the system **auto-awards** to **participant-seat** users when the instructor **ends** the session (idempotent: at most one active grant per user+badge). Instructors also **manually grant** from the **badge hub** (org-scoped user search). **Instructor verification** of trainee completion remains the gate for other completion signals; grants surface on session views, profile where applicable, and the **global leaderboard**. Revocation (hub) requires an auditable reason and updates active counts/leaderboard views.
 - **Prework/prerequisites**: Lessons can define prerequisite tasks; trainee completion is tracked and surfaced before session start.
 - **Pacing tools**: Session timer **writes** and instructor cockpit controls (per-part countdown/elapsed and overrun flags) are instructor-only; rostered trainees may **read** the server timer snapshot over HTTP for pacing. **Timer audit events** (actor-bearing list) stay instructor-only.
 - **Backend delivery method**: Use `/python-tdd-with-uv` workflow across the entire backend implementation (test-first, vertical slices, `uv run pytest` loop).
@@ -415,15 +415,15 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  traineeFinish[TraineeMarksFinished] --> pendingVerify[CompletionPendingInstructorVerification]
-  pendingVerify --> instructorVerify[InstructorVerifiesCompletionSingleOrBulk]
-  instructorVerify --> grantBadge[GrantUserBadge]
-  grantBadge --> showSurfaces[ShowOnProfileSessionLeaderboard]
-  showSurfaces --> revokeDecision{RevokeNeeded}
-  revokeDecision -->|yes| revokeReason[InstructorProvidesMandatoryReason]
-  revokeReason --> revokeBadge[RevokeBadgeAndWriteAuditTrail]
-  revokeBadge --> updateViews[RemoveFromActiveCountsAndLeaderboard]
-  revokeDecision -->|no| keepBadge[BadgeRemainsActive]
+  manifest[LessonBadgeDefinitions] --> sessionEnd[SessionEnded]
+  sessionEnd --> autoGrant[AutoGrantParticipantsIdempotent]
+  hubSearch[InstructorHubUserSearch] --> hubGrant[ManualHubGrant]
+  autoGrant --> activeGrant[(One active grant per user+badge)]
+  hubGrant --> activeGrant
+  instructorVerify[InstructorVerifiesCompletion] --> rosterSignals[RosterCompletionSignals]
+  activeGrant --> surfaces[SessionDetailLeaderboardProfile]
+  surfaces --> revokeHub[RevokeFromHubWithReason]
+  revokeHub --> surfaces
 ```
 
 ## Domain persistence
@@ -683,9 +683,9 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 ## Testing
 
 - **Local Playwright:** follow [playwright-local-gate](.cursor/skills/playwright-local-gate/SKILL.md) — **`scripts/e2e-backend-reset.sh`** and the commands there are the authoritative host workflow (CI defines green across the matrix).
-- Unit: install/repo refresh RBAC (**403** for non-instructor) and polling/refresh failure paths where covered; enter when scheduled; stale **part_generation** mutation; lesson sync safe-retry/idempotency where applicable; handoff **422** when target not instructor; **last-instructor removal blocked (409)** on non-ended sessions; add-member opposite-role invokes always-replace atomically; badge grant only on instructor verification; badge revocation requires reason.
+- Unit: install/repo refresh RBAC (**403** for non-instructor) and polling/refresh failure paths where covered; enter when scheduled; stale **part_generation** mutation; lesson sync safe-retry/idempotency where applicable; handoff **422** when target not instructor; **last-instructor removal blocked (409)** on non-ended sessions; add-member opposite-role invokes always-replace atomically; badge **session-end auto-award** + **hub** grant/revoke paths and archived-definition guards; badge revocation requires reason.
 - Unit: manifest missing/invalid hard-fails sync + marks repo unhealthy; relative asset rewrite/canonicalization and markdown safety pipeline behavior; avatar cleared on unlink; bulk verify can grant for arbitrary selected trainees (no finished-only guardrail).
-- Playwright: two trainee profiles **cannot** observe each other's status or avatars in session views; instructor sees both; trainee GET/WS payloads snapshot-tested for absence of peer PII/live_status/avatar fields; badge appears only after instructor verify action; revocation removes badge from learner surfaces + leaderboard.
+- Playwright: two trainee profiles **cannot** observe each other's status or avatars in session views; instructor sees both; trainee GET/WS payloads snapshot-tested for absence of peer PII/live_status/avatar fields; lesson-linked badge appears for the trainee **after session end** (auto-award) and via **hub** manual grant; hub revocation removes the badge from learner surfaces; post-end UI is preview-only (link to hub).
 - Playwright: in-app notifications appear as toast and in notification center for roster/session/badge events; live content drift prompt appears to instructor with default preselection **Switch to latest**.
 - Dashboard role-scope tests: trainee dashboard never renders instructor-only cards (roster, peer stats, revocation controls); instructor dashboard shows all applicable management cards.
 - Post-login landing tests: route to correct dashboard by role (`is_instructor`, superuser combinations), including fallback when role changes after login.

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import PurePosixPath
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, func, select
 
 from app.models import (
     Lesson,
@@ -14,6 +14,7 @@ from app.models import (
     LessonPart,
     LessonRepo,
     WorkshopBadgeDefinition,
+    WorkshopBadgeGrant,
     get_datetime_utc,
 )
 from app.services.lesson_manifest import ManifestValidationError, parse_lesson_manifest
@@ -196,7 +197,9 @@ def apply_prepared_lesson_sync_to_repo(
                 ),
             )
 
+        manifest_badge_slugs: set[str] = set()
         for m_badge_slug, b_title, b_points, b_description in item.badges:
+            manifest_badge_slugs.add(m_badge_slug)
             full_slug = f"{item.lesson_slug}__{m_badge_slug}"
             if len(full_slug) > 128:
                 raise LessonRepoSyncError(
@@ -222,6 +225,32 @@ def apply_prepared_lesson_sync_to_repo(
                 existing_badge.points = b_points
                 existing_badge.description = b_description
                 existing_badge.lesson_id = lesson.id
+                existing_badge.archived_at = None
+
+        expected_full_slugs = {f"{item.lesson_slug}__{s}" for s in manifest_badge_slugs}
+        prefix = f"{item.lesson_slug}__"
+        for stale_def in session.exec(
+            select(WorkshopBadgeDefinition).where(
+                WorkshopBadgeDefinition.lesson_id == lesson.id,
+                col(WorkshopBadgeDefinition.slug).like(f"{prefix}%"),
+            )
+        ).all():
+            if stale_def.slug in expected_full_slugs:
+                continue
+            active_grants = session.exec(
+                select(func.count())
+                .select_from(WorkshopBadgeGrant)
+                .where(
+                    WorkshopBadgeGrant.badge_id == stale_def.id,
+                    col(WorkshopBadgeGrant.revoked_at).is_(None),
+                )
+            ).one()
+            n_active = int(active_grants or 0)
+            if n_active > 0:
+                stale_def.archived_at = get_datetime_utc()
+                session.add(stale_def)
+            else:
+                session.delete(stale_def)
 
         lesson.lesson_sync_generation = lesson.lesson_sync_generation + 1
         session.add(lesson)

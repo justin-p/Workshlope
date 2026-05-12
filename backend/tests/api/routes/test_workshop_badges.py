@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.core.config import settings
 from app.models import (
@@ -9,6 +9,8 @@ from app.models import (
     LessonRepo,
     SessionInstructor,
     User,
+    WorkshopBadgeDefinition,
+    WorkshopBadgeGrant,
     WorkshopParticipant,
     WorkshopSession,
 )
@@ -355,6 +357,42 @@ def test_create_badge_rejects_duplicate_slug(client: TestClient, db: Session) ->
     assert conflict.status_code == 409
 
 
+def test_read_and_patch_workshop_badge(client: TestClient, db: Session) -> None:
+    headers, _ = _instructor_headers(client, db)
+    slug = f"badge-edit-{uuid.uuid4().hex}"
+    create = client.post(
+        f"{settings.API_V1_STR}/workshop/badges",
+        headers=headers,
+        json={"slug": slug, "title": "Before", "points": 3, "description": "d0"},
+    )
+    assert create.status_code == 200
+    badge_id = create.json()["id"]
+
+    missing = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/{uuid.uuid4()}",
+        headers=headers,
+    )
+    assert missing.status_code == 404
+
+    got = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/{badge_id}",
+        headers=headers,
+    )
+    assert got.status_code == 200
+    assert got.json()["title"] == "Before"
+    assert got.json()["points"] == 3
+
+    patched = client.patch(
+        f"{settings.API_V1_STR}/workshop/badges/{badge_id}",
+        headers=headers,
+        json={"title": "After", "points": 7, "description": "d1", "slug": slug},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["title"] == "After"
+    assert patched.json()["points"] == 7
+    assert patched.json()["description"] == "d1"
+
+
 def test_superuser_grant_bypasses_session_instructor_check(
     client: TestClient, db: Session
 ) -> None:
@@ -606,3 +644,119 @@ def test_org_grant_requires_instructor(client: TestClient, db: Session) -> None:
         json={"user_id": str(trainee.id), "badge_id": str(uuid.uuid4())},
     )
     assert r.status_code == 403
+
+
+def test_hub_badge_grant_and_revoke_paths(client: TestClient, db: Session) -> None:
+    headers, instructor = _instructor_headers(client, db)
+    session_row = _create_live_session(db)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    badge = WorkshopBadgeDefinition(
+        slug=f"hub-path-{uuid.uuid4()}",
+        title="Hub path",
+        points=4,
+        lesson_id=lesson.id,
+    )
+    db.add(badge)
+    db.commit()
+    db.refresh(badge)
+
+    trainee_email = f"hub-trainee-{uuid.uuid4()}@example.com"
+    authentication_token_from_email(client=client, email=trainee_email, db=db)
+    trainee = db.exec(select(User).where(User.email == trainee_email)).first()
+    assert trainee is not None
+
+    grant = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/{badge.id}/grants",
+        headers=headers,
+        json={"user_id": str(trainee.id)},
+    )
+    assert grant.status_code == 200
+
+    rec = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/{badge.id}/grants",
+        headers=headers,
+    )
+    assert rec.status_code == 200
+    assert rec.json()["count"] == 1
+
+    revoke = client.post(
+        f"{settings.API_V1_STR}/workshop/badges/{badge.id}/grants/revoke",
+        headers=headers,
+        json={"user_id": str(trainee.id), "reason": "cleanup"},
+    )
+    assert revoke.status_code == 200
+    rec2 = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/{badge.id}/grants",
+        headers=headers,
+    )
+    assert rec2.json()["count"] == 0
+
+
+def test_session_end_auto_awards_lesson_badges(client: TestClient, db: Session) -> None:
+    headers, instructor = _instructor_headers(client, db)
+    session_row = _create_live_session(db)
+    db.add(
+        SessionInstructor(
+            session_id=session_row.id,
+            user_id=instructor.id,
+            role="lead",
+        )
+    )
+    db.commit()
+    lesson = db.get(Lesson, session_row.lesson_id)
+    assert lesson is not None
+    badge = WorkshopBadgeDefinition(
+        slug=f"auto-{uuid.uuid4()}",
+        title="Auto badge",
+        points=7,
+        lesson_id=lesson.id,
+    )
+    db.add(badge)
+    trainee_email = f"auto-trainee-{uuid.uuid4()}@example.com"
+    authentication_token_from_email(client=client, email=trainee_email, db=db)
+    trainee = db.exec(select(User).where(User.email == trainee_email)).first()
+    assert trainee is not None
+    db.add(
+        WorkshopParticipant(
+            session_id=session_row.id,
+            user_id=trainee.id,
+        )
+    )
+    db.commit()
+    db.refresh(badge)
+
+    end = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/end",
+        headers=headers,
+    )
+    assert end.status_code == 200
+
+    active = db.exec(
+        select(WorkshopBadgeGrant).where(
+            WorkshopBadgeGrant.badge_id == badge.id,
+            WorkshopBadgeGrant.user_id == trainee.id,
+            col(WorkshopBadgeGrant.revoked_at).is_(None),
+        )
+    ).first()
+    assert active is not None
+    assert active.session_id == session_row.id
+
+    end2 = client.post(
+        f"{settings.API_V1_STR}/workshop/sessions/{session_row.id}/end",
+        headers=headers,
+    )
+    assert end2.status_code == 403
+
+    rows = db.exec(
+        select(WorkshopBadgeGrant).where(WorkshopBadgeGrant.badge_id == badge.id)
+    ).all()
+    assert len([r for r in rows if r.revoked_at is None]) == 1

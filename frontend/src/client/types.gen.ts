@@ -309,6 +309,7 @@ export type WorkshopBadgeDefinitionPublic = {
      * Relative API path to uploaded image, or null to use UI default artwork.
      */
     image_url?: (string | null);
+    archived_at?: (string | null);
 };
 
 export type WorkshopBadgeDefinitionsPublic = {
@@ -348,6 +349,15 @@ export type WorkshopBadgeGrantRecipientsPublic = {
 export type WorkshopBadgeGrantRequest = {
     user_id: string;
     badge_id: string;
+};
+
+export type WorkshopBadgeGrantRevokeForBadgeRequest = {
+    user_id: string;
+    reason: string;
+};
+
+export type WorkshopBadgeHubGrantRequest = {
+    user_id: string;
 };
 
 export type WorkshopBadgeRevokeRequest = {
@@ -937,6 +947,10 @@ export type UtilsTestEmailResponse = (Message);
 
 export type UtilsHealthCheckResponse = (boolean);
 
+export type WorkshopBadgesReadWorkshopBadgesData = {
+    includeArchived?: boolean;
+};
+
 export type WorkshopBadgesReadWorkshopBadgesResponse = (WorkshopBadgeDefinitionsPublic);
 
 export type WorkshopBadgesCreateWorkshopBadgeData = {
@@ -946,6 +960,19 @@ export type WorkshopBadgesCreateWorkshopBadgeData = {
 export type WorkshopBadgesCreateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
 
 export type WorkshopBadgesReadWorkshopGlobalBadgeLeaderboardResponse = (WorkshopGlobalLeaderboardPublic);
+
+export type WorkshopBadgesReadWorkshopBadgeData = {
+    badgeId: string;
+};
+
+export type WorkshopBadgesReadWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
+
+export type WorkshopBadgesUpdateWorkshopBadgeData = {
+    badgeId: string;
+    requestBody: WorkshopBadgeDefinitionUpdate;
+};
+
+export type WorkshopBadgesUpdateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
 
 export type WorkshopBadgesGrantWorkshopBadgeData = {
     requestBody: WorkshopBadgeGrantRequest;
@@ -979,11 +1006,14 @@ export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardData = {
 
 export type WorkshopBadgesReadWorkshopSessionBadgeLeaderboardResponse = (WorkshopSessionLeaderboardPublic);
 
-export type WorkshopBadgesReadWorkshopBadgeDefinitionsForSessionData = {
-    sessionId: string;
+export type WorkshopBadgesReadWorkshopBadgeGrantUserPickerData = {
+    badgeId: string;
+    limit?: number;
+    q?: (string | null);
+    skip?: number;
 };
 
-export type WorkshopBadgesReadWorkshopBadgeDefinitionsForSessionResponse = (WorkshopBadgeDefinitionsPublic);
+export type WorkshopBadgesReadWorkshopBadgeGrantUserPickerResponse = (WorkshopRosterUserPickerPublic);
 
 export type WorkshopBadgesReadWorkshopBadgeGrantRecipientsData = {
     badgeId: string;
@@ -991,24 +1021,19 @@ export type WorkshopBadgesReadWorkshopBadgeGrantRecipientsData = {
 
 export type WorkshopBadgesReadWorkshopBadgeGrantRecipientsResponse = (WorkshopBadgeGrantRecipientsPublic);
 
-export type WorkshopBadgesReadWorkshopBadgeData = {
+export type WorkshopBadgesGrantWorkshopBadgeFromHubData = {
     badgeId: string;
+    requestBody: WorkshopBadgeHubGrantRequest;
 };
 
-export type WorkshopBadgesReadWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
+export type WorkshopBadgesGrantWorkshopBadgeFromHubResponse = (Message);
 
-export type WorkshopBadgesUpdateWorkshopBadgeData = {
+export type WorkshopBadgesRevokeWorkshopBadgeFromHubData = {
     badgeId: string;
-    requestBody: WorkshopBadgeDefinitionUpdate;
+    requestBody: WorkshopBadgeGrantRevokeForBadgeRequest;
 };
 
-export type WorkshopBadgesUpdateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
-
-export type WorkshopBadgesDeleteWorkshopBadgeData = {
-    badgeId: string;
-};
-
-export type WorkshopBadgesDeleteWorkshopBadgeResponse = (Message);
+export type WorkshopBadgesRevokeWorkshopBadgeFromHubResponse = (Message);
 
 export type WorkshopBadgesReadWorkshopBadgeImageData = {
     badgeId: string;
