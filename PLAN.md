@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-12** — **Instructor badge revoke + lesson sync drift** on branch **`feat/workshop/revoke-badge-lesson-sync-drift`**: `WorkshopSession.lesson_sync_ack_generation` (migration + backfill), session detail exposes `lesson_sync_generation` / ack + **`active_badge_grants`** for revoke targeting; **`PATCH …/workshop/sessions/{id}`** accepts `lesson_sync_ack_generation` (must match current lesson generation) with part index clamp; instructor **`workshop.$sessionId.tsx`** revoke dialog (required reason + test IDs), drift **Alert** + **Dialog** (“Review later” dismisses; “Switch to latest” PATCHes ack); local-only **`POST …/private/workshop/e2e-bump-lesson-sync/{session_id}/`** for Playwright; OpenAPI + `frontend/src/client` regenerated. Prior merged on **`main`**: verify + grant (**#76**), pause part-nav (**#75**), code highlight (**#74**). |
 | **Branch** | **`feat/workshop/revoke-badge-lesson-sync-drift`** |
-| **PR** | *(open after push — `gh pr create`)* |
+| **PR** | **[#77](https://github.com/justin-p/testing/pull/77)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
