@@ -1,0 +1,35 @@
+wing: testing
+rooms:
+- name: scripts
+  description: Files from scripts/
+  keywords:
+  - scripts
+  - scripts
+- name: backend
+  description: Files from backend/
+  keywords:
+  - backend
+  - backend
+- name: frontend
+  description: Files from frontend/
+  keywords:
+  - frontend
+  - frontend
+- name: hooks
+  description: Files from hooks/
+  keywords:
+  - hooks
+  - hooks
+- name: authjs_service
+  description: Files from authjs-service/
+  keywords:
+  - authjs_service
+  - authjs-service
+- name: testing
+  description: Files from tests/
+  keywords:
+  - testing
+  - tests
+- name: general
+  description: Files that don't fit other rooms
+  keywords: []
