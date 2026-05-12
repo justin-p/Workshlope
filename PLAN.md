@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-12** — **Instructor verify + badge grant (cockpit):** [`workshop.$sessionId.tsx`](frontend/src/routes/_layout/workshop.$sessionId.tsx) roster adds **Mark verified complete** (`PATCH …/participants` `finished_at`) and **Grant badge** (uses [`WorkshopBadgesService`](frontend/src/client/sdk.gen.ts)); trainee view shows **Badges earned in this session** from `self.session_badges` on session detail ([`read_workshop_session_detail`](backend/app/api/routes/workshop_sessions.py)). E2E: [`with_e2e_badge`](backend/app/api/routes/private.py) bootstrap + [`workshop-instructor-verify-badge.spec.ts`](frontend/tests/workshop-instructor-verify-badge.spec.ts). Prior: pause freezes part navigation (**#75**); workshop lesson code blocks (**#74**). |
 | **Branch** | **`feat/workshop/instructor-verify-badge`** |
-| **PR** | *(open after push)* |
+| **PR** | [#76](https://github.com/justin-p/testing/pull/76) |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
