@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-13** — **`feat/authjs-service/frontend-theme-match`**: Auth.js bridge service uses the same oklch design tokens as [`frontend/src/index.css`](frontend/src/index.css) and applies `dark` / `light` from **`vite-ui-theme`** (default **dark**, matching [`frontend/src/main.tsx`](frontend/src/main.tsx) + [`frontend/src/components/theme-provider.tsx`](frontend/src/components/theme-provider.tsx)). |
 | **Branch** | **`feat/authjs-service/frontend-theme-match`** |
-| **PR** | *(open after push — `gh pr create`)* |
+| **PR** | **[#97](https://github.com/justin-p/testing/pull/97)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
