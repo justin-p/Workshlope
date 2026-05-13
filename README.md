@@ -4,8 +4,6 @@
 
 ---
 
-This repository now uses the [`fastapi/full-stack-fastapi-template`](https://github.com/fastapi/full-stack-fastapi-template) as its baseline.
-
 ## Quick start (Docker-first)
 
 1. Create local secrets/config from the tracked defaults:
@@ -134,7 +132,7 @@ Behavior in the workshop sync card:
   sync and shows `Grant repository access`.
 - If installations exist but the Installation ID box is blank, it is prefilled from the API (`GET …/installations`; use **Refresh lists** after a new GitHub App install).
 
-## Upstream template docs
+This repository uses the [`fastapi/full-stack-fastapi-template`](https://github.com/fastapi/full-stack-fastapi-template) as its baseline. Upstream template docs below.
 
 ## Technology Stack and Features
 
