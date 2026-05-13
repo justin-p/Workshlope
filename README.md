@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="frontend/public/assets/images/workshlope-logo.svg" alt="Workshlopé" width="280" />
+  <img src="frontend/public/assets/images/workshlope-logo.svg" alt="Workshlopé" width="1120" />
 </div>
 
-# Workshlopé
+---
 
 This repository now uses the [`fastapi/full-stack-fastapi-template`](https://github.com/fastapi/full-stack-fastapi-template) as its baseline.
 
