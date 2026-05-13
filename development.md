@@ -34,6 +34,22 @@ To check the logs of a specific service, add the name of the service, e.g.:
 docker compose logs backend
 ```
 
+### Troubleshooting: `permission denied` when stopping containers
+
+If `docker compose down` (or `stop`) fails with `Error response from daemon: cannot stop container: … permission denied`, the engine cannot signal the container. This is almost always an environment mismatch, not the project Compose files.
+
+1. **Match how you started the stack.** If you ever ran Compose with `sudo` (`sudo docker compose up …`), you must tear it down the same way: `sudo docker compose down`. If you started without `sudo`, do not use `sudo` for `down`. Mixing the two leaves root-owned containers that your normal user cannot stop.
+
+2. **Use the same Compose env as the scripts.** From the repo root, prefer the same pattern as `scripts/e2e-backend-reset.sh`:
+
+   ```bash
+   docker compose --env-file .env.local down -v --remove-orphans
+   ```
+
+3. **Confirm your user can talk to Docker.** On Linux, your account should be in the `docker` group (then sign out and back in, or `newgrp docker`). Until that applies, you may need `sudo` consistently—or avoid `sudo` entirely once the group is active.
+
+4. **If the daemon still cannot stop containers**, restart the Docker service (systemd example: `sudo systemctl restart docker`), then run `docker compose … down` again. As a last resort, stop the named project containers with the same privilege level you used to create them (`docker ps` / `sudo docker ps`, then `docker rm -f` on those IDs only).
+
 ## Mailcatcher
 
 Mailcatcher is a simple SMTP server that catches all emails sent by the backend during local development. Instead of sending real emails, they are captured and displayed in a web interface.

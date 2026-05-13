@@ -26,6 +26,8 @@ docker compose --env-file .env.local up -d --build
    - API docs: `http://localhost:8000/docs`
    - Auth.js bridge health: `http://localhost:3001/api/bridge/health`
 
+If `docker compose down` fails with **permission denied** when stopping containers, see [development.md](development.md) (section **Troubleshooting: `permission denied` when stopping containers**).
+
 ## GitHub sign-in (pending-approval flow)
 
 This stack supports an optional "Continue with GitHub" sign-in via a sidecar
