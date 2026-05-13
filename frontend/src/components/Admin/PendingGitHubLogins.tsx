@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, Github, X } from "lucide-react"
+import { Check, X } from "lucide-react"
 import { useState } from "react"
+import { SiGithub } from "react-icons/si"
 
 import { OauthService, type PendingGitHubLoginPublic } from "@/client"
 import { Button } from "@/components/ui/button"
@@ -97,7 +98,7 @@ export function PendingGitHubLogins() {
               >
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <Github className="size-4 text-muted-foreground" />
+                    <SiGithub className="size-4 text-muted-foreground" />
                     <span className="font-medium">
                       {row.provider_login || row.provider_account_id}
                     </span>
