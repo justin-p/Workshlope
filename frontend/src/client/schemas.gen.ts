@@ -1114,6 +1114,18 @@ export const UserPublicSchema = {
                 }
             ],
             title: 'Created At'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 512
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
         }
     },
     type: 'object',

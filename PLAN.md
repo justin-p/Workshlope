@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-13** — **`feat/workshop/leaderboard-user-badges-dropdown`**: Global badge leaderboard shows **display name only** (no email in UI or `WorkshopGlobalLeaderboardRowPublic`); **`GET /workshop/badges/leaderboard/users/{user_id}/badges`** returns active badges for lazy dropdown; leaderboard row opens Radix menu with badge titles, points, and image URLs; OpenAPI-driven client regen; backend tests + **`workshop-badges-hub-org-leaderboard.spec.ts`** extended (dropdown + no-email row). |
-| **Branch** | **`feat/workshop/leaderboard-user-badges-dropdown`** |
-| **PR** | **[#94](https://github.com/justin-p/testing/pull/94)** |
+| **Last synced** | **2026-05-13** — **`feat/frontend/github-sidebar-avatar`**: `UserPublic` includes optional **`avatar_url`** (linked GitHub `OAuthAccount`); user-returning routes and login test-token enrich responses; sidebar **`User`** uses **`AvatarImage`** with initials fallback; OpenAPI + generated client updated; backend **`test_users.py`** asserts `/users/me` avatar when OAuth linked and `null` otherwise. |
+| **Branch** | **`feat/frontend/github-sidebar-avatar`** |
+| **PR** | **[#96](https://github.com/justin-p/testing/pull/96)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
