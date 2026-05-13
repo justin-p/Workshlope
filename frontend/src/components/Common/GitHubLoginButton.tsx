@@ -7,10 +7,11 @@ export function GitHubLoginButton() {
 
   const onClick = () => {
     const callbackUrl = `${window.location.origin}/auth/callback`
-    const target = `${authjsUrl.replace(
-      /\/$/,
-      "",
-    )}/api/auth/signin?provider=github&callbackUrl=${encodeURIComponent(callbackUrl)}`
+    const base = authjsUrl.replace(/\/$/, "")
+    const target = `${base}/auth/signin?${new URLSearchParams({
+      callbackUrl,
+      provider: "github",
+    }).toString()}`
     window.location.href = target
   }
 

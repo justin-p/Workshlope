@@ -10,6 +10,15 @@ declare module "next-auth" {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
+  // Built-in Preact sign-in page uses fixed grays; use our Next page instead.
+  pages: {
+    signIn: "/auth/signin",
+  },
+  // Still applied to built-in error / verify-request HTML if those render.
+  theme: {
+    colorScheme: "dark",
+    brandColor: "#14b8a6",
+  },
   providers: [
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,

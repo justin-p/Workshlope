@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-13** — **`feat/frontend/github-sidebar-avatar`**: `UserPublic` includes optional **`avatar_url`** (linked GitHub `OAuthAccount`); user-returning routes and login test-token enrich responses; sidebar **`User`** uses **`AvatarImage`** with initials fallback; OpenAPI + generated client updated; backend **`test_users.py`** asserts `/users/me` avatar when OAuth linked and `null` otherwise. |
-| **Branch** | **`feat/frontend/github-sidebar-avatar`** |
-| **PR** | **[#96](https://github.com/justin-p/testing/pull/96)** |
+| **Last synced** | **2026-05-13** — **`feat/authjs-service/frontend-theme-match`**: Auth.js bridge uses shared oklch tokens + **`vite-ui-theme`**; GitHub OAuth uses a **custom** [`authjs-service/app/auth/signin/page.tsx`](authjs-service/app/auth/signin/page.tsx) (not Auth.js default HTML) so the sign-in screen matches the SPA; [`frontend/src/components/Common/GitHubLoginButton.tsx`](frontend/src/components/Common/GitHubLoginButton.tsx) targets **`/auth/signin`**. |
+| **Branch** | **`feat/authjs-service/frontend-theme-match`** |
+| **PR** | **[#97](https://github.com/justin-p/testing/pull/97)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -171,7 +171,7 @@ Keep PRs merge-ready via **`AGENTS.md`** loops—especially **`gh pr checks --wa
 | Admin users (`is_instructor`) | [`frontend/src/components/Admin/AddUser.tsx`](frontend/src/components/Admin/AddUser.tsx), [`frontend/src/components/Admin/EditUser.tsx`](frontend/src/components/Admin/EditUser.tsx), [`frontend/src/components/Admin/columns.tsx`](frontend/src/components/Admin/columns.tsx); E2E [`frontend/tests/admin.spec.ts`](frontend/tests/admin.spec.ts) |
 | Playwright harness (backend reset / env) | [`scripts/e2e-backend-reset.sh`](scripts/e2e-backend-reset.sh), [`frontend/playwright.global-setup.ts`](frontend/playwright.global-setup.ts), [`frontend/playwright.config.ts`](frontend/playwright.config.ts) |
 | ORM / domain models | [`backend/app/models.py`](backend/app/models.py) |
-| Auth.js login + FastAPI bridge | [`authjs-service/auth.ts`](authjs-service/auth.ts), [`authjs-service/app/api/bridge/route.ts`](authjs-service/app/api/bridge/route.ts), [`authjs-service/lib/bridge-token.ts`](authjs-service/lib/bridge-token.ts); backend [`backend/app/api/routes/oauth.py`](backend/app/api/routes/oauth.py), JWT helpers [`backend/app/core/security.py`](backend/app/core/security.py) |
+| Auth.js login + FastAPI bridge | [`authjs-service/auth.ts`](authjs-service/auth.ts) (`pages.signIn`), [`authjs-service/app/auth/signin/page.tsx`](authjs-service/app/auth/signin/page.tsx), [`authjs-service/app/api/bridge/route.ts`](authjs-service/app/api/bridge/route.ts), [`authjs-service/lib/bridge-token.ts`](authjs-service/lib/bridge-token.ts); UI tokens + theme init [`authjs-service/app/globals.css`](authjs-service/app/globals.css), [`authjs-service/app/layout.tsx`](authjs-service/app/layout.tsx), [`authjs-service/lib/theme-init-script.ts`](authjs-service/lib/theme-init-script.ts); backend [`backend/app/api/routes/oauth.py`](backend/app/api/routes/oauth.py), JWT helpers [`backend/app/core/security.py`](backend/app/core/security.py) |
 
 ## Workshop HTTP vs realtime — delivery audit
 

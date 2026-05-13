@@ -22,13 +22,13 @@ test.describe("GitHub login button on /login", () => {
     // the button forces window.location.href change.
     const navigationPromise = page.waitForRequest((request) => {
       const url = request.url()
-      return url.includes("/api/auth/signin")
+      return url.includes("/auth/signin")
     })
 
     await button.click()
 
     const request = await navigationPromise
-    expect(request.url()).toContain("/api/auth/signin")
+    expect(request.url()).toContain("/auth/signin")
     expect(request.url()).toContain("provider=github")
     expect(request.url()).toContain("callbackUrl=")
     expect(decodeURIComponent(request.url())).toContain("/auth/callback")
