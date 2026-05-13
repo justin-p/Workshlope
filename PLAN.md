@@ -13,7 +13,7 @@
 
 | **Last synced** | **2026-05-13** — **`feat/frontend/github-sidebar-avatar`**: `UserPublic` includes optional **`avatar_url`** (linked GitHub `OAuthAccount`); user-returning routes and login test-token enrich responses; sidebar **`User`** uses **`AvatarImage`** with initials fallback; OpenAPI + generated client updated; backend **`test_users.py`** asserts `/users/me` avatar when OAuth linked and `null` otherwise. |
 | **Branch** | **`feat/frontend/github-sidebar-avatar`** |
-| **PR** | *(open after push)* |
+| **PR** | **[#96](https://github.com/justin-p/testing/pull/96)** |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
