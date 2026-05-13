@@ -33,6 +33,8 @@ details.
 3. Run: `npm run dev` (listens on `http://localhost:3001`).
 4. Set `VITE_AUTHJS_URL=http://localhost:3001` in `frontend/.env`.
 
+The browser opens **`/auth/signin`** on this host (styled like the main SPA), which then calls Auth.js to start GitHub OAuth. Legacy **`/api/auth/signin`** redirects there when configured.
+
 ## Production
 
 The included Dockerfile produces a `next start`-ready image. Deploy behind a

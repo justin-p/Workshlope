@@ -106,3 +106,131 @@ body {
   font-size: 0.8125rem;
   word-break: break-all;
 }
+
+/* GitHub OAuth sign-in — mirrors frontend AuthLayout (split + promo + tokens). */
+
+.auth-signin-shell {
+  display: grid;
+  min-height: 100vh;
+}
+
+@media (min-width: 1024px) {
+  .auth-signin-shell {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.auth-signin-promo {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: var(--muted);
+}
+
+.dark .auth-signin-promo {
+  background: #18181b;
+}
+
+@media (min-width: 1024px) {
+  .auth-signin-promo {
+    display: flex;
+  }
+}
+
+.auth-signin-logo {
+  height: 6rem;
+  width: auto;
+}
+
+.auth-signin-logo--for-dark-promo {
+  display: none;
+}
+
+.dark .auth-signin-promo .auth-signin-logo--for-light-bg {
+  display: none;
+}
+
+.dark .auth-signin-promo .auth-signin-logo--for-dark-promo {
+  display: block;
+}
+
+.auth-signin-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .auth-signin-panel {
+    padding: 2.5rem;
+  }
+}
+
+.auth-signin-panel-inner {
+  width: 100%;
+  max-width: 20rem;
+  margin: 0 auto;
+}
+
+.auth-signin-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.auth-signin-sub {
+  margin: 0 0 1.25rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.auth-signin-status {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.auth-signin-github-btn {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 1px 2px oklch(0 0 0 / 6%);
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.auth-signin-github-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.auth-signin-github-btn:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.auth-signin-github-icon {
+  flex-shrink: 0;
+}
+
+.auth-signin-error {
+  margin-bottom: 1rem;
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  background: var(--destructive);
+  color: var(--primary-foreground);
+}

@@ -8,11 +8,12 @@ export default function Home() {
         directly &mdash; the FastAPI frontend redirects through it.
       </p>
       <p className="auth-bridge-p">
-        Sign in starts at{" "}
+        The SPA opens{" "}
         <code className="auth-bridge-code">
-          /api/auth/signin/github?callbackUrl=&lt;frontend&gt;/auth/callback
-        </code>
-        .
+          /auth/signin?provider=github&amp;callbackUrl=&lt;frontend&gt;/auth/callback
+        </code>{" "}
+        (themed Next page), which continues with Auth.js{" "}
+        <code className="auth-bridge-code">POST /api/auth/signin/github</code>.
       </p>
     </main>
   )
