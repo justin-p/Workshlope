@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-13** — **`feat/workshop/leaderboard-user-badges-dropdown`**: Global badge leaderboard shows **display name only** (no email in UI or `WorkshopGlobalLeaderboardRowPublic`); **`GET /workshop/badges/leaderboard/users/{user_id}/badges`** returns active badges for lazy dropdown; leaderboard row opens Radix menu with badge titles, points, and image URLs; OpenAPI-driven client regen; backend tests + **`workshop-badges-hub-org-leaderboard.spec.ts`** extended (dropdown + no-email row). |
-| **Branch** | **`feat/workshop/leaderboard-user-badges-dropdown`** |
-| **PR** | **[#94](https://github.com/justin-p/testing/pull/94)** |
+| **Last synced** | **2026-05-13** — **`feat/authjs-service/frontend-theme-match`**: Auth.js bridge service uses the same oklch design tokens as [`frontend/src/index.css`](frontend/src/index.css) and applies `dark` / `light` from **`vite-ui-theme`** (default **dark**, matching [`frontend/src/main.tsx`](frontend/src/main.tsx) + [`frontend/src/components/theme-provider.tsx`](frontend/src/components/theme-provider.tsx)). |
+| **Branch** | **`feat/authjs-service/frontend-theme-match`** |
+| **PR** | *(open after push — `gh pr create`)* |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -171,7 +171,7 @@ Keep PRs merge-ready via **`AGENTS.md`** loops—especially **`gh pr checks --wa
 | Admin users (`is_instructor`) | [`frontend/src/components/Admin/AddUser.tsx`](frontend/src/components/Admin/AddUser.tsx), [`frontend/src/components/Admin/EditUser.tsx`](frontend/src/components/Admin/EditUser.tsx), [`frontend/src/components/Admin/columns.tsx`](frontend/src/components/Admin/columns.tsx); E2E [`frontend/tests/admin.spec.ts`](frontend/tests/admin.spec.ts) |
 | Playwright harness (backend reset / env) | [`scripts/e2e-backend-reset.sh`](scripts/e2e-backend-reset.sh), [`frontend/playwright.global-setup.ts`](frontend/playwright.global-setup.ts), [`frontend/playwright.config.ts`](frontend/playwright.config.ts) |
 | ORM / domain models | [`backend/app/models.py`](backend/app/models.py) |
-| Auth.js login + FastAPI bridge | [`authjs-service/auth.ts`](authjs-service/auth.ts), [`authjs-service/app/api/bridge/route.ts`](authjs-service/app/api/bridge/route.ts), [`authjs-service/lib/bridge-token.ts`](authjs-service/lib/bridge-token.ts); backend [`backend/app/api/routes/oauth.py`](backend/app/api/routes/oauth.py), JWT helpers [`backend/app/core/security.py`](backend/app/core/security.py) |
+| Auth.js login + FastAPI bridge | [`authjs-service/auth.ts`](authjs-service/auth.ts), [`authjs-service/app/api/bridge/route.ts`](authjs-service/app/api/bridge/route.ts), [`authjs-service/lib/bridge-token.ts`](authjs-service/lib/bridge-token.ts); UI tokens + theme init [`authjs-service/app/globals.css`](authjs-service/app/globals.css), [`authjs-service/app/layout.tsx`](authjs-service/app/layout.tsx), [`authjs-service/lib/theme-init-script.ts`](authjs-service/lib/theme-init-script.ts); backend [`backend/app/api/routes/oauth.py`](backend/app/api/routes/oauth.py), JWT helpers [`backend/app/core/security.py`](backend/app/core/security.py) |
 
 ## Workshop HTTP vs realtime — delivery audit
 
