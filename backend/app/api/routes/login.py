@@ -43,11 +43,11 @@ def login_access_token(
 
 
 @router.post("/login/test-token", response_model=UserPublic)
-def test_token(current_user: CurrentUser) -> Any:
+def test_token(session: SessionDep, current_user: CurrentUser) -> Any:
     """
     Test access token
     """
-    return current_user
+    return crud.user_public_with_github_avatar(session=session, user=current_user)
 
 
 @router.post("/password-recovery/{email}")

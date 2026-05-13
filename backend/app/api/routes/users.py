@@ -47,7 +47,9 @@ def read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
     )
     users = session.exec(statement).all()
 
-    users_public = [UserPublic.model_validate(user) for user in users]
+    users_public = crud.users_public_with_github_avatars(
+        session=session, users=list(users)
+    )
     return UsersPublic(data=users_public, count=count)
 
 
@@ -75,7 +77,7 @@ def create_user(*, session: SessionDep, user_in: UserCreate) -> Any:
             subject=email_data.subject,
             html_content=email_data.html_content,
         )
-    return user
+    return crud.user_public_with_github_avatar(session=session, user=user)
 
 
 @router.patch("/me", response_model=UserPublic)
@@ -97,7 +99,7 @@ def update_user_me(
     session.add(current_user)
     session.commit()
     session.refresh(current_user)
-    return current_user
+    return crud.user_public_with_github_avatar(session=session, user=current_user)
 
 
 @router.patch("/me/password", response_model=Message)
@@ -122,11 +124,11 @@ def update_password_me(
 
 
 @router.get("/me", response_model=UserPublic)
-def read_user_me(current_user: CurrentUser) -> Any:
+def read_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     """
     Get current user.
     """
-    return current_user
+    return crud.user_public_with_github_avatar(session=session, user=current_user)
 
 
 @router.delete("/me", response_model=Message)
@@ -159,7 +161,7 @@ def register_user(session: SessionDep, user_in: UserRegister) -> Any:
         )
     user_create = UserCreate.model_validate(user_in)
     user = crud.create_user(session=session, user_create=user_create)
-    return user
+    return crud.user_public_with_github_avatar(session=session, user=user)
 
 
 @router.get("/{user_id}", response_model=UserPublic)
@@ -170,8 +172,8 @@ def read_user_by_id(
     Get a specific user by id.
     """
     user = session.get(User, user_id)
-    if user == current_user:
-        return user
+    if user is not None and user == current_user:
+        return crud.user_public_with_github_avatar(session=session, user=user)
     if not current_user.is_superuser:
         raise HTTPException(
             status_code=403,
@@ -179,7 +181,7 @@ def read_user_by_id(
         )
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return crud.user_public_with_github_avatar(session=session, user=user)
 
 
 @router.patch(
@@ -211,7 +213,7 @@ def update_user(
             )
 
     db_user = crud.update_user(session=session, db_user=db_user, user_in=user_in)
-    return db_user
+    return crud.user_public_with_github_avatar(session=session, user=db_user)
 
 
 @router.delete("/{user_id}", dependencies=[Depends(get_current_active_superuser)])

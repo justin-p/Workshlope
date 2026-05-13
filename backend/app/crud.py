@@ -13,6 +13,7 @@ from app.models import (
     PendingGitHubLogin,
     User,
     UserCreate,
+    UserPublic,
     UserUpdate,
 )
 
@@ -81,6 +82,42 @@ def create_item(*, session: Session, item_in: ItemCreate, owner_id: uuid.UUID) -
 # ---------------------------------------------------------------------------
 # OAuth accounts (GitHub) and pending logins
 # ---------------------------------------------------------------------------
+
+
+def github_avatar_urls_for_user_ids(
+    *, session: Session, user_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, str | None]:
+    """Map user ids to linked GitHub OAuth profile image URLs (if any)."""
+    if not user_ids:
+        return {}
+    rows = session.exec(
+        select(OAuthAccount.user_id, OAuthAccount.avatar_url).where(
+            OAuthAccount.provider == "github",
+            col(OAuthAccount.user_id).in_(user_ids),
+        )
+    ).all()
+    return dict(rows)
+
+
+def user_public_with_github_avatar(*, session: Session, user: User) -> UserPublic:
+    avatars = github_avatar_urls_for_user_ids(session=session, user_ids={user.id})
+    base = UserPublic.model_validate(user)
+    return base.model_copy(update={"avatar_url": avatars.get(user.id)})
+
+
+def users_public_with_github_avatars(
+    *, session: Session, users: list[User]
+) -> list[UserPublic]:
+    if not users:
+        return []
+    ids = {u.id for u in users}
+    avatars = github_avatar_urls_for_user_ids(session=session, user_ids=ids)
+    return [
+        UserPublic.model_validate(u).model_copy(
+            update={"avatar_url": avatars.get(u.id)}
+        )
+        for u in users
+    ]
 
 
 def get_oauth_account(

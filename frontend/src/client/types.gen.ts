@@ -248,6 +248,7 @@ export type UserPublic = {
     full_name?: (string | null);
     id: string;
     created_at?: (string | null);
+    avatar_url?: (string | null);
 };
 
 export type UserRegister = {
