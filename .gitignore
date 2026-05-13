@@ -12,3 +12,4 @@ node_modules/
 .vite/
 **/tsconfig.tsbuildinfo
 data/badge_images/
+.worktrees

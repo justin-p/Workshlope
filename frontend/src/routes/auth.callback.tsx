@@ -20,7 +20,7 @@ export const Route = createFileRoute("/auth/callback")({
     error: typeof search.error === "string" ? search.error : undefined,
   }),
   head: () => ({
-    meta: [{ title: "Signing in - FastAPI Template" }],
+    meta: [{ title: "Signing in - Workshlopé" }],
   }),
 })
 
