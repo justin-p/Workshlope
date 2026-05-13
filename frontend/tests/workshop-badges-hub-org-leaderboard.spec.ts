@@ -56,11 +56,20 @@ test.describe("Badge hub, org grant, global leaderboard", () => {
 
     await page.goto("/workshop/badges/leaderboard")
     await page.waitForLoadState("networkidle")
-    await expect(
-      page.getByTestId(`workshop-global-lb-row-${trainee.id}`),
-    ).toBeVisible({ timeout: 10_000 })
+    const row = page.getByTestId(`workshop-global-lb-row-${trainee.id}`)
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    await expect(row).not.toContainText(traineeEmail)
     await expect(
       page.getByTestId(`workshop-global-lb-points-${trainee.id}`),
     ).toHaveText("9")
+
+    await page
+      .getByTestId(`workshop-global-lb-badges-trigger-${trainee.id}`)
+      .click()
+    const badgeMenuItem = page.getByTestId(
+      `workshop-global-lb-badge-item-${slug}`,
+    )
+    await badgeMenuItem.waitFor({ state: "visible" })
+    await expect(badgeMenuItem).toContainText("E2E org badge")
   })
 })

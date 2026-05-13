@@ -849,7 +849,6 @@ class WorkshopGlobalLeaderboardRowPublic(SQLModel):
     rank: int = Field(ge=1)
     user_id: uuid.UUID
     full_name: str | None = None
-    email: str
     avatar_url: str | None = None
     total_points: int = Field(ge=0)
     badge_count: int = Field(ge=0)
@@ -857,6 +856,18 @@ class WorkshopGlobalLeaderboardRowPublic(SQLModel):
 
 class WorkshopGlobalLeaderboardPublic(SQLModel):
     data: list[WorkshopGlobalLeaderboardRowPublic]
+    count: int
+
+
+class WorkshopGlobalLeaderboardUserBadgePublic(SQLModel):
+    badge_id: uuid.UUID
+    title: str
+    slug: str
+    points: int = Field(ge=0)
+
+
+class WorkshopGlobalLeaderboardUserBadgesPublic(SQLModel):
+    data: list[WorkshopGlobalLeaderboardUserBadgePublic]
     count: int
 
 

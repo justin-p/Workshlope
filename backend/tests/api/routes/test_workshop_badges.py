@@ -635,9 +635,21 @@ def test_org_grant_and_global_leaderboard(client: TestClient, db: Session) -> No
     body = global_lb.json()
     assert body["count"] >= 1
     row = next(r for r in body["data"] if r["user_id"] == str(trainee.id))
+    assert "email" not in row
     assert row["total_points"] == 7
     assert row["badge_count"] == 1
     assert row["rank"] >= 1
+
+    user_badges = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/leaderboard/users/{trainee.id}/badges",
+        headers=trainee_headers,
+    )
+    assert user_badges.status_code == 200
+    ub = user_badges.json()
+    assert ub["count"] == 1
+    assert ub["data"][0]["title"] == "Org only"
+    assert ub["data"][0]["slug"].startswith("org-badge-")
+    assert ub["data"][0]["points"] == 7
 
     revoke = client.post(
         f"{settings.API_V1_STR}/workshop/badges/org/revoke",
@@ -650,6 +662,13 @@ def test_org_grant_and_global_leaderboard(client: TestClient, db: Session) -> No
     )
     assert revoke.status_code == 200
 
+    user_badges_after = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/leaderboard/users/{trainee.id}/badges",
+        headers=trainee_headers,
+    )
+    assert user_badges_after.status_code == 200
+    assert user_badges_after.json()["count"] == 0
+
     after = client.get(
         f"{settings.API_V1_STR}/workshop/badges/leaderboard",
         headers=trainee_headers,
@@ -657,6 +676,21 @@ def test_org_grant_and_global_leaderboard(client: TestClient, db: Session) -> No
     assert after.status_code == 200
     ids = {r["user_id"] for r in after.json()["data"]}
     assert str(trainee.id) not in ids
+
+
+def test_global_leaderboard_user_badges_empty_when_none(
+    client: TestClient, db: Session
+) -> None:
+    headers, _ = _instructor_headers(client, db)
+    uid = uuid.uuid4()
+    r = client.get(
+        f"{settings.API_V1_STR}/workshop/badges/leaderboard/users/{uid}/badges",
+        headers=headers,
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["count"] == 0
+    assert body["data"] == []
 
 
 def test_org_grant_requires_instructor(client: TestClient, db: Session) -> None:

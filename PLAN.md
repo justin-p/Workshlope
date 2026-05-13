@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-12** — **`feat/workshop/badge-image-anonymous-get`**: OpenAPI + client for anonymous **`GET /workshop/badges/{id}/image`** (binary 200, `security: []`); removed unused `AuthenticatedBadgeImage`; hub artwork E2E (`workshop-badge-hub-artwork.spec.ts`). Prior: **[#81](https://github.com/justin-p/testing/pull/81)** (badge hub lesson config). |
-| **Branch** | **`feat/workshop/badge-image-anonymous-get`** |
-| **PR** | **[#82](https://github.com/justin-p/testing/pull/82)** |
+| **Last synced** | **2026-05-13** — **`feat/workshop/leaderboard-user-badges-dropdown`**: Global badge leaderboard shows **display name only** (no email in UI or `WorkshopGlobalLeaderboardRowPublic`); **`GET /workshop/badges/leaderboard/users/{user_id}/badges`** returns active badges for lazy dropdown; leaderboard row opens Radix menu with badge titles, points, and image URLs; OpenAPI-driven client regen; backend tests + **`workshop-badges-hub-org-leaderboard.spec.ts`** extended (dropdown + no-email row). |
+| **Branch** | **`feat/workshop/leaderboard-user-badges-dropdown`** |
+| **PR** | — *(open after push)* |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
@@ -648,7 +648,7 @@ Accessibility: unchanged for **personal** toggles + **aria-live** for **your** v
 - **Profile/settings:** badge collection grid (earned/unearned optional), grant timestamps, and associated lesson/session context when available.
 - **My Sessions:** compact badge chips on completed session cards.
 - **Instructor session detail:** verified-completion action includes visible badge grant confirmation per trainee.
-- **Global leaderboard page:** rank by total score from **per-badge custom points** (active, non-revoked grants only); clearly separate from live session UI.
+- **Global leaderboard page:** rank by total score from **per-badge custom points** (active, non-revoked grants only); clearly separate from live session UI; **display name only** (no email in API or table); opening a learner shows **active badges** (lazy `GET /workshop/badges/leaderboard/users/{user_id}/badges`).
 - **Badge catalog ownership:** instructors can manage badges only for lessons/repos they control; superusers have global override.
 
 ### Visual / design system notes
