@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { Github } from "lucide-react"
+import { SiGithub } from "react-icons/si"
 
 import { OauthService } from "@/client"
 import { Badge } from "@/components/ui/badge"
@@ -28,7 +28,7 @@ export function GitHubLinkBadge({ userId }: GitHubLinkBadgeProps) {
       className="gap-1"
       data-testid={`github-linked-${userId}`}
     >
-      <Github className="size-3" />
+      <SiGithub className="size-3" />
       {data.provider_login || data.provider_account_id}
     </Badge>
   )

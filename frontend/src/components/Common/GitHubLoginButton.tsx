@@ -1,4 +1,4 @@
-import { Github } from "lucide-react"
+import { SiGithub } from "react-icons/si"
 import { Button } from "@/components/ui/button"
 
 export function GitHubLoginButton() {
@@ -22,7 +22,7 @@ export function GitHubLoginButton() {
       data-testid="github-login-button"
       className="w-full"
     >
-      <Github className="size-4" />
+      <SiGithub className="size-4" />
       Continue with GitHub
     </Button>
   )

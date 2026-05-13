@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Github, Link2Off } from "lucide-react"
+import { Link2Off } from "lucide-react"
 import { useState } from "react"
+import { SiGithub } from "react-icons/si"
 
 import { OauthService, type UserPublic } from "@/client"
 import { Button } from "@/components/ui/button"
@@ -59,7 +60,7 @@ export const ManageGitHubLink = ({
         onClick={() => setIsOpen(true)}
         data-testid={`manage-github-${user.id}`}
       >
-        <Github />
+        <SiGithub />
         Manage GitHub
       </DropdownMenuItem>
       <DialogContent className="sm:max-w-md">
