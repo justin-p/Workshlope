@@ -33,6 +33,37 @@ def test_get_users_normal_user_me(
     assert current_user["is_superuser"] is False
     assert current_user["is_instructor"] is False
     assert current_user["email"] == settings.EMAIL_TEST_USER
+    assert current_user.get("avatar_url") is None
+
+
+def test_get_users_me_includes_github_avatar_when_linked(
+    client: TestClient, db: Session
+) -> None:
+    username = random_email()
+    password = random_lower_string()
+    user_in = UserCreate(email=username, password=password)
+    user = crud.create_user(session=db, user_create=user_in)
+    avatar = "https://avatars.githubusercontent.com/u/1?v=4"
+    crud.create_oauth_account(
+        session=db,
+        user_id=user.id,
+        provider="github",
+        provider_account_id="424242",
+        avatar_url=avatar,
+    )
+    login_data = {
+        "username": username,
+        "password": password,
+    }
+    r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
+    assert r.status_code == 200
+    a_token = r.json()["access_token"]
+    me = client.get(
+        f"{settings.API_V1_STR}/users/me",
+        headers={"Authorization": f"Bearer {a_token}"},
+    )
+    assert me.status_code == 200
+    assert me.json().get("avatar_url") == avatar
 
 
 def test_create_user_new_email(

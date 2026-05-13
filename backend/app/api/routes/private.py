@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
 from sqlmodel import select
 
+from app import crud
 from app.api.deps import SessionDep
 from app.core.config import settings
 from app.core.security import get_password_hash
@@ -49,7 +50,7 @@ def create_user(user_in: PrivateUserCreate, session: SessionDep) -> Any:
     session.add(user)
     session.commit()
 
-    return user
+    return crud.user_public_with_github_avatar(session=session, user=user)
 
 
 class PrivateWorkshopE2ELiveSessionResponse(BaseModel):

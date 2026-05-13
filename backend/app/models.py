@@ -69,6 +69,7 @@ class User(UserBase, table=True):
 class UserPublic(UserBase):
     id: uuid.UUID
     created_at: datetime | None = None
+    avatar_url: str | None = Field(default=None, max_length=512)
 
 
 class UsersPublic(SQLModel):
