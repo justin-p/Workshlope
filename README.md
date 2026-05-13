@@ -1,5 +1,6 @@
 <div align="center">
   <img src="frontend/public/assets/images/workshlope-logo.svg" alt="Workshlopé" width="1120" />
+  <p><em>May be slop, but it sure gets the job done.</em></p>
 </div>
 
 ---
