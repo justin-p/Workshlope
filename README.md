@@ -1,4 +1,8 @@
-# Testing Web App (FastAPI Full Stack)
+<div align="center">
+  <img src="frontend/public/assets/images/workshlope-logo.svg" alt="Workshlopé" width="280" />
+</div>
+
+# Workshlopé
 
 This repository now uses the [`fastapi/full-stack-fastapi-template`](https://github.com/fastapi/full-stack-fastapi-template) as its baseline.
 

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="42 17 276 48" role="img" aria-label="Workshlop&#233;">
+  <defs>
+    <linearGradient id="wsl-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c9a84a"/>
+      <stop offset="50%" stop-color="#f0dc8a"/>
+      <stop offset="100%" stop-color="#a68b32"/>
+    </linearGradient>
+    <linearGradient id="wsl-ink" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e8f6f3"/>
+      <stop offset="100%" stop-color="#b8e6de"/>
+    </linearGradient>
+  </defs>
+  <path
+    fill="none"
+    stroke="url(#wsl-gold)"
+    stroke-width="1.1"
+    stroke-linecap="round"
+    d="M 18 44 Q 7.5 35 13.5 27 Q 22 19.5 33 29 Q 39 36 34 44"
+  />
+  <path fill="none" stroke="url(#wsl-gold)" stroke-width="0.85" d="M 52 22 H 308"/>
+  <text
+    x="180"
+    y="50"
+    text-anchor="middle"
+    font-family="Georgia, 'Palatino Linotype', Palatino, 'Book Antiqua', serif"
+    font-size="28"
+    font-style="italic"
+    font-weight="600"
+    letter-spacing="0.04em"
+    fill="url(#wsl-ink)"
+  >Workshlop<tspan fill="url(#wsl-gold)" font-weight="700">&#233;</tspan></text>
+  <path
+    fill="none"
+    stroke="url(#wsl-gold)"
+    stroke-width="0.9"
+    stroke-linecap="round"
+    d="M 72 58 Q 120 64 180 60 Q 240 56 288 58"
+  />
+  <path
+    fill="none"
+    stroke="url(#wsl-gold)"
+    stroke-width="1.1"
+    stroke-linecap="round"
+    d="M 342 44 Q 352.5 35 346.5 27 Q 338 19.5 327 29 Q 321 36 326 44"
+  />
+</svg>
