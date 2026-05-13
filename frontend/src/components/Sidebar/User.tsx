@@ -22,14 +22,14 @@ import { getInitials } from "@/utils"
 interface UserInfoProps {
   fullName?: string
   email?: string
-  avatarUrl?: string | null
+  avatarUrl?: string
 }
 
 function UserInfo({ fullName, email, avatarUrl }: UserInfoProps) {
   return (
     <div className="flex items-center gap-2.5 w-full min-w-0">
       <Avatar className="size-8">
-        <AvatarImage src={avatarUrl ?? undefined} alt="" />
+        <AvatarImage src={avatarUrl} alt="" />
         <AvatarFallback className="bg-zinc-600 text-white">
           {getInitials(fullName || "User")}
         </AvatarFallback>
@@ -68,9 +68,9 @@ export function User({ user }: { user: UserPublic | null | undefined }) {
               data-testid="user-menu"
             >
               <UserInfo
-                fullName={user?.full_name}
-                email={user?.email}
-                avatarUrl={user?.avatar_url}
+                fullName={user.full_name ?? undefined}
+                email={user.email}
+                avatarUrl={user.avatar_url ?? undefined}
               />
               <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
             </SidebarMenuButton>
@@ -83,9 +83,9 @@ export function User({ user }: { user: UserPublic | null | undefined }) {
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <UserInfo
-                fullName={user?.full_name}
-                email={user?.email}
-                avatarUrl={user?.avatar_url}
+                fullName={user.full_name ?? undefined}
+                email={user.email}
+                avatarUrl={user.avatar_url ?? undefined}
               />
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
