@@ -379,10 +379,21 @@ export type WorkshopGlobalLeaderboardRowPublic = {
     rank: number;
     user_id: string;
     full_name?: (string | null);
-    email: string;
     avatar_url?: (string | null);
     total_points: number;
     badge_count: number;
+};
+
+export type WorkshopGlobalLeaderboardUserBadgePublic = {
+    badge_id: string;
+    title: string;
+    slug: string;
+    points: number;
+};
+
+export type WorkshopGlobalLeaderboardUserBadgesPublic = {
+    data: Array<WorkshopGlobalLeaderboardUserBadgePublic>;
+    count: number;
 };
 
 /**
@@ -964,6 +975,12 @@ export type WorkshopBadgesCreateWorkshopBadgeData = {
 export type WorkshopBadgesCreateWorkshopBadgeResponse = (WorkshopBadgeDefinitionPublic);
 
 export type WorkshopBadgesReadWorkshopGlobalBadgeLeaderboardResponse = (WorkshopGlobalLeaderboardPublic);
+
+export type WorkshopBadgesReadWorkshopGlobalLeaderboardUserBadgesData = {
+    userId: string;
+};
+
+export type WorkshopBadgesReadWorkshopGlobalLeaderboardUserBadgesResponse = (WorkshopGlobalLeaderboardUserBadgesPublic);
 
 export type WorkshopBadgesReadWorkshopBadgeData = {
     badgeId: string;

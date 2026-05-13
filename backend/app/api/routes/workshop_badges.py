@@ -32,6 +32,8 @@ from app.models import (
     WorkshopBadgeRevokeRequest,
     WorkshopGlobalLeaderboardPublic,
     WorkshopGlobalLeaderboardRowPublic,
+    WorkshopGlobalLeaderboardUserBadgePublic,
+    WorkshopGlobalLeaderboardUserBadgesPublic,
     WorkshopParticipant,
     WorkshopRosterUserPickerPublic,
     WorkshopSession,
@@ -239,13 +241,47 @@ def read_workshop_global_badge_leaderboard(
                 rank=rank,
                 user_id=user_id,
                 full_name=u.full_name,
-                email=str(u.email),
                 avatar_url=avatars.get(user_id),
                 total_points=int(total_points or 0),
                 badge_count=int(badge_count or 0),
             )
         )
     return WorkshopGlobalLeaderboardPublic(data=data, count=len(data))
+
+
+@router.get(
+    "/leaderboard/users/{user_id}/badges",
+    response_model=WorkshopGlobalLeaderboardUserBadgesPublic,
+)
+def read_workshop_global_leaderboard_user_badges(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    user_id: uuid.UUID,
+) -> WorkshopGlobalLeaderboardUserBadgesPublic:
+    _ = current_user.id
+    rows = session.exec(
+        select(WorkshopBadgeGrant, WorkshopBadgeDefinition)
+        .join(
+            WorkshopBadgeDefinition,
+            col(WorkshopBadgeGrant.badge_id) == col(WorkshopBadgeDefinition.id),
+        )
+        .where(
+            WorkshopBadgeGrant.user_id == user_id,
+            col(WorkshopBadgeGrant.revoked_at).is_(None),
+        )
+        .order_by(col(WorkshopBadgeDefinition.title))
+    ).all()
+    data = [
+        WorkshopGlobalLeaderboardUserBadgePublic(
+            badge_id=definition.id,
+            title=definition.title,
+            slug=definition.slug,
+            points=int(definition.points),
+        )
+        for _grant, definition in rows
+    ]
+    return WorkshopGlobalLeaderboardUserBadgesPublic(data=data, count=len(data))
 
 
 @router.post("", response_model=WorkshopBadgeDefinitionPublic)

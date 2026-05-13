@@ -1728,10 +1728,6 @@ export const WorkshopGlobalLeaderboardRowPublicSchema = {
             ],
             title: 'Full Name'
         },
-        email: {
-            type: 'string',
-            title: 'Email'
-        },
         avatar_url: {
             anyOf: [
                 {
@@ -1755,8 +1751,53 @@ export const WorkshopGlobalLeaderboardRowPublicSchema = {
         }
     },
     type: 'object',
-    required: ['rank', 'user_id', 'email', 'total_points', 'badge_count'],
+    required: ['rank', 'user_id', 'total_points', 'badge_count'],
     title: 'WorkshopGlobalLeaderboardRowPublic'
+} as const;
+
+export const WorkshopGlobalLeaderboardUserBadgePublicSchema = {
+    properties: {
+        badge_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Badge Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        points: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Points'
+        }
+    },
+    type: 'object',
+    required: ['badge_id', 'title', 'slug', 'points'],
+    title: 'WorkshopGlobalLeaderboardUserBadgePublic'
+} as const;
+
+export const WorkshopGlobalLeaderboardUserBadgesPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/WorkshopGlobalLeaderboardUserBadgePublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'WorkshopGlobalLeaderboardUserBadgesPublic'
 } as const;
 
 export const WorkshopLessonPartBriefSchema = {
