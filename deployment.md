@@ -8,6 +8,28 @@ You can use CI/CD (continuous integration and continuous deployment) systems to 
 
 But you have to configure a couple things first. 🤓
 
+## Tailscale production (single `*.ts.net` host, no public DNS)
+
+For a private tailnet deployment with one MagicDNS name, path-based routing, and
+Traefik TLS certificates from the host Tailscale daemon, use the standalone
+`compose-prod-ts.yml` (do not combine with `compose.yml` or `compose.traefik.yml`).
+
+1. On the server: [enable Tailscale HTTPS certificates](https://tailscale.com/kb/1153/enabling-https) and note the machine FQDN (e.g. `workshop-vm.my-tailnet.ts.net`).
+2. Copy [`.prod-ts-env.example`](.prod-ts-env.example) to `.prod-ts-env` and set secrets (`TS_MACHINE_HOST`, `AUTH_SECRET`, Postgres, GitHub OAuth, etc.). This file is separate from `.env` / `.env.local`.
+3. Register GitHub OAuth callback:
+   `https://<TS_MACHINE_HOST>/auth-js/api/auth/callback/github`
+4. Deploy:
+
+```bash
+docker compose --env-file .prod-ts-env -f compose-prod-ts.yml up -d --build
+```
+
+Routes: `/` → SPA, `/api` → API, `/auth-js` → Auth.js bridge, `/adminer` → Adminer (default server `db`).
+
+Docker networks: `traefik-public` (edge HTTP) and an internal `db-internal` bridge (Postgres, backend DB access; adminer joins both). Restrict tailnet access to `/adminer`.
+
+References: [Traefik + Tailscale certificates](https://tailscale.com/docs/integrations/web-servers/traefik/traefik-certificates), [Traefik `tailscale` cert resolver](https://doc.traefik.io/traefik/reference/install-configuration/tls/certificate-resolvers/tailscale/).
+
 ## Preparation
 
 * Have a remote server ready and available.

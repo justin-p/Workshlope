@@ -1,0 +1,62 @@
+# Tailscale production env for compose-prod-ts.yml
+#
+#   cp .prod-ts-env.example .prod-ts-env
+#   # edit secrets, then:
+#   docker compose --env-file .prod-ts-env -f compose-prod-ts.yml up -d --build
+#
+# Do not use .env or .env.local for this stack — keeps prod tailnet config isolated.
+
+# --- Tailscale / Traefik (required) --------------------------------------------
+TS_MACHINE_HOST=workshop-vm.my-tailnet.ts.net
+STACK_NAME=workshop
+
+# --- Core app ------------------------------------------------------------------
+ENVIRONMENT=production
+PROJECT_NAME=Workshop Training App
+SECRET_KEY=changethis
+FIRST_SUPERUSER=admin@example.com
+FIRST_SUPERUSER_PASSWORD=changethis
+
+DOCKER_IMAGE_BACKEND=backend
+DOCKER_IMAGE_FRONTEND=frontend
+TAG=latest
+
+# --- Postgres ------------------------------------------------------------------
+POSTGRES_SERVER=db
+POSTGRES_PORT=5432
+POSTGRES_DB=app
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=changethis
+
+# --- Email (optional) ----------------------------------------------------------
+SMTP_HOST=
+SMTP_USER=
+SMTP_PASSWORD=
+EMAILS_FROM_EMAIL=noreply@example.com
+SMTP_TLS=True
+SMTP_SSL=False
+SMTP_PORT=587
+
+SENTRY_DSN=
+
+# --- URLs (compose-prod-ts.yml overrides host-derived values in containers) ----
+FRONTEND_HOST=https://workshop-vm.my-tailnet.ts.net
+BACKEND_CORS_ORIGINS=https://workshop-vm.my-tailnet.ts.net
+FRONTEND_CALLBACK_URL=https://workshop-vm.my-tailnet.ts.net/auth/callback
+VITE_AUTHJS_URL=https://workshop-vm.my-tailnet.ts.net/auth-js
+
+# --- Auth.js / GitHub OAuth ----------------------------------------------------
+AUTH_SECRET=change-me-openssl-rand-base64-32
+AUTH_URL=https://workshop-vm.my-tailnet.ts.net/auth-js
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_BRIDGE_SECRET=changethis-bridge-secret-please-rotate
+GITHUB_BRIDGE_ISSUER=authjs
+GITHUB_BRIDGE_AUDIENCE=fastapi-bridge
+
+# GitHub OAuth App authorization callback URL:
+# https://workshop-vm.my-tailnet.ts.net/auth-js/api/auth/callback/github
+
+# --- Feature flags -------------------------------------------------------------
+USER_REGISTRATION_ENABLED=false
+VITE_USER_REGISTRATION_ENABLED=false
