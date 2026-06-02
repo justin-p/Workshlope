@@ -1,4 +1,35 @@
-# FastAPI Project - Deployment
+# Deployment
+
+## Tailscale production (single `*.ts.net` host, no public DNS)
+
+For a private tailnet deployment with one MagicDNS name, path-based routing, and
+Traefik TLS certificates from the host Tailscale daemon, use the standalone
+`compose-ts.yml` (do not combine with `compose.yml` or `compose.traefik.yml`).
+
+1. On the server: [enable Tailscale HTTPS certificates](https://tailscale.com/kb/1153/enabling-https) and note the machine FQDN (e.g. `workshop-vm.my-tailnet.ts.net`).
+2. Copy [`.ts-env.example`](.ts-env.example) to `.ts-env` and set secrets. This file is separate from `.env` / `.env.local`:
+   - **Login (OAuth App):** `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `AUTH_SECRET`, `GITHUB_BRIDGE_SECRET` (must match between Auth.js and backend).
+   - **Lesson repo sync (GitHub App):** `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_APP_SLUG` or `GITHUB_APP_INSTALL_URL` (backend only; not used by Auth.js).
+3. Register the **OAuth App** authorization callback (not `FRONTEND_CALLBACK_URL`):
+   `https://<TS_MACHINE_HOST>/auth-js/api/auth/callback/github`
+   Use a dedicated production OAuth app for this callback; keep local dev on a
+   separate OAuth app using `http://localhost:3001/api/auth/callback/github`.
+4. On the **GitHub App** settings page, point homepage/setup URLs at your tailnet host (e.g. `https://<TS_MACHINE_HOST>` and `https://<TS_MACHINE_HOST>/workshops`). Webhooks can stay disabled when using the installation poller (see [development.md](development.md)).
+5. Deploy:
+
+```bash
+docker compose --env-file .ts-env -f compose-ts.yml up -d --build
+```
+
+Routes: `/` → SPA, `/api` → API, `/auth-js` → Auth.js bridge.
+
+Workshop session WebSockets (`WorkshopRealtimeHub`) fan out in-process only. The production backend image runs **one** Uvicorn worker (`backend/Dockerfile`). Do not scale workers until a shared pub/sub layer exists, or instructor part advances will not reach trainees on other workers.
+
+Docker networks: `traefik-public` (edge HTTP) and an internal `db-internal` bridge (Postgres + backend DB access).
+
+References: [Traefik + Tailscale certificates](https://tailscale.com/docs/integrations/web-servers/traefik/traefik-certificates), [Traefik `tailscale` cert resolver](https://doc.traefik.io/traefik/reference/install-configuration/tls/certificate-resolvers/tailscale/).
+
+## Original FastAPI Project - Deployment
 
 You can deploy the project using Docker Compose to a remote server.
 
@@ -7,6 +38,7 @@ This project expects you to have a Traefik proxy handling communication to the o
 You can use CI/CD (continuous integration and continuous deployment) systems to deploy automatically, there are already configurations to do it with GitHub Actions.
 
 But you have to configure a couple things first. 🤓
+
 
 ## Preparation
 

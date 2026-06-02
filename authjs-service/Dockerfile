@@ -10,6 +10,11 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Set to `/auth-js` for path-mounted production (compose-ts.yml).
+ARG NEXT_BASE_PATH=
+ARG NEXT_PUBLIC_AUTHJS_API_BASE_PATH=/api/auth
+ENV NEXT_BASE_PATH=$NEXT_BASE_PATH
+ENV NEXT_PUBLIC_AUTHJS_API_BASE_PATH=$NEXT_PUBLIC_AUTHJS_API_BASE_PATH
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

@@ -1,0 +1,79 @@
+# Tailscale production env for compose-ts.yml
+#
+#   cp .ts-env.example .ts-env
+#   # edit secrets, then:
+#   docker compose --env-file .ts-env -f compose-ts.yml up -d --build
+#
+# Do not use .env or .env.local for this stack — keeps prod tailnet config isolated.
+
+# --- Tailscale / Traefik (required) --------------------------------------------
+TS_MACHINE_HOST=workshop-vm.my-tailnet.ts.net
+STACK_NAME=workshop
+
+# --- Core app ------------------------------------------------------------------
+ENVIRONMENT=production
+PROJECT_NAME=Workshop Training App
+SECRET_KEY=changethis
+FIRST_SUPERUSER=admin@example.com
+FIRST_SUPERUSER_PASSWORD=changethis
+
+DOCKER_IMAGE_BACKEND=backend
+DOCKER_IMAGE_FRONTEND=frontend
+TAG=latest
+
+# --- Postgres ------------------------------------------------------------------
+POSTGRES_SERVER=db
+POSTGRES_PORT=5432
+POSTGRES_DB=app
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=changethis
+
+# --- Email (optional) ----------------------------------------------------------
+SMTP_HOST=
+SMTP_USER=
+SMTP_PASSWORD=
+EMAILS_FROM_EMAIL=noreply@example.com
+SMTP_TLS=True
+SMTP_SSL=False
+SMTP_PORT=587
+
+SENTRY_DSN=
+
+# --- URLs (compose-ts.yml overrides host-derived values in containers) ----
+# Same hostname everywhere; paths differ by service (see auth comments below).
+FRONTEND_HOST=https://workshop-vm.my-tailnet.ts.net
+BACKEND_CORS_ORIGINS=https://workshop-vm.my-tailnet.ts.net
+# SPA route after Auth.js bridge (not the GitHub OAuth callback).
+FRONTEND_CALLBACK_URL=https://workshop-vm.my-tailnet.ts.net/auth/callback
+VITE_AUTHJS_URL=https://workshop-vm.my-tailnet.ts.net/auth-js
+
+# --- Auth.js / GitHub OAuth (login only) ---------------------------------------
+# Create a GitHub *OAuth App* at https://github.com/settings/developers
+AUTH_SECRET=change-me-openssl-rand-base64-32
+# Public Auth.js origin (no path). Callback path is derived from
+# NEXT_PUBLIC_AUTHJS_API_BASE_PATH.
+AUTH_URL=https://workshop-vm.my-tailnet.ts.net
+GITHUB_CLIENT_ID=Ov23liexample0000000000
+GITHUB_CLIENT_SECRET=replace-with-oauth-app-client-secret
+GITHUB_BRIDGE_SECRET=changethis-bridge-secret-please-rotate
+GITHUB_BRIDGE_ISSUER=authjs
+GITHUB_BRIDGE_AUDIENCE=fastapi-bridge
+
+# Paste into the OAuth App "Authorization callback URL" (GitHub → Auth.js only):
+# https://workshop-vm.my-tailnet.ts.net/auth-js/api/auth/callback/github
+
+# --- GitHub App (lesson repo sync — FastAPI backend only) ----------------------
+# Separate from the OAuth App above. Create at Settings → Developer settings →
+# GitHub Apps. Generate a private key in the UI; paste PEM below (\n for newlines).
+GITHUB_APP_ID=1234567
+GITHUB_APP_SLUG=your-github-app-slug
+# GITHUB_APP_INSTALL_URL=https://github.com/apps/your-github-app-slug/installations/new
+GITHUB_APP_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\nREPLACE_WITH_PEM_FROM_GITHUB\n-----END RSA PRIVATE KEY-----
+
+# Optional installation poller (same as local .env.local):
+# GITHUB_INSTALLATION_POLL_ENABLED=true
+# GITHUB_INSTALLATION_POLL_INTERVAL_SECONDS=300
+
+# --- Feature flags -------------------------------------------------------------
+USER_REGISTRATION_ENABLED=false
+VITE_USER_REGISTRATION_ENABLED=false

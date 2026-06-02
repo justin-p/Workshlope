@@ -11,9 +11,9 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-05-13** — **`feat/authjs-service/frontend-theme-match`**: Auth.js bridge uses shared oklch tokens + **`vite-ui-theme`**; GitHub OAuth uses a **custom** [`authjs-service/app/auth/signin/page.tsx`](authjs-service/app/auth/signin/page.tsx) (not Auth.js default HTML) so the sign-in screen matches the SPA; [`frontend/src/components/Common/GitHubLoginButton.tsx`](frontend/src/components/Common/GitHubLoginButton.tsx) targets **`/auth/signin`**. |
-| **Branch** | **`feat/authjs-service/frontend-theme-match`** |
-| **PR** | **[#97](https://github.com/justin-p/testing/pull/97)** |
+| **Last synced** | **2026-06-01** — **`feat/deploy/tailscale-compose-prod`**: standalone [`compose-ts.yml`](compose-ts.yml) (`docker compose --env-file .ts-env -f compose-ts.yml up`) — full stack + Traefik Tailscale TLS, `/` → SPA, `/api` → API, `/auth-js` → Auth.js; [`.ts-env.example`](.ts-env.example), [`deployment.md`](deployment.md) Tailscale section. |
+| **Branch** | **`feat/deploy/tailscale-compose-prod`** |
+| **PR** | _(open on push)_ |
 | **Integrate against** | **`main`** |
 | **Not done yet** | See **[Remaining work](#remaining-work-authoritative)** for workshop-runnable functional gaps first; log non-blocking polish in **[Deferred polish backlog](#deferred-polish-backlog-skip-log)** and skip it until core flow is complete. Posture **`security-hardening-new-features`**. |
 
