@@ -4,22 +4,21 @@
 #   - Tailscale with HTTPS certificates enabled (MagicDNS FQDN, e.g. *.ts.net).
 #   - /var/run/tailscale/tailscaled.sock available for Traefik TLS.
 #
-# Required env file: copy .prod-ts-env.example → .prod-ts-env (gitignored).
+# Required env file: copy .ts-env.example → .ts-env (gitignored).
 #
-#   docker compose --env-file .prod-ts-env -f compose-prod-ts.yml up -d --build
+#   docker compose --env-file .ts-env -f compose-ts.yml up -d --build
 #
 # Routes on https://${TS_MACHINE_HOST}:
 #   /         → frontend (SPA)
 #   /api      → FastAPI backend (/api/v1/…)
 #   /auth-js  → Auth.js bridge (NEXT_BASE_PATH=/auth-js)
-#   /adminer  → Adminer (DB UI)
 #
 # GitHub OAuth callback:
 #   https://${TS_MACHINE_HOST}/auth-js/api/auth/callback/github
 #
 # Networks:
-#   traefik-public — edge HTTP (Traefik, frontend, backend, authjs, adminer).
-#   db-internal    — Postgres + backend DB client (+ adminer); not reachable from frontend/authjs.
+#   traefik-public — edge HTTP (Traefik, frontend, backend, authjs).
+#   db-internal    — Postgres + backend DB client; not reachable from frontend/authjs.
 #
 # Docs:
 #   https://tailscale.com/docs/integrations/web-servers/traefik/traefik-certificates
@@ -65,7 +64,7 @@ services:
     volumes:
       - app-db-data:/var/lib/postgresql/data/pgdata
     env_file:
-      - .prod-ts-env
+      - .ts-env
     environment:
       - PGDATA=/var/lib/postgresql/data/pgdata
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
@@ -75,36 +74,6 @@ services:
       - "127.0.0.1:5432:5432"
     networks:
       - db-internal
-
-  adminer:
-    image: adminer
-    restart: always
-    depends_on:
-      - db
-    environment:
-      - ADMINER_DESIGN=pepa-linha-dark
-      - ADMINER_DEFAULT_SERVER=db
-    networks:
-      - traefik-public
-      - db-internal
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=traefik-public
-      - traefik.constraint-label=traefik-public
-      - traefik.http.middlewares.${STACK_NAME?Variable not set}-adminer-strip.stripprefix.prefixes=/adminer
-      - traefik.http.services.${STACK_NAME?Variable not set}-adminer.loadbalancer.server.port=8080
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-web.rule=Host(`${TS_MACHINE_HOST?Variable not set}`) && PathPrefix(`/adminer`)
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-web.entrypoints=web
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-web.middlewares=${STACK_NAME?Variable not set}-https-redirect
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-web.priority=75
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-web.service=${STACK_NAME?Variable not set}-adminer
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-websecure.rule=Host(`${TS_MACHINE_HOST?Variable not set}`) && PathPrefix(`/adminer`)
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-websecure.entrypoints=websecure
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-websecure.tls=true
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-websecure.tls.certresolver=ts
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-websecure.middlewares=${STACK_NAME?Variable not set}-adminer-strip
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-websecure.priority=75
-      - traefik.http.routers.${STACK_NAME?Variable not set}-adminer-websecure.service=${STACK_NAME?Variable not set}-adminer
 
   prestart:
     image: "${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}"
@@ -117,7 +86,7 @@ services:
         restart: true
     command: bash scripts/prestart.sh
     env_file:
-      - .prod-ts-env
+      - .ts-env
     environment:
       - DOMAIN=${DOMAIN:-}
       - FRONTEND_HOST=https://${TS_MACHINE_HOST?Variable not set}
@@ -149,7 +118,7 @@ services:
       prestart:
         condition: service_completed_successfully
     env_file:
-      - .prod-ts-env
+      - .ts-env
     environment:
       - DOMAIN=${DOMAIN:-}
       - FRONTEND_HOST=https://${TS_MACHINE_HOST?Variable not set}
@@ -268,12 +237,12 @@ services:
       - traefik.docker.network=traefik-public
       - traefik.constraint-label=traefik-public
       - traefik.http.services.${STACK_NAME?Variable not set}-frontend.loadbalancer.server.port=80
-      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-web.rule=Host(`${TS_MACHINE_HOST?Variable not set}`) && !PathPrefix(`/api`) && !PathPrefix(`/auth-js`) && !PathPrefix(`/adminer`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-web.rule=Host(`${TS_MACHINE_HOST?Variable not set}`) && !PathPrefix(`/api`) && !PathPrefix(`/auth-js`)
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-web.entrypoints=web
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-web.middlewares=${STACK_NAME?Variable not set}-https-redirect
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-web.priority=1
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-web.service=${STACK_NAME?Variable not set}-frontend
-      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-websecure.rule=Host(`${TS_MACHINE_HOST?Variable not set}`) && !PathPrefix(`/api`) && !PathPrefix(`/auth-js`) && !PathPrefix(`/adminer`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-websecure.rule=Host(`${TS_MACHINE_HOST?Variable not set}`) && !PathPrefix(`/api`) && !PathPrefix(`/auth-js`)
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-websecure.entrypoints=websecure
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-websecure.tls=true
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-websecure.tls.certresolver=ts

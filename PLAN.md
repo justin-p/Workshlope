@@ -11,7 +11,7 @@
 | Field | Value |
 | ------ | ------ |
 
-| **Last synced** | **2026-06-01** — **`feat/deploy/tailscale-compose-prod`**: standalone [`compose-prod-ts.yml`](compose-prod-ts.yml) (`docker compose --env-file .prod-ts-env -f compose-prod-ts.yml up`) — full stack + Traefik Tailscale TLS, `/` → SPA, `/api` → API, `/auth-js` → Auth.js; [`.prod-ts-env.example`](.prod-ts-env.example), [`deployment.md`](deployment.md) Tailscale section. |
+| **Last synced** | **2026-06-01** — **`feat/deploy/tailscale-compose-prod`**: standalone [`compose-ts.yml`](compose-ts.yml) (`docker compose --env-file .ts-env -f compose-ts.yml up`) — full stack + Traefik Tailscale TLS, `/` → SPA, `/api` → API, `/auth-js` → Auth.js; [`.ts-env.example`](.ts-env.example), [`deployment.md`](deployment.md) Tailscale section. |
 | **Branch** | **`feat/deploy/tailscale-compose-prod`** |
 | **PR** | _(open on push)_ |
 | **Integrate against** | **`main`** |

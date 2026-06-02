@@ -1,8 +1,8 @@
-# Tailscale production env for compose-prod-ts.yml
+# Tailscale production env for compose-ts.yml
 #
-#   cp .prod-ts-env.example .prod-ts-env
+#   cp .ts-env.example .ts-env
 #   # edit secrets, then:
-#   docker compose --env-file .prod-ts-env -f compose-prod-ts.yml up -d --build
+#   docker compose --env-file .ts-env -f compose-ts.yml up -d --build
 #
 # Do not use .env or .env.local for this stack — keeps prod tailnet config isolated.
 
@@ -39,7 +39,7 @@ SMTP_PORT=587
 
 SENTRY_DSN=
 
-# --- URLs (compose-prod-ts.yml overrides host-derived values in containers) ----
+# --- URLs (compose-ts.yml overrides host-derived values in containers) ----
 # Same hostname everywhere; paths differ by service (see auth comments below).
 FRONTEND_HOST=https://workshop-vm.my-tailnet.ts.net
 BACKEND_CORS_ORIGINS=https://workshop-vm.my-tailnet.ts.net
