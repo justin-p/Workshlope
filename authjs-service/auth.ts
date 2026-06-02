@@ -79,16 +79,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.providerLogin = sessionToken.providerLogin ?? null
       return session
     },
-    // After successful GitHub sign-in we always route the browser through our
-    // /api/bridge endpoint, which mints the bridge JWT and forwards it to the
-    // FastAPI frontend's /auth/callback route.
+    // After successful GitHub sign-in we route the browser through our
+    // /auth-js/api/bridge endpoint, which mints the bridge JWT and forwards it
+    // to the frontend /auth/callback route.
     async redirect({ url, baseUrl }) {
-      const target = new URL("/api/bridge", baseUrl)
-      const callbackUrl =
+      const normalized =
         url.startsWith("http") || url.startsWith("/")
-          ? url
-          : `${baseUrl}${url}`
-      target.searchParams.set("callbackUrl", callbackUrl)
+          ? new URL(url, baseUrl)
+          : new URL(`${baseUrl}${url}`)
+
+      // Avoid recursively wrapping an already-bridged URL.
+      if (
+        normalized.pathname === "/api/bridge" ||
+        normalized.pathname === "/auth-js/api/bridge"
+      ) {
+        return normalized.toString()
+      }
+
+      const target = new URL("/auth-js/api/bridge", baseUrl)
+      target.searchParams.set("callbackUrl", normalized.toString())
       return target.toString()
     },
   },
