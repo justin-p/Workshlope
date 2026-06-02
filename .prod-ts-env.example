@@ -50,7 +50,9 @@ VITE_AUTHJS_URL=https://workshop-vm.my-tailnet.ts.net/auth-js
 # --- Auth.js / GitHub OAuth (login only) ---------------------------------------
 # Create a GitHub *OAuth App* at https://github.com/settings/developers
 AUTH_SECRET=change-me-openssl-rand-base64-32
-AUTH_URL=https://workshop-vm.my-tailnet.ts.net/auth-js
+# Public Auth.js origin (no path). Callback path is derived from
+# NEXT_PUBLIC_AUTHJS_API_BASE_PATH.
+AUTH_URL=https://workshop-vm.my-tailnet.ts.net
 GITHUB_CLIENT_ID=Ov23liexample0000000000
 GITHUB_CLIENT_SECRET=replace-with-oauth-app-client-secret
 GITHUB_BRIDGE_SECRET=changethis-bridge-secret-please-rotate

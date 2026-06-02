@@ -1,6 +1,17 @@
 import NextAuth, { type DefaultSession } from "next-auth"
 import GitHub from "next-auth/providers/github"
 
+function normalizeAuthApiBasePath(raw: string | undefined): string {
+  const trimmed = (raw ?? "").trim()
+  if (!trimmed) return "/api/auth"
+  const withLeading = trimmed.startsWith("/") ? trimmed : `/${trimmed}`
+  return withLeading.replace(/\/+$/, "") || "/api/auth"
+}
+
+const authApiBasePath = normalizeAuthApiBasePath(
+  process.env.NEXT_PUBLIC_AUTHJS_API_BASE_PATH,
+)
+
 declare module "next-auth" {
   interface Session {
     providerAccountId?: string | null
@@ -27,7 +38,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
       authorization: {
         params: {
-          redirect_uri: `${process.env.AUTH_URL}/auth-js/api/auth/callback/github`,
+          redirect_uri: `${process.env.AUTH_URL}${authApiBasePath}/callback/github`,
         },
       },
       profile(profile) {
