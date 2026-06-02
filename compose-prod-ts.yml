@@ -212,7 +212,7 @@ services:
       - HOSTNAME=0.0.0.0
       - PORT=3001
       - AUTH_URL=https://${TS_MACHINE_HOST?Variable not set}
-      - NEXT_PUBLIC_AUTHJS_API_BASE_PATH=/auth-js/api/auth
+      - NEXT_PUBLIC_AUTHJS_API_BASE_PATH=/api/auth
       - AUTH_TRUST_HOST=true
       - AUTH_SECRET=${AUTH_SECRET?Variable not set}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID?Variable not set}
@@ -237,12 +237,12 @@ services:
       - traefik.docker.network=traefik-public
       - traefik.constraint-label=traefik-public
       - traefik.http.services.${STACK_NAME?Variable not set}-authjs.loadbalancer.server.port=3001
-      - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-web.rule=Host(`${TS_MACHINE_HOST?Variable not set}`) && PathPrefix(`/auth-js`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-web.rule=Host(`${TS_MACHINE_HOST?Variable not set}`) && (PathPrefix(`/auth-js`) || PathPrefix(`/api/auth`))
       - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-web.entrypoints=web
       - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-web.middlewares=${STACK_NAME?Variable not set}-https-redirect
       - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-web.priority=100
       - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-web.service=${STACK_NAME?Variable not set}-authjs
-      - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-websecure.rule=Host(`${TS_MACHINE_HOST?Variable not set}`) && PathPrefix(`/auth-js`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-websecure.rule=Host(`${TS_MACHINE_HOST?Variable not set}`) && (PathPrefix(`/auth-js`) || PathPrefix(`/api/auth`))
       - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-websecure.entrypoints=websecure
       - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-websecure.tls=true
       - traefik.http.routers.${STACK_NAME?Variable not set}-authjs-websecure.tls.certresolver=ts
