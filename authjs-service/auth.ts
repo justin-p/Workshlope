@@ -10,6 +10,8 @@ declare module "next-auth" {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
+  // Parse actions from /api/auth/* while app is exposed under /auth-js/*.
+  basePath: "/api/auth",
   // Built-in Preact sign-in page uses fixed grays; use our Next page instead.
   pages: {
     signIn: "/auth/signin",
@@ -23,6 +25,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      authorization: {
+        params: {
+          redirect_uri: `${process.env.AUTH_URL}/auth-js/api/auth/callback/github`,
+        },
+      },
       profile(profile) {
         return {
           id: String(profile.id),
