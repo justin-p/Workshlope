@@ -204,6 +204,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_BASE_PATH: /auth-js
+        NEXT_PUBLIC_AUTHJS_API_BASE_PATH: /auth-js/api/auth
     depends_on:
       - backend
     environment:
