@@ -15,10 +15,13 @@ Traefik TLS certificates from the host Tailscale daemon, use the standalone
 `compose-prod-ts.yml` (do not combine with `compose.yml` or `compose.traefik.yml`).
 
 1. On the server: [enable Tailscale HTTPS certificates](https://tailscale.com/kb/1153/enabling-https) and note the machine FQDN (e.g. `workshop-vm.my-tailnet.ts.net`).
-2. Copy [`.prod-ts-env.example`](.prod-ts-env.example) to `.prod-ts-env` and set secrets (`TS_MACHINE_HOST`, `AUTH_SECRET`, Postgres, GitHub OAuth, etc.). This file is separate from `.env` / `.env.local`.
-3. Register GitHub OAuth callback:
+2. Copy [`.prod-ts-env.example`](.prod-ts-env.example) to `.prod-ts-env` and set secrets. This file is separate from `.env` / `.env.local`:
+   - **Login (OAuth App):** `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `AUTH_SECRET`, `GITHUB_BRIDGE_SECRET` (must match between Auth.js and backend).
+   - **Lesson repo sync (GitHub App):** `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_APP_SLUG` or `GITHUB_APP_INSTALL_URL` (backend only; not used by Auth.js).
+3. Register the **OAuth App** authorization callback (not `FRONTEND_CALLBACK_URL`):
    `https://<TS_MACHINE_HOST>/auth-js/api/auth/callback/github`
-4. Deploy:
+4. On the **GitHub App** settings page, point homepage/setup URLs at your tailnet host (e.g. `https://<TS_MACHINE_HOST>` and `https://<TS_MACHINE_HOST>/workshops`). Webhooks can stay disabled when using the installation poller (see [development.md](development.md)).
+5. Deploy:
 
 ```bash
 docker compose --env-file .prod-ts-env -f compose-prod-ts.yml up -d --build

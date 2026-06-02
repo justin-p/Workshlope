@@ -208,6 +208,8 @@ services:
       - backend
     environment:
       - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      - PORT=3001
       - AUTH_URL=https://${TS_MACHINE_HOST?Variable not set}/auth-js
       - AUTH_TRUST_HOST=true
       - AUTH_SECRET=${AUTH_SECRET?Variable not set}
