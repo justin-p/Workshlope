@@ -11,6 +11,9 @@ function normalizeAuthApiBasePath(raw: string | undefined): string {
 const authApiBasePath = normalizeAuthApiBasePath(
   process.env.NEXT_PUBLIC_AUTHJS_API_BASE_PATH,
 )
+const bridgePath = authApiBasePath.endsWith("/api/auth")
+  ? `${authApiBasePath.slice(0, -"/api/auth".length)}/api/bridge` || "/api/bridge"
+  : "/api/bridge"
 
 declare module "next-auth" {
   interface Session {
@@ -91,7 +94,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session
     },
     // After successful GitHub sign-in we route the browser through our
-    // /auth-js/api/bridge endpoint, which mints the bridge JWT and forwards it
+    // dynamic /api/bridge endpoint (path-mounted in prod), which mints the bridge
+    // JWT and forwards it
     // to the frontend /auth/callback route.
     async redirect({ url, baseUrl }) {
       const normalized =
@@ -100,14 +104,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           : new URL(`${baseUrl}${url}`)
 
       // Avoid recursively wrapping an already-bridged URL.
-      if (
-        normalized.pathname === "/api/bridge" ||
-        normalized.pathname === "/auth-js/api/bridge"
-      ) {
+      if (normalized.pathname === bridgePath) {
         return normalized.toString()
       }
 
-      const target = new URL("/auth-js/api/bridge", baseUrl)
+      const target = new URL(bridgePath, baseUrl)
       target.searchParams.set("callbackUrl", normalized.toString())
       return target.toString()
     },

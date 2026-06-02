@@ -20,6 +20,8 @@ Traefik TLS certificates from the host Tailscale daemon, use the standalone
    - **Lesson repo sync (GitHub App):** `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_APP_SLUG` or `GITHUB_APP_INSTALL_URL` (backend only; not used by Auth.js).
 3. Register the **OAuth App** authorization callback (not `FRONTEND_CALLBACK_URL`):
    `https://<TS_MACHINE_HOST>/auth-js/api/auth/callback/github`
+   Use a dedicated production OAuth app for this callback; keep local dev on a
+   separate OAuth app using `http://localhost:3001/api/auth/callback/github`.
 4. On the **GitHub App** settings page, point homepage/setup URLs at your tailnet host (e.g. `https://<TS_MACHINE_HOST>` and `https://<TS_MACHINE_HOST>/workshops`). Webhooks can stay disabled when using the installation poller (see [development.md](development.md)).
 5. Deploy:
 
