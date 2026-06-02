@@ -10,9 +10,6 @@ declare module "next-auth" {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  // Next route handlers parse Auth.js actions relative to /api/auth, even when
-  // the app is mounted behind a public basePath (/auth-js).
-  basePath: "/api/auth",
   // Built-in Preact sign-in page uses fixed grays; use our Next page instead.
   pages: {
     signIn: "/auth/signin",
