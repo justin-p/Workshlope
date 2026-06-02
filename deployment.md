@@ -29,6 +29,8 @@ docker compose --env-file .prod-ts-env -f compose-prod-ts.yml up -d --build
 
 Routes: `/` → SPA, `/api` → API, `/auth-js` → Auth.js bridge, `/adminer` → Adminer (default server `db`).
 
+Workshop session WebSockets (`WorkshopRealtimeHub`) fan out in-process only. The production backend image runs **one** Uvicorn worker (`backend/Dockerfile`). Do not scale workers until a shared pub/sub layer exists, or instructor part advances will not reach trainees on other workers.
+
 Docker networks: `traefik-public` (edge HTTP) and an internal `db-internal` bridge (Postgres, backend DB access; adminer joins both). Restrict tailnet access to `/adminer`.
 
 References: [Traefik + Tailscale certificates](https://tailscale.com/docs/integrations/web-servers/traefik/traefik-certificates), [Traefik `tailscale` cert resolver](https://doc.traefik.io/traefik/reference/install-configuration/tls/certificate-resolvers/tailscale/).
