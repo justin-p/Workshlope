@@ -1,6 +1,20 @@
 import NextAuth, { type DefaultSession } from "next-auth"
 import GitHub from "next-auth/providers/github"
 
+function normalizeAuthApiBasePath(raw: string | undefined): string {
+  const trimmed = (raw ?? "").trim()
+  if (!trimmed) return "/api/auth"
+  const withLeading = trimmed.startsWith("/") ? trimmed : `/${trimmed}`
+  return withLeading.replace(/\/+$/, "") || "/api/auth"
+}
+
+const authApiBasePath = normalizeAuthApiBasePath(
+  process.env.NEXT_PUBLIC_AUTHJS_API_BASE_PATH,
+)
+const bridgePath = authApiBasePath.endsWith("/api/auth")
+  ? `${authApiBasePath.slice(0, -"/api/auth".length)}/api/bridge` || "/api/bridge"
+  : "/api/bridge"
+
 declare module "next-auth" {
   interface Session {
     providerAccountId?: string | null
@@ -10,6 +24,8 @@ declare module "next-auth" {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
+  // Parse actions from /api/auth/* while app is exposed under /auth-js/*.
+  basePath: "/api/auth",
   // Built-in Preact sign-in page uses fixed grays; use our Next page instead.
   pages: {
     signIn: "/auth/signin",
@@ -23,6 +39,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      authorization: {
+        params: {
+          redirect_uri: `${process.env.AUTH_URL}${authApiBasePath}/callback/github`,
+        },
+      },
       profile(profile) {
         return {
           id: String(profile.id),
@@ -72,16 +93,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.providerLogin = sessionToken.providerLogin ?? null
       return session
     },
-    // After successful GitHub sign-in we always route the browser through our
-    // /api/bridge endpoint, which mints the bridge JWT and forwards it to the
-    // FastAPI frontend's /auth/callback route.
+    // After successful GitHub sign-in we route the browser through our
+    // dynamic /api/bridge endpoint (path-mounted in prod), which mints the bridge
+    // JWT and forwards it
+    // to the frontend /auth/callback route.
     async redirect({ url, baseUrl }) {
-      const target = new URL("/api/bridge", baseUrl)
-      const callbackUrl =
+      const normalized =
         url.startsWith("http") || url.startsWith("/")
-          ? url
-          : `${baseUrl}${url}`
-      target.searchParams.set("callbackUrl", callbackUrl)
+          ? new URL(url, baseUrl)
+          : new URL(`${baseUrl}${url}`)
+
+      // Avoid recursively wrapping an already-bridged URL.
+      if (normalized.pathname === bridgePath) {
+        return normalized.toString()
+      }
+
+      const target = new URL(bridgePath, baseUrl)
+      target.searchParams.set("callbackUrl", normalized.toString())
       return target.toString()
     },
   },

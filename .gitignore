@@ -7,6 +7,7 @@ node_modules/
 /playwright/.cache/
 .env.local
 .env.*.local
+.ts-env
 .pre-commit-cache/
 .gitnexus/
 .vite/

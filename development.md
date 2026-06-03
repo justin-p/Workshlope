@@ -211,6 +211,8 @@ The optional GitHub OAuth path goes through a sidecar Next.js service running
 - `authjs-service/.env`: copy from `authjs-service/.env.example` and fill in
   `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from a GitHub OAuth app whose
   authorization callback URL is `http://localhost:3001/api/auth/callback/github`.
+  Keep this as a dedicated local OAuth app; do not reuse your production OAuth
+  app, because GitHub callback URLs are environment-specific.
   Set `BRIDGE_SECRET` to the same value as `GITHUB_BRIDGE_SECRET` in the
   backend `.env`.
 - Bring the stack up with `docker compose up -d`. Health-check the bridge:

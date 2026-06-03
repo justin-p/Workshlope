@@ -92,8 +92,8 @@ Use this checklist when creating/editing the GitHub App:
     - `Contents`: **Read-only**
     - `Metadata`: **Read-only** (GitHub may mark this mandatory)
   - Keep unrelated repository permissions (`Actions`, `Administration`, etc.) as **No access** unless explicitly needed.
-- **Subscribe to events**
-  - None required for lesson sync in polling mode.
+  - Account permissions
+    - `Email addresses`: **Read-only**
 
 1. Create/register the GitHub App in GitHub:
    - [Creating GitHub Apps](https://docs.github.com/en/apps/creating-github-apps)

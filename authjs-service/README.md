@@ -39,3 +39,11 @@ The browser opens **`/auth/signin`** on this host (styled like the main SPA), wh
 
 The included Dockerfile produces a `next start`-ready image. Deploy behind a
 reverse proxy and ensure `AUTH_URL` matches the public URL.
+
+For Tailscale production (`docker compose --env-file .ts-env -f compose-ts.yml`), build with
+`NEXT_BASE_PATH=/auth-js` and set:
+
+- `AUTH_URL=https://<machine>.<tailnet>.ts.net` (origin only; no `/auth-js`)
+- `FRONTEND_CALLBACK_URL=https://<machine>.<tailnet>.ts.net/auth/callback`
+- GitHub OAuth callback:
+  `https://<machine>.<tailnet>.ts.net/auth-js/api/auth/callback/github`

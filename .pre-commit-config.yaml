@@ -17,6 +17,11 @@ repos:
             )$
       - id: trailing-whitespace
         exclude: ^frontend/src/client/.*
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+        name: gitleaks
   - repo: local
     hooks:
       - id: local-biome-check

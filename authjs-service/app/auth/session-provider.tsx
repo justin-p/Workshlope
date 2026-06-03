@@ -7,5 +7,7 @@ export function AuthSessionProvider({
 }: {
   children: React.ReactNode
 }) {
-  return <SessionProvider>{children}</SessionProvider>
+  const basePath = process.env.NEXT_PUBLIC_AUTHJS_API_BASE_PATH ?? "/api/auth"
+
+  return <SessionProvider basePath={basePath}>{children}</SessionProvider>
 }

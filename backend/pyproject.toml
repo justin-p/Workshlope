@@ -17,7 +17,7 @@ dependencies = [
     "sqlmodel<1.0.0,>=0.0.21",
     "pydantic-settings<3.0.0,>=2.2.1",
     "sentry-sdk[fastapi]>=2.0.0,<3.0.0",
-    "pyjwt<3.0.0,>=2.8.0",
+    "pyjwt<3.0.0,>=2.13.0",
     "cryptography>=42.0.0,<45",
     "pwdlib[argon2,bcrypt]>=0.3.0",
     "markdown-it-py>=3.0,<4",
@@ -30,7 +30,7 @@ dev = [
     "mypy<2.0.0,>=1.8.0",
     "ty>=0.0.25",
     "ruff<1.0.0,>=0.2.2",
-    "prek>=0.2.24,<1.0.0",
+    "prek>=0.4.3,<1.0.0",
     "coverage<8.0.0,>=7.4.3",
 ]
 
