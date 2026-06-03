@@ -24,6 +24,34 @@ def test_settings_raises_on_default_password_in_production() -> None:
         )
 
 
+def test_settings_raises_on_empty_secret_key() -> None:
+    with pytest.raises(ValueError, match="SECRET_KEY"):
+        Settings.model_validate(
+            {
+                "PROJECT_NAME": "proj",
+                "POSTGRES_SERVER": "db",
+                "POSTGRES_USER": "u",
+                "FIRST_SUPERUSER": "a@example.com",
+                "FIRST_SUPERUSER_PASSWORD": "pw",
+                "SECRET_KEY": "",
+            }
+        )
+
+
+def test_settings_raises_on_whitespace_github_bridge_secret() -> None:
+    with pytest.raises(ValueError, match="GITHUB_BRIDGE_SECRET"):
+        Settings.model_validate(
+            {
+                "PROJECT_NAME": "proj",
+                "POSTGRES_SERVER": "db",
+                "POSTGRES_USER": "u",
+                "FIRST_SUPERUSER": "a@example.com",
+                "FIRST_SUPERUSER_PASSWORD": "pw",
+                "GITHUB_BRIDGE_SECRET": "   ",
+            }
+        )
+
+
 def test_settings_raises_on_default_postgres_password_non_local() -> None:
     with pytest.raises(ValueError, match="POSTGRES_PASSWORD"):
         Settings.model_validate(

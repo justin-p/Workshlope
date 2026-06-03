@@ -124,8 +124,17 @@ class Settings(BaseSettings):
             else:
                 raise ValueError(message)
 
+    def _check_nonempty_secret(self, var_name: str, value: str | None) -> None:
+        if value is not None and not value.strip():
+            raise ValueError(
+                f"The value of {var_name} must not be empty "
+                "(PyJWT rejects empty HMAC keys)."
+            )
+
     @model_validator(mode="after")
     def _enforce_non_default_secrets(self) -> Self:
+        self._check_nonempty_secret("SECRET_KEY", self.SECRET_KEY)
+        self._check_nonempty_secret("GITHUB_BRIDGE_SECRET", self.GITHUB_BRIDGE_SECRET)
         self._check_default_secret("SECRET_KEY", self.SECRET_KEY)
         self._check_default_secret("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD)
         self._check_default_secret(
