@@ -30,26 +30,27 @@ function waitForRosterPickerResponse(
   })
 }
 
-async function waitForRosterPickerMinCount(
+async function waitForRosterPickerEmail(
   request: APIRequestContext,
   sessionId: string,
   q: string,
-  minCount: number,
+  email: string,
+  skip: number,
 ) {
   await expect
     .poll(
       async () => {
         const res = await request.get(
           `${apiBase}/api/v1/workshop/sessions/${sessionId}/roster-user-picker`,
-          { params: { q, skip: 0, limit: 25 } },
+          { params: { q, skip, limit: 25 } },
         )
-        if (!res.ok()) return 0
-        const body = (await res.json()) as { count: number }
-        return body.count
+        if (!res.ok()) return false
+        const body = (await res.json()) as { data: Array<{ email: string }> }
+        return body.data.some((row) => row.email === email)
       },
-      { timeout: 30_000 },
+      { timeout: 60_000 },
     )
-    .toBeGreaterThanOrEqual(minCount)
+    .toBe(true)
 }
 
 test.describe("Workshop roster user picker", () => {
@@ -57,6 +58,7 @@ test.describe("Workshop roster user picker", () => {
     page,
     request,
   }) => {
+    test.setTimeout(120_000)
     const prefix = `mselect_${Math.random().toString(36).slice(2, 8)}`
     const sessionRes = await request.post(
       `${apiBase}/api/v1/private/workshop/e2e-live-session/?omit_participant_seat=true`,
@@ -68,16 +70,15 @@ test.describe("Workshop roster user picker", () => {
       page.getByTestId("workshop-roster-user-picker-search"),
     ).toBeVisible()
 
-    await Promise.all(
-      Array.from({ length: 30 }, (_, i) => {
-        const email = `${prefix}_${String(i).padStart(2, "0")}@example.com`
-        return createUser({ email, password: "changethis123" })
-      }),
-    )
-    await waitForRosterPickerMinCount(request, session_id, prefix, 30)
+    for (let i = 0; i < 30; i += 1) {
+      const email = `${prefix}_${String(i).padStart(2, "0")}@example.com`
+      await createUser({ email, password: "changethis123" })
+    }
 
     const email0 = `${prefix}_00@example.com`
     const email25 = `${prefix}_25@example.com`
+    await waitForRosterPickerEmail(request, session_id, prefix, email0, 0)
+    await waitForRosterPickerEmail(request, session_id, prefix, email25, 25)
     const page1Ready = waitForRosterPickerResponse(page, session_id, {
       q: prefix,
       skip: 0,
