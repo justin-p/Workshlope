@@ -6,6 +6,7 @@ import {
   test,
 } from "@playwright/test"
 
+import { getApiTokenAsSuperuser } from "./utils/bridgeToken"
 import { createUser } from "./utils/privateApi"
 
 const apiBase = process.env.VITE_API_URL ?? "http://localhost:8000"
@@ -37,12 +38,14 @@ async function waitForRosterPickerEmail(
   email: string,
   skip: number,
 ) {
+  const token = await getApiTokenAsSuperuser()
+  const auth = { Authorization: `Bearer ${token}` }
   await expect
     .poll(
       async () => {
         const res = await request.get(
           `${apiBase}/api/v1/workshop/sessions/${sessionId}/roster-user-picker`,
-          { params: { q, skip, limit: 25 } },
+          { params: { q, skip, limit: 25 }, headers: auth },
         )
         if (!res.ok()) return false
         const body = (await res.json()) as { data: Array<{ email: string }> }
